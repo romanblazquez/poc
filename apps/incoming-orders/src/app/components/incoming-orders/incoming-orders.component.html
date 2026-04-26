@@ -4,15 +4,22 @@
       <span class="ws-title-mark">IO</span>
       <span class="ws-title-text">Incoming Orders</span>
     </div>
-    <p-tag [value]="orders.length + ' orders'" severity="info"></p-tag>
-  </div>
-
-  <div class="ws-toolbar">
-    <div style="flex:1;min-width:0">
-      <div class="ws-label">Fund Filter</div>
-      <div class="ws-kpi-value">{{ selectedFund ? selectedFund.name : 'All funds' }}</div>
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0">
+      <span style="min-width:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ws-muted);font-size:12px;font-weight:800">
+        {{ selectedFund ? selectedFund.name : 'All funds' }}
+      </span>
+      <button
+        *ngIf="selectedFund"
+        pButton
+        type="button"
+        size="small"
+        label="Clear"
+        severity="secondary"
+        [outlined]="true"
+        (click)="clearFilter()"
+      ></button>
+      <p-tag [value]="orders.length + ' orders'" severity="info"></p-tag>
     </div>
-    <button pButton type="button" label="Clear" severity="secondary" [outlined]="true" (click)="clearFilter()"></button>
   </div>
 
   <div [class]="agGridTheme" class="ws-grid">

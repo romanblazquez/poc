@@ -41,7 +41,7 @@
           <div style="font-size:13px;font-weight:700;color:var(--ws-text);margin-top:2px">{{ field.value }}</div>
         </div>
       </div>
-      <p-tag *ngIf="intentStatus" [value]="intentStatus" severity="success"></p-tag>
+      <p-tag *ngIf="intentStatus" [value]="intentStatus" [severity]="intentSeverity"></p-tag>
     </div>
 
     <div *ngIf="accounts.length > 0" class="ws-card" style="margin-bottom:12px">

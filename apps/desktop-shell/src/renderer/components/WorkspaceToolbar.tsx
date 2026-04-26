@@ -9,19 +9,19 @@ export function WorkspaceToolbar({ onSave, saveStatus }: WorkspaceToolbarProps) 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       {saveStatus && (
-        <span style={{ color: '#40c080', fontSize: 12, fontWeight: 500 }}>{saveStatus}</span>
+        <span style={{ color: 'var(--shell-positive)', fontSize: 12, fontWeight: 800 }}>{saveStatus}</span>
       )}
       <button
         onClick={onSave}
         style={{
           padding: '5px 12px',
-          background: '#1e2a4a',
-          border: '1px solid #2a3a6a',
+          background: 'var(--shell-panel-2)',
+          border: '1px solid var(--shell-border)',
           borderRadius: 6,
-          color: '#a0b0d0',
+          color: 'var(--shell-text)',
           cursor: 'pointer',
           fontSize: 12,
-          fontWeight: 500,
+          fontWeight: 800,
           display: 'flex',
           alignItems: 'center',
           gap: 6,

@@ -14,6 +14,7 @@ export const IpcEvents = {
   REMOVE_CONTEXT_LISTENER: 'fdc3:removeContextListener',
   ADD_INTENT_LISTENER: 'fdc3:addIntentListener',
   REMOVE_INTENT_LISTENER: 'fdc3:removeIntentListener',
+  COMPLETE_INTENT: 'fdc3:completeIntent',
   JOIN_CHANNEL: 'fdc3:joinChannel',
   LEAVE_CHANNEL: 'fdc3:leaveChannel',
   GET_CURRENT_CHANNEL: 'fdc3:getCurrentChannel',
@@ -24,16 +25,17 @@ export const IpcEvents = {
   APPLY_WORKSPACE: 'fdc3:applyWorkspace',
   GET_APP_LIST: 'fdc3:getAppList',
   GET_PRELOAD_PATH: 'fdc3:getPreloadPath',
-  // Deprecated: replaced by single-window Dockview workspace.
-  // Do not use for main workspace runtime.
   OPEN_WORKSPACE_WINDOW: 'fdc3:openWorkspaceWindow',
   GET_WORKSPACE_WINDOW_PAYLOAD: 'fdc3:getWorkspaceWindowPayload',
+  UPDATE_WORKSPACE_WINDOW_PAYLOAD: 'fdc3:updateWorkspaceWindowPayload',
+  CLOSE_CURRENT_WINDOW: 'fdc3:closeCurrentWindow',
 
   // ─── Main → Renderer (webContents.send) ──────────────────────────────────
   CONTEXT_UPDATE: 'fdc3:contextUpdate',
   INTENT_FIRE: 'fdc3:intentFire',
   CHANNEL_CHANGED: 'fdc3:channelChanged',
   APP_LIST_CHANGED: 'fdc3:appListChanged',
+  WORKSPACE_WINDOW_CLOSED: 'fdc3:workspaceWindowClosed',
 } as const;
 
 export type IpcEventKey = keyof typeof IpcEvents;

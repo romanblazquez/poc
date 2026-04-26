@@ -3,6 +3,7 @@ import { AppLauncher } from './components/AppLauncher.js';
 import { ChannelBar } from './components/ChannelBar.js';
 import { WorkspaceToolbar } from './components/WorkspaceToolbar.js';
 import { DockviewWorkspace } from './components/DockviewWorkspace.js';
+import type { DetachedWorkspacePayload } from './components/DockviewWorkspace.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
 import type { UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
@@ -20,6 +21,10 @@ declare global {
       joinUserChannel(channelId: string): Promise<void>;
       leaveCurrentChannel(): Promise<void>;
       saveWorkspace(name?: string): Promise<void>;
+      openWorkspaceWindow(payload: DetachedWorkspacePayload): Promise<{ opened: boolean; id: string }>;
+      getWorkspaceWindowPayload(workspaceWindowId: string): Promise<DetachedWorkspacePayload | null>;
+      updateWorkspaceWindowPayload(payload: DetachedWorkspacePayload): Promise<boolean>;
+      onWorkspaceWindowClosed(handler: (payload: DetachedWorkspacePayload) => void): () => void;
       onChannelChanged(handler: (ch: UserChannel | null) => void): () => void;
       broadcast(context: unknown): Promise<void>;
     };
@@ -103,10 +108,12 @@ export function App() {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<WorkspaceId>('trading-flow');
   const [workspaceStates, setWorkspaceStates] = useState<Record<WorkspaceId, WorkspaceState>>(() => readWorkspaceStates());
   const [openPanelIds, setOpenPanelIds] = useState<string[]>(WORKSPACE_PRESETS['trading-flow'].panelIds);
+  const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
 
   const activeWorkspaceState = workspaceStates[activeWorkspaceId];
   const activeWorkspacePreset = WORKSPACE_PRESETS[activeWorkspaceId];
   const theme = activeWorkspaceState.theme;
+  const detachedWorkspaceId = new URLSearchParams(window.location.search).get('detachedWorkspaceId');
 
   useEffect(() => {
     if (!window.fdc3) return;
@@ -193,15 +200,52 @@ export function App() {
     }));
   }, [activeWorkspaceId]);
 
+  const handleDetachWorkspace = useCallback(async (payload: DetachedWorkspacePayload) => {
+    await window.fdc3.openWorkspaceWindow({
+      ...payload,
+      sourceWorkspaceId: activeWorkspaceId,
+    });
+  }, [activeWorkspaceId]);
+
+  useEffect(() => {
+    if (!window.fdc3 || detachedWorkspaceId) return;
+    return window.fdc3.onWorkspaceWindowClosed((payload) => {
+      const workspaceId = validWorkspaceId(payload.sourceWorkspaceId);
+      setActiveMode('workspace');
+      setActiveWorkspaceId(workspaceId);
+      setWorkspaceStates((prev) => ({
+        ...prev,
+        [workspaceId]: {
+          ...prev[workspaceId],
+          channelId: payload.channelId,
+          layout: payload.layout,
+          theme: payload.theme,
+        },
+      }));
+      setOpenPanelIds(payload.panelIds);
+      setWorkspaceEpoch((value) => value + 1);
+    });
+  }, [detachedWorkspaceId]);
+
+  if (detachedWorkspaceId) {
+    return (
+      <DetachedWorkspaceShell
+        apps={apps}
+        preloadPath={preloadPath}
+        workspaceId={detachedWorkspaceId}
+      />
+    );
+  }
+
   return (
     <div
       style={{
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
-        background: THEMES[theme].dataTheme === 'dark'
-          ? 'linear-gradient(180deg, #06111d 0%, #0d1827 100%)'
-          : 'linear-gradient(180deg, #dde6f2 0%, #cfd9e8 100%)',
+        background: 'var(--shell-bg)',
+        color: 'var(--shell-text)',
+        fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       }}
     >
       <div
@@ -211,8 +255,8 @@ export function App() {
           justifyContent: 'space-between',
           padding: '0 14px',
           height: 30,
-          background: THEMES[theme].dataTheme === 'dark' ? '#07111d' : '#eef3f8',
-          borderBottom: `1px solid ${THEMES[theme].dataTheme === 'dark' ? '#1c2b3d' : '#b4c2d3'}`,
+          background: 'var(--shell-panel)',
+          borderBottom: '1px solid var(--shell-border)',
           flexShrink: 0,
         }}
       >
@@ -222,7 +266,9 @@ export function App() {
               width: 18,
               height: 18,
               borderRadius: 4,
-              background: 'linear-gradient(135deg, #1f6feb, #3ba0ff)',
+              background: 'var(--shell-accent-soft)',
+              border: '1px solid var(--shell-accent-border)',
+              color: 'var(--shell-accent-text)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -232,10 +278,10 @@ export function App() {
             ⚡
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <div style={{ fontWeight: 800, fontSize: 12, color: THEMES[theme].dataTheme === 'dark' ? '#dce8f8' : '#11253c', letterSpacing: 0.4 }}>
+            <div style={{ fontWeight: 800, fontSize: 12, color: 'var(--shell-text)', letterSpacing: 0 }}>
               FDC3 Desktop Shell
             </div>
-            <div style={{ fontSize: 10, color: THEMES[theme].dataTheme === 'dark' ? '#7b90a8' : '#526a82', letterSpacing: 0.8 }}>
+            <div style={{ fontSize: 10, color: 'var(--shell-muted)', letterSpacing: 0 }}>
               TRADER WORKSTATION
             </div>
           </div>
@@ -246,10 +292,10 @@ export function App() {
             value={theme}
             onChange={(e) => void handleThemeChange(e.target.value as ThemeName)}
             style={{
-              background: '#0d1826',
-              border: '1px solid #2a4060',
-              borderRadius: 4,
-              color: '#c8daf0',
+              background: 'var(--shell-panel-2)',
+              border: '1px solid var(--shell-border)',
+              borderRadius: 6,
+              color: 'var(--shell-text)',
               cursor: 'pointer',
               fontSize: 11,
               fontWeight: 700,
@@ -297,7 +343,7 @@ export function App() {
         {activeMode === 'workspace' ? (
           apps.length > 0 && preloadPath ? (
             <DockviewWorkspace
-              key={activeWorkspaceId}
+              key={`${activeWorkspaceId}-${workspaceEpoch}`}
               apps={apps}
               currentChannel={currentChannel}
               preloadPath={preloadPath}
@@ -305,7 +351,7 @@ export function App() {
               initialLayout={activeWorkspaceState.layout}
               onLayoutChange={handleLayoutChange}
               onOpenPanelsChange={setOpenPanelIds}
-              onOpenStandalone={handleOpen}
+              onDetachWorkspace={handleDetachWorkspace}
               workspaceName={activeWorkspacePreset.name}
               theme={theme}
             />
@@ -342,8 +388,8 @@ export function App() {
       <div
         style={{
           height: 28,
-          background: '#0a0a18',
-          borderTop: '1px solid #1e1e3e',
+          background: 'var(--shell-panel)',
+          borderTop: '1px solid var(--shell-border)',
           display: 'flex',
           alignItems: 'center',
           padding: '0 16px',
@@ -357,11 +403,102 @@ export function App() {
           value={currentChannel?.displayMetadata.name ?? 'None'}
           color={currentChannel?.displayMetadata.color ?? '#555'}
         />
-        <StatusItem label="Bus" value="Electron / FDC3" color="#4080e8" />
-        <StatusItem label="Panels" value={String(openPanelIds.length)} color="#40c080" />
+        <StatusItem label="Bus" value="Electron / FDC3" color="var(--shell-accent)" />
+        <StatusItem label="Panels" value={String(openPanelIds.length)} color="var(--shell-positive)" />
       </div>
     </div>
   );
+}
+
+function DetachedWorkspaceShell({
+  apps,
+  preloadPath,
+  workspaceId,
+}: {
+  apps: AppEntry[];
+  preloadPath: string;
+  workspaceId: string;
+}) {
+  const [payload, setPayload] = useState<DetachedWorkspacePayload | null>(null);
+  const [currentChannel, setCurrentChannel] = useState<UserChannel | null>(null);
+
+  useEffect(() => {
+    if (!window.fdc3) return;
+    void window.fdc3.getWorkspaceWindowPayload(workspaceId).then((nextPayload) => {
+      setPayload(nextPayload);
+      if (nextPayload) {
+        document.documentElement.dataset.theme = THEMES[nextPayload.theme].dataTheme;
+        void window.fdc3.broadcast({
+          type: 'com.demo.theme',
+          name: THEMES[nextPayload.theme].label,
+          theme: nextPayload.theme,
+        });
+        if (nextPayload.channelId) void window.fdc3.joinUserChannel(nextPayload.channelId);
+      }
+    });
+    void window.fdc3.getCurrentChannel().then(setCurrentChannel);
+    const unsub = window.fdc3.onChannelChanged(setCurrentChannel);
+    return unsub;
+  }, [workspaceId]);
+
+  const handleDetachedLayoutChange = useCallback((layout: unknown) => {
+    setPayload((current) => {
+      if (!current) return current;
+      const next = { ...current, layout };
+      void window.fdc3.updateWorkspaceWindowPayload(next);
+      return next;
+    });
+  }, []);
+
+  if (!payload || apps.length === 0 || !preloadPath) {
+    return (
+      <div style={{
+        alignItems: 'center',
+        background: 'var(--shell-bg)',
+        color: 'var(--shell-muted)',
+        display: 'flex',
+        fontSize: 12,
+        fontWeight: 800,
+        height: '100vh',
+        justifyContent: 'center',
+      }}>
+        Loading detached workspace...
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: 'var(--shell-bg)', color: 'var(--shell-text)', display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <div style={{
+        alignItems: 'center',
+        background: 'var(--shell-panel)',
+        borderBottom: '1px solid var(--shell-border)',
+        display: 'flex',
+        flexShrink: 0,
+        height: 34,
+        justifyContent: 'space-between',
+        padding: '0 12px',
+      }}>
+        <div style={{ color: 'var(--shell-text)', fontSize: 12, fontWeight: 900 }}>{payload.name}</div>
+        <div style={{ color: 'var(--shell-muted)', fontSize: 11, fontWeight: 800 }}>Floating workspace window</div>
+      </div>
+      <DockviewWorkspace
+        apps={apps}
+        currentChannel={currentChannel}
+        preloadPath={preloadPath}
+        initialPanelIds={payload.panelIds}
+        initialLayout={payload.layout}
+        onLayoutChange={handleDetachedLayoutChange}
+        workspaceName={payload.name}
+        theme={payload.theme}
+        detached
+      />
+    </div>
+  );
+}
+
+function validWorkspaceId(value: string | undefined): WorkspaceId {
+  return value === 'market-view' || value === 'trading-flow' ? value : 'trading-flow';
 }
 
 function WorkspaceTabButton({
@@ -377,10 +514,10 @@ function WorkspaceTabButton({
     <button
       onClick={onClick}
       style={{
-        background: active ? '#143152' : '#0d1520',
-        border: `1px solid ${active ? '#2d5f97' : '#213247'}`,
+        background: active ? 'var(--shell-accent-soft)' : 'var(--shell-panel-2)',
+        border: `1px solid ${active ? 'var(--shell-accent-border)' : 'var(--shell-border)'}`,
         borderRadius: '6px 6px 0 0',
-        color: active ? '#e4efff' : '#8ea1b7',
+        color: active ? 'var(--shell-accent-text)' : 'var(--shell-muted)',
         cursor: 'pointer',
         fontSize: 11,
         fontWeight: 800,
@@ -406,10 +543,10 @@ function TabButton({
     <button
       onClick={onClick}
       style={{
-        background: active ? '#173454' : '#0d1520',
-        border: `1px solid ${active ? '#2f648f' : '#223347'}`,
+        background: active ? 'var(--shell-accent-soft)' : 'var(--shell-panel-2)',
+        border: `1px solid ${active ? 'var(--shell-accent-border)' : 'var(--shell-border)'}`,
         borderRadius: 5,
-        color: active ? '#e0e8ff' : '#90a4bb',
+        color: active ? 'var(--shell-accent-text)' : 'var(--shell-muted)',
         cursor: 'pointer',
         fontSize: 11,
         fontWeight: 800,
@@ -426,7 +563,7 @@ function TabButton({
 function StatusItem({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-      <span style={{ color: '#505070' }}>{label}:</span>
+      <span style={{ color: 'var(--shell-subtle)' }}>{label}:</span>
       <span style={{ color, fontWeight: 600 }}>{value}</span>
     </div>
   );

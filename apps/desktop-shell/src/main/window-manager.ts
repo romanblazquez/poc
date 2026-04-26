@@ -3,6 +3,7 @@ import type { Rectangle } from 'electron';
 import path from 'path';
 import type { AppDefinition } from '@fdc3-poc/fdc3-core';
 import type { WindowState } from '@fdc3-poc/workspace-engine';
+import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -35,8 +36,16 @@ export interface WindowEntry {
   appId: string;
 }
 
-// Deprecated: replaced by single-window Dockview workspace.
-// Do not use for main workspace runtime.
+export interface DetachedWorkspacePayload {
+  id: string;
+  name: string;
+  panelIds: string[];
+  layout: unknown | null;
+  channelId: string | null;
+  theme: string;
+  sourceWorkspaceId?: string;
+}
+
 const SNAP_THRESHOLD = 18;
 const ATTACH_THRESHOLD = 6;
 const SNAP_DEBOUNCE_MS = 120;
@@ -55,6 +64,7 @@ export class WindowManager {
   private readonly windows = new Map<number, WindowEntry>();
   private readonly lastBounds = new Map<number, Rectangle>();
   private readonly snapTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  private readonly detachedWorkspaces = new Map<string, DetachedWorkspacePayload>();
   private readonly preloadPath: string;
   private isApplyingMagnetism = false;
 
@@ -103,9 +113,9 @@ export class WindowManager {
     return this.createShellWindow();
   }
 
-  // Deprecated: replaced by single-window Dockview workspace.
-  // Do not use for main workspace runtime.
-  createWorkspaceWindow(workspaceWindowId: string, title: string): BrowserWindow {
+  createWorkspaceWindow(payload: DetachedWorkspacePayload): BrowserWindow {
+    this.detachedWorkspaces.set(payload.id, payload);
+
     const win = new BrowserWindow({
       width: 1800,
       height: 1040,
@@ -118,15 +128,36 @@ export class WindowManager {
         webviewTag: true,
         sandbox: false,
       },
-      title,
+      title: payload.name,
       backgroundColor: '#090916',
       show: false,
     });
 
-    win.loadURL(appendQuery(getShellUrl(), `workspaceWindowId=${encodeURIComponent(workspaceWindowId)}`)).catch(console.error);
+    win.loadURL(appendQuery(getShellUrl(), `detachedWorkspaceId=${encodeURIComponent(payload.id)}`)).catch(console.error);
     win.once('ready-to-show', () => win.show());
-    this.register(win, `workspace:${workspaceWindowId}`);
+    this.register(win, `workspace:${payload.id}`);
+    win.on('closed', () => this.returnDetachedWorkspace(payload.id));
     return win;
+  }
+
+  getWorkspaceWindowPayload(workspaceWindowId: string): DetachedWorkspacePayload | null {
+    return this.detachedWorkspaces.get(workspaceWindowId) ?? null;
+  }
+
+  updateWorkspaceWindowPayload(payload: DetachedWorkspacePayload): void {
+    this.detachedWorkspaces.set(payload.id, payload);
+  }
+
+  private returnDetachedWorkspace(workspaceWindowId: string): void {
+    const payload = this.detachedWorkspaces.get(workspaceWindowId);
+    this.detachedWorkspaces.delete(workspaceWindowId);
+    if (!payload) return;
+
+    const shell = this.findByAppId('shell');
+    if (!shell || shell.isDestroyed()) return;
+    if (shell.isMinimized()) shell.restore();
+    shell.focus();
+    shell.webContents.send(IpcEvents.WORKSPACE_WINDOW_CLOSED, payload);
   }
 
   openApp(appId: string): BrowserWindow | null {
@@ -201,6 +232,22 @@ export class WindowManager {
       if (entry.appId === 'shell' || appIds.has(entry.appId) || entry.window.isDestroyed()) continue;
       entry.window.close();
     }
+  }
+
+  closeByWebContentsId(webContentsId: number): boolean {
+    const entry = this.windows.get(webContentsId);
+    if (entry && entry.appId !== 'shell' && !entry.window.isDestroyed()) {
+      entry.window.close();
+      return true;
+    }
+
+    const contents = webContents.fromId(webContentsId);
+    if (contents && !contents.isDestroyed()) {
+      contents.close();
+      return true;
+    }
+
+    return false;
   }
 
   getEntry(webContentsId: number): WindowEntry | undefined {

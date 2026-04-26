@@ -2,7 +2,7 @@ import { Component, Input, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDet
 import { CommonModule } from '@angular/common';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
-import type { ContactContext, PaymentRequestContext } from '@fdc3-poc/fdc3-core';
+import type { ContactContext, PaymentRequestContext, PaymentResultContext } from '@fdc3-poc/fdc3-core';
 import type { ThemeName } from '@fdc3-poc/fdc3-core';
 import {
   getCustomerById,
@@ -25,6 +25,7 @@ export class CustomerProfileComponent implements OnInit, OnDestroy {
   accounts: Account[] = [];
   transactions: Transaction[] = [];
   intentStatus = '';
+  intentSeverity: 'success' | 'warn' | 'danger' | 'info' = 'info';
 
   private unsub1?: () => void;
   private unsub2?: () => void;
@@ -77,12 +78,24 @@ export class CustomerProfileComponent implements OnInit, OnDestroy {
       reference: `PAY-${Date.now()}`,
     };
     this.intentStatus = 'Routing intent…';
+    this.intentSeverity = 'info';
     this.cdr.markForCheck();
     try {
-      await window.fdc3.raiseIntent('StartPayment', ctx);
-      this.intentStatus = 'Payment Action opened';
+      const resolution = await window.fdc3.raiseIntent('StartPayment', ctx);
+      const result = resolution.result as PaymentResultContext | undefined;
+      if (result?.type === 'com.demo.paymentResult') {
+        this.intentStatus =
+          result.status === 'approved'
+            ? `Payment approved: ${result.currency} ${result.amount.toLocaleString()}`
+            : `Payment rejected: ${result.reference}`;
+        this.intentSeverity = result.status === 'approved' ? 'success' : 'danger';
+      } else {
+        this.intentStatus = 'Payment completed';
+        this.intentSeverity = 'success';
+      }
     } catch {
       this.intentStatus = 'No handler for StartPayment';
+      this.intentSeverity = 'danger';
     }
     this.cdr.markForCheck();
     this.intentTimeout = setTimeout(() => {

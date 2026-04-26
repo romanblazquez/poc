@@ -4,14 +4,11 @@
       <span class="ws-title-mark">PA</span>
       <span class="ws-title-text">Payment Action</span>
     </div>
-    <p-tag *ngIf="fromIntent" value="Via intent" severity="success"></p-tag>
-  </div>
-
-  <div *ngIf="status === 'approved'" class="ws-toolbar" style="color:var(--ws-positive);font-weight:850">
-    Payment {{ form.reference }} approved
-  </div>
-  <div *ngIf="status === 'rejected'" class="ws-toolbar" style="color:var(--ws-negative);font-weight:850">
-    Payment rejected
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0">
+      <p-tag *ngIf="status === 'approved'" [value]="'Approved ' + form.reference" severity="success"></p-tag>
+      <p-tag *ngIf="status === 'rejected'" value="Rejected" severity="danger"></p-tag>
+      <p-tag *ngIf="fromIntent" value="Via intent" severity="success"></p-tag>
+    </div>
   </div>
 
   <div *ngIf="status === 'idle'" class="ws-empty">

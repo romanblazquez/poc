@@ -7,6 +7,10 @@ import type { UserChannel } from '../types/channel.js';
  */
 export type Unsubscribe = () => void;
 
+export interface IntentInvocationMetadata {
+  requestId?: string;
+}
+
 /**
  * The core interoperability contract.
  *
@@ -49,7 +53,7 @@ export interface InteropAdapter {
    */
   addIntentListener(
     intent: string,
-    handler: (context?: Fdc3Context) => Promise<void> | void,
+    handler: (context?: Fdc3Context, metadata?: IntentInvocationMetadata) => Promise<void> | void,
   ): Unsubscribe;
 
   // ─── User channels ────────────────────────────────────────────────────────
@@ -89,8 +93,10 @@ export interface Fdc3DesktopAgent {
   raiseIntent(intent: string, context?: Fdc3Context): Promise<IntentResolution>;
   addIntentListener(
     intent: string,
-    handler: (context?: Fdc3Context) => Promise<void> | void,
+    handler: (context?: Fdc3Context, metadata?: IntentInvocationMetadata) => Promise<void> | void,
   ): Unsubscribe;
+  completeIntent(requestId: string, result?: Fdc3Context): Promise<void>;
+  closeWindow(): Promise<boolean>;
   joinUserChannel(channelId: string): Promise<void>;
   leaveCurrentChannel(): Promise<void>;
   getCurrentChannel(): Promise<UserChannel | null>;

@@ -36,9 +36,20 @@ interface DockviewWorkspaceProps {
   initialLayout?: unknown;
   onLayoutChange?: (layout: unknown) => void;
   onOpenPanelsChange?: (panelIds: string[]) => void;
-  onOpenStandalone?: (appId: string) => Promise<void>;
+  onDetachWorkspace?: (payload: DetachedWorkspacePayload) => Promise<void>;
   workspaceName?: string;
   theme: ThemeMode;
+  detached?: boolean;
+}
+
+export interface DetachedWorkspacePayload {
+  id: string;
+  name: string;
+  panelIds: string[];
+  layout: unknown | null;
+  channelId: string | null;
+  theme: ThemeMode;
+  sourceWorkspaceId?: string;
 }
 
 interface AppPanelParams {
@@ -85,7 +96,7 @@ function syncEmbeddedApp(webview: EmbeddedWebview, channelId: string | null, the
 function AppPanelComponent({ params }: IDockviewPanelProps<AppPanelParams>) {
   const { registerWebview, markReady } = useContext(WebviewContext);
   return (
-    <div style={{ height: '100%', width: '100%', background: '#070b14' }}>
+    <div style={{ height: '100%', width: '100%', background: 'var(--shell-bg)' }}>
       <webview
         ref={(node) => registerWebview(params.appId, node as EmbeddedWebview | null)}
         src={params.appUrl}
@@ -180,9 +191,10 @@ export function DockviewWorkspace({
   initialLayout,
   onLayoutChange,
   onOpenPanelsChange,
-  onOpenStandalone,
+  onDetachWorkspace,
   workspaceName,
   theme,
+  detached = false,
 }: DockviewWorkspaceProps) {
   const channelId = currentChannel?.id ?? null;
   const dockApiRef = useRef<DockviewApi | null>(null);
@@ -311,58 +323,70 @@ export function DockviewWorkspace({
     setShowAddMenu(false);
   }, [channelId, preloadPath, theme]);
 
-  const detachAll = useCallback(async () => {
-    if (!onOpenStandalone) return;
+  const detachWorkspace = useCallback(async () => {
+    if (!onDetachWorkspace) return;
     const api = dockApiRef.current;
     const ids = Array.from(openPanelIds);
-    for (const appId of ids) {
-      await onOpenStandalone(appId);
-    }
-    api?.clear();
-  }, [onOpenStandalone, openPanelIds]);
+    if (!api || ids.length === 0) return;
+
+    const payload: DetachedWorkspacePayload = {
+      id: `workspace-${Date.now()}`,
+      name: workspaceName ?? 'Workspace',
+      panelIds: ids,
+      layout: api.toJSON(),
+      channelId,
+      theme,
+    };
+    await onDetachWorkspace(payload);
+    api.clear();
+    syncOpenPanels(api);
+    onLayoutChange?.(null);
+  }, [channelId, onDetachWorkspace, onLayoutChange, openPanelIds, syncOpenPanels, theme, workspaceName]);
 
   const closedApps = apps.filter((app) => !openPanelIds.has(app.appId));
 
   return (
     <div style={rootStyle}>
-      <div style={toolbarStyle}>
-        <button onClick={resetLayout} style={secondaryButtonStyle}>
-          Reset Layout
-        </button>
-        {onOpenStandalone && openPanelIds.size > 0 && (
-          <button onClick={() => void detachAll()} style={detachButtonStyle} title="Open all panels as standalone windows">
-            Detach All
+      {!detached && (
+        <div style={toolbarStyle}>
+          <button onClick={resetLayout} style={secondaryButtonStyle}>
+            Reset Layout
           </button>
-        )}
-        <div style={{ position: 'relative' }}>
-          <button onClick={() => setShowAddMenu((value) => !value)} style={primaryButtonStyle}>
-            Add App
-          </button>
-          {showAddMenu && (
-            <div style={addMenuStyle}>
-              {closedApps.length === 0 && (
-                <div style={{ padding: '8px 12px', color: '#607090', fontSize: 11 }}>All apps open</div>
-              )}
-              {closedApps.map((app) => (
-                <button
-                  key={app.appId}
-                  onClick={() => addPanel(app)}
-                  style={addMenuItemStyle}
-                >
-                  {app.title}
-                </button>
-              ))}
-            </div>
+          {onDetachWorkspace && openPanelIds.size > 0 && (
+            <button onClick={() => void detachWorkspace()} style={detachButtonStyle} title="Detach this workspace as one window">
+              Detach Workspace
+            </button>
           )}
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setShowAddMenu((value) => !value)} style={primaryButtonStyle}>
+              Add App
+            </button>
+            {showAddMenu && (
+              <div style={addMenuStyle}>
+                {closedApps.length === 0 && (
+                  <div style={{ padding: '8px 12px', color: 'var(--shell-muted)', fontSize: 11 }}>All apps open</div>
+                )}
+                {closedApps.map((app) => (
+                  <button
+                    key={app.appId}
+                    onClick={() => addPanel(app)}
+                    style={addMenuItemStyle}
+                  >
+                    {app.title}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={{ flex: 1 }} />
+          <span style={{ color: 'var(--shell-muted)', fontSize: 11, fontWeight: 800, letterSpacing: 0 }}>
+            {workspaceName ?? 'Workspace'}
+          </span>
+          <span style={{ color: 'var(--shell-subtle)', fontSize: 11 }}>
+            Single-window Dockview workspace
+          </span>
         </div>
-        <div style={{ flex: 1 }} />
-        <span style={{ color: '#9fb3d9', fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>
-          {workspaceName ?? 'Workspace'}
-        </span>
-        <span style={{ color: '#53627f', fontSize: 11 }}>
-          Single-window Dockview workspace
-        </span>
-      </div>
+      )}
 
       <div style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
         <WebviewContext.Provider value={{ registerWebview, markReady }}>
@@ -388,8 +412,8 @@ const rootStyle: CSSProperties = {
 
 const toolbarStyle: CSSProperties = {
   alignItems: 'center',
-  background: 'var(--shell-surface-1, #08101c)',
-  borderBottom: '1px solid var(--shell-border-1, #1d2a3c)',
+  background: 'var(--shell-panel)',
+  borderBottom: '1px solid var(--shell-border)',
   display: 'flex',
   flexShrink: 0,
   gap: 8,
@@ -397,10 +421,10 @@ const toolbarStyle: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: '#12325b',
-  border: '1px solid #29548c',
-  borderRadius: 4,
-  color: '#d8e6ff',
+  background: 'var(--shell-accent-soft)',
+  border: '1px solid var(--shell-accent-border)',
+  borderRadius: 6,
+  color: 'var(--shell-accent-text)',
   cursor: 'pointer',
   fontSize: 11,
   fontWeight: 800,
@@ -410,10 +434,10 @@ const primaryButtonStyle: CSSProperties = {
 };
 
 const secondaryButtonStyle: CSSProperties = {
-  background: '#0f1826',
-  border: '1px solid #29415f',
-  borderRadius: 4,
-  color: '#b5c7e8',
+  background: 'var(--shell-panel-2)',
+  border: '1px solid var(--shell-border)',
+  borderRadius: 6,
+  color: 'var(--shell-text)',
   cursor: 'pointer',
   fontSize: 11,
   fontWeight: 800,
@@ -423,10 +447,10 @@ const secondaryButtonStyle: CSSProperties = {
 };
 
 const detachButtonStyle: CSSProperties = {
-  background: '#1a1230',
-  border: '1px solid #4a3a7a',
-  borderRadius: 4,
-  color: '#c4b5fd',
+  background: 'var(--shell-accent-soft)',
+  border: '1px solid var(--shell-accent-border)',
+  borderRadius: 6,
+  color: 'var(--shell-accent-text)',
   cursor: 'pointer',
   fontSize: 11,
   fontWeight: 800,
@@ -436,9 +460,9 @@ const detachButtonStyle: CSSProperties = {
 };
 
 const addMenuStyle: CSSProperties = {
-  background: '#0c1420',
-  border: '1px solid #20324c',
-  borderRadius: 6,
+  background: 'var(--shell-panel)',
+  border: '1px solid var(--shell-border)',
+  borderRadius: 8,
   boxShadow: '0 10px 24px rgba(0,0,0,0.45)',
   display: 'flex',
   flexDirection: 'column',
@@ -453,7 +477,7 @@ const addMenuStyle: CSSProperties = {
 const addMenuItemStyle: CSSProperties = {
   background: 'transparent',
   border: 'none',
-  color: '#d5e3fb',
+  color: 'var(--shell-text)',
   cursor: 'pointer',
   fontSize: 12,
   padding: '8px 12px',

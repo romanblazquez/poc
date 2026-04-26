@@ -4,18 +4,17 @@
       <span class="ws-title-mark">CS</span>
       <span class="ws-title-text">Customer Search</span>
     </div>
-    <p-tag [value]="filtered.length + ' matches'" severity="info"></p-tag>
-  </div>
-
-  <div class="ws-toolbar">
-    <input
-      pInputText
-      type="text"
-      placeholder="Search by name, ID, or segment"
-      [(ngModel)]="query"
-      style="width:100%;max-width:420px"
-    />
-    <p-tag *ngIf="lastBroadcast" [value]="'Broadcast sent: ' + lastBroadcast" severity="success"></p-tag>
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0">
+      <input
+        pInputText
+        type="text"
+        placeholder="Search by name, ID, or segment"
+        [(ngModel)]="query"
+        style="width:min(34vw,320px);min-width:180px"
+      />
+      <p-tag *ngIf="lastBroadcast" [value]="'Sent: ' + lastBroadcast" severity="success"></p-tag>
+      <p-tag [value]="filtered.length + ' matches'" severity="info"></p-tag>
+    </div>
   </div>
 
   <div [class]="agGridTheme" class="ws-grid">

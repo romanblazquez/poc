@@ -64,6 +64,16 @@ export interface PaymentRequestContext extends Fdc3Context {
   description?: string;
 }
 
+export interface PaymentResultContext extends Fdc3Context {
+  type: 'com.demo.paymentResult';
+  status: 'approved' | 'rejected';
+  reference: string;
+  customerId: string;
+  amount: number;
+  currency: string;
+  message: string;
+}
+
 export interface AccountContext extends Fdc3Context {
   type: 'com.demo.account';
   accountId: string;

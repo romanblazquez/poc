@@ -19,17 +19,28 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
-import type { Fdc3Context, IntentResolution, UserChannel } from '@fdc3-poc/fdc3-core';
+import type { Fdc3Context, IntentInvocationMetadata, IntentResolution, UserChannel } from '@fdc3-poc/fdc3-core';
 
 // ─── Handler registries (live in preload isolate, not renderer) ────────────
 
 type ContextHandler = (context: Fdc3Context) => void;
-type IntentHandler = (context?: Fdc3Context) => Promise<void> | void;
+type IntentHandler = (context?: Fdc3Context, metadata?: IntentInvocationMetadata) => Promise<void> | void;
 type ChannelHandler = (channel: UserChannel | null) => void;
+
+interface DetachedWorkspacePayload {
+  id: string;
+  name: string;
+  panelIds: string[];
+  layout: unknown | null;
+  channelId: string | null;
+  theme: string;
+  sourceWorkspaceId?: string;
+}
 
 const contextHandlers = new Map<string, Set<ContextHandler>>();
 const intentHandlers = new Map<string, Set<IntentHandler>>();
 const channelChangeHandlers = new Set<ChannelHandler>();
+const workspaceWindowClosedHandlers = new Set<(payload: DetachedWorkspacePayload) => void>();
 
 // ─── Inbound IPC listeners (main → preload) ───────────────────────────────
 
@@ -48,12 +59,12 @@ ipcRenderer.on(IpcEvents.CONTEXT_UPDATE, (_event, context: Fdc3Context) => {
 
 ipcRenderer.on(
   IpcEvents.INTENT_FIRE,
-  (_event, payload: { intent: string; context?: Fdc3Context }) => {
+  (_event, payload: { intent: string; context?: Fdc3Context; requestId?: string }) => {
     const handlers = intentHandlers.get(payload.intent);
     if (!handlers) return;
     for (const handler of handlers) {
       try {
-        void handler(payload.context);
+        void handler(payload.context, { requestId: payload.requestId });
       } catch (e) {
         console.error('[fdc3 preload] Intent handler threw:', e);
       }
@@ -64,6 +75,12 @@ ipcRenderer.on(
 ipcRenderer.on(IpcEvents.CHANNEL_CHANGED, (_event, channel: UserChannel | null) => {
   for (const handler of channelChangeHandlers) {
     handler(channel);
+  }
+});
+
+ipcRenderer.on(IpcEvents.WORKSPACE_WINDOW_CLOSED, (_event, payload: DetachedWorkspacePayload) => {
+  for (const handler of workspaceWindowClosedHandlers) {
+    handler(payload);
   }
 });
 
@@ -108,6 +125,11 @@ contextBridge.exposeInMainWorld('fdc3', {
    */
   raiseIntent(intent: string, context?: Fdc3Context): Promise<IntentResolution> {
     return ipcRenderer.invoke(IpcEvents.RAISE_INTENT, { intent, context }) as Promise<IntentResolution>;
+  },
+
+  /** Complete a pending intent invocation with an optional result context. */
+  completeIntent(requestId: string, result?: Fdc3Context): Promise<void> {
+    return ipcRenderer.invoke(IpcEvents.COMPLETE_INTENT, { requestId, result }) as Promise<void>;
   },
 
   /**
@@ -155,6 +177,11 @@ contextBridge.exposeInMainWorld('fdc3', {
     return ipcRenderer.invoke(IpcEvents.OPEN_APP, { appId: app.appId, context }) as Promise<void>;
   },
 
+  /** Close the current Electron app window or embedded app surface. */
+  closeWindow(): Promise<boolean> {
+    return ipcRenderer.invoke(IpcEvents.CLOSE_CURRENT_WINDOW) as Promise<boolean>;
+  },
+
   // ─── Shell-specific extras (used by the launcher renderer) ───────────────
 
   /** Get the list of registered applications from the app directory. */
@@ -170,6 +197,27 @@ contextBridge.exposeInMainWorld('fdc3', {
   /** Save the current workspace layout. */
   saveWorkspace(name?: string): Promise<void> {
     return ipcRenderer.invoke(IpcEvents.SAVE_WORKSPACE, name) as Promise<void>;
+  },
+
+  /** Open a complete Dockview workspace in its own Electron window. */
+  openWorkspaceWindow(payload: DetachedWorkspacePayload): Promise<{ opened: boolean; id: string }> {
+    return ipcRenderer.invoke(IpcEvents.OPEN_WORKSPACE_WINDOW, payload) as Promise<{ opened: boolean; id: string }>;
+  },
+
+  /** Read the payload for a detached workspace window. */
+  getWorkspaceWindowPayload(workspaceWindowId: string): Promise<DetachedWorkspacePayload | null> {
+    return ipcRenderer.invoke(IpcEvents.GET_WORKSPACE_WINDOW_PAYLOAD, workspaceWindowId) as Promise<DetachedWorkspacePayload | null>;
+  },
+
+  /** Update the latest payload for a detached workspace window. */
+  updateWorkspaceWindowPayload(payload: DetachedWorkspacePayload): Promise<boolean> {
+    return ipcRenderer.invoke(IpcEvents.UPDATE_WORKSPACE_WINDOW_PAYLOAD, payload) as Promise<boolean>;
+  },
+
+  /** Subscribe when a detached workspace window closes and should return to the shell. */
+  onWorkspaceWindowClosed(handler: (payload: DetachedWorkspacePayload) => void): () => void {
+    workspaceWindowClosedHandlers.add(handler);
+    return () => workspaceWindowClosedHandlers.delete(handler);
   },
 
   /**

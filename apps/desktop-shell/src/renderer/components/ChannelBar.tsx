@@ -47,19 +47,19 @@ export function ChannelBar({ currentChannel, onChannelChange }: ChannelBarProps)
           gap: 8,
           padding: '5px 12px',
           borderRadius: 6,
-          border: `1.5px solid ${currentChannel?.displayMetadata.color ?? '#333'}`,
+          border: `1px solid ${currentChannel?.displayMetadata.color ?? 'var(--shell-border)'}`,
           background: currentChannel
             ? currentChannel.displayMetadata.color + '1a'
-            : 'transparent',
-          color: '#c0c0e0',
+            : 'var(--shell-panel-2)',
+          color: 'var(--shell-text)',
           cursor: 'pointer',
-          fontSize: 13,
-          fontWeight: 500,
+          fontSize: 12,
+          fontWeight: 800,
         }}
       >
         <span style={dot(currentChannel?.displayMetadata.color ?? '#444')} />
         {currentChannel ? currentChannel.displayMetadata.name : 'No Channel'}
-        <span style={{ color: '#6060a0', fontSize: 10 }}>▼</span>
+        <span style={{ color: 'var(--shell-muted)', fontSize: 10 }}>▼</span>
       </button>
 
       {open && (
@@ -73,16 +73,16 @@ export function ChannelBar({ currentChannel, onChannelChange }: ChannelBarProps)
               position: 'absolute',
               top: 'calc(100% + 6px)',
               right: 0,
-              background: '#12122a',
-              border: '1px solid #2a2a5a',
-              borderRadius: 10,
+              background: 'var(--shell-panel)',
+              border: '1px solid var(--shell-border)',
+              borderRadius: 8,
               padding: 8,
               zIndex: 1000,
               minWidth: 180,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+              boxShadow: 'var(--shell-shadow)',
             }}
           >
-            <div style={{ color: '#6060a0', fontSize: 10, fontWeight: 700, letterSpacing: 1, padding: '4px 8px 8px', textTransform: 'uppercase' }}>
+            <div style={{ color: 'var(--shell-muted)', fontSize: 10, fontWeight: 800, letterSpacing: 0, padding: '4px 8px 8px', textTransform: 'uppercase' }}>
               User Channels
             </div>
             {channels.map((ch) => (
@@ -97,7 +97,7 @@ export function ChannelBar({ currentChannel, onChannelChange }: ChannelBarProps)
                   background:
                     currentChannel?.id === ch.id ? ch.displayMetadata.color + '22' : 'transparent',
                   border: 'none',
-                  color: '#d0d0f0',
+                  color: 'var(--shell-text)',
                   padding: '7px 10px',
                   cursor: 'pointer',
                   borderRadius: 6,
@@ -114,14 +114,14 @@ export function ChannelBar({ currentChannel, onChannelChange }: ChannelBarProps)
             ))}
             {currentChannel && (
               <>
-                <div style={{ borderTop: '1px solid #2a2a5a', margin: '6px 0' }} />
+                <div style={{ borderTop: '1px solid var(--shell-border)', margin: '6px 0' }} />
                 <button
                   onClick={() => void leave()}
                   style={{
                     width: '100%',
                     background: 'transparent',
                     border: 'none',
-                    color: '#8080a0',
+                    color: 'var(--shell-muted)',
                     padding: '6px 10px',
                     cursor: 'pointer',
                     borderRadius: 6,

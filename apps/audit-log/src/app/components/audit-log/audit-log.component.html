@@ -4,17 +4,13 @@
       <span class="ws-title-mark">AL</span>
       <span class="ws-title-text">Audit Log</span>
     </div>
-    <p-tag [value]="events.length + ' events'" severity="warn"></p-tag>
-  </div>
-
-  <div class="ws-toolbar">
-    <div style="flex:1;min-width:0">
-      <div class="ws-label">Listening To Fund Selection</div>
-      <div class="ws-kpi-value">
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0">
+      <span style="min-width:0;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ws-muted);font-size:12px;font-weight:800">
         {{ selectedFund ? (selectedFund.ticker + ' - ' + selectedFund.name) : 'All fund events' }}
-      </div>
+      </span>
+      <p-tag *ngIf="lastOrderId" [value]="'Last order ' + lastOrderId" severity="secondary"></p-tag>
+      <p-tag [value]="events.length + ' events'" severity="warn"></p-tag>
     </div>
-    <p-tag *ngIf="lastOrderId" [value]="'Last order ' + lastOrderId" severity="secondary"></p-tag>
   </div>
 
   <div [class]="agGridTheme" class="ws-grid">

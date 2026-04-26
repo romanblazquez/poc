@@ -18,7 +18,10 @@
     </div>
   </div>
 
-  <div *ngIf="channelOpen" class="ws-toolbar" style="gap:8px;min-height:auto">
+  <div
+    *ngIf="channelOpen"
+    style="position:absolute;top:48px;right:12px;z-index:20;display:flex;align-items:center;gap:8px;padding:8px;background:var(--ws-panel);border:1px solid var(--ws-border-soft);border-radius:8px;box-shadow:var(--ws-shadow)"
+  >
     <button
       *ngFor="let ch of channels; trackBy: trackByChannelId"
       pButton

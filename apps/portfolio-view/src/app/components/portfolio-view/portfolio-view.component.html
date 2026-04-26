@@ -4,7 +4,18 @@
       <span class="ws-title-mark">PV</span>
       <span class="ws-title-text">Portfolio View</span>
     </div>
-    <p-tag [value]="positions.length + ' positions'" severity="info"></p-tag>
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:0">
+      <ng-container *ngIf="positions.length > 0">
+        <span style="min-width:0;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ws-muted);font-size:12px;font-weight:800">
+          {{ customerName }}
+        </span>
+        <span style="color:var(--ws-muted);font-size:12px;font-weight:800">USD {{ totalValue | number:'1.0-0' }}</span>
+        <span style="font-size:12px;font-weight:850" [class.positive]="totalPnL >= 0" [class.negative]="totalPnL < 0">
+          {{ totalPnL >= 0 ? '+' : '' }}{{ totalPnL | number:'1.0-0' }}
+        </span>
+      </ng-container>
+      <p-tag [value]="positions.length + ' positions'" severity="info"></p-tag>
+    </div>
   </div>
 
   <div *ngIf="positions.length === 0" class="ws-empty">
@@ -16,29 +27,6 @@
   </div>
 
   <ng-container *ngIf="positions.length > 0">
-    <div class="ws-toolbar">
-      <div class="ws-kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
-        <div>
-          <div class="ws-kpi-label">Portfolio</div>
-          <div class="ws-kpi-value">{{ customerName }}</div>
-        </div>
-        <div>
-          <div class="ws-kpi-label">Total Value</div>
-          <div class="ws-kpi-value">USD {{ totalValue | number:'1.0-0' }}</div>
-        </div>
-        <div>
-          <div class="ws-kpi-label">Total P&amp;L</div>
-          <div class="ws-kpi-value" [class.positive]="totalPnL >= 0" [class.negative]="totalPnL < 0">
-            {{ totalPnL >= 0 ? '+' : '' }}{{ totalPnL | number:'1.0-0' }}
-          </div>
-        </div>
-        <div>
-          <div class="ws-kpi-label">Positions</div>
-          <div class="ws-kpi-value">{{ positions.length }}</div>
-        </div>
-      </div>
-    </div>
-
     <div [class]="agGridTheme" class="ws-grid">
       <ag-grid-angular
         [rowData]="positions"

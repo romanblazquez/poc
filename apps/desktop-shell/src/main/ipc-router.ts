@@ -1,10 +1,12 @@
 import { ipcMain } from 'electron';
-import type { Fdc3Context } from '@fdc3-poc/fdc3-core';
+import { randomUUID } from 'crypto';
+import type { Fdc3Context, IntentResolution } from '@fdc3-poc/fdc3-core';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
 import type { ChannelManager } from '@fdc3-poc/channel-engine';
 import type { IntentRegistry } from '@fdc3-poc/intent-engine';
 import { IntentResolver } from '@fdc3-poc/intent-engine';
 import type { WindowManager } from './window-manager.js';
+import type { DetachedWorkspacePayload } from './window-manager.js';
 import type { WorkspaceManager } from './workspace-manager.js';
 import type { AppDefinition } from '@fdc3-poc/fdc3-core';
 
@@ -16,6 +18,7 @@ import type { AppDefinition } from '@fdc3-poc/fdc3-core';
  */
 export class IpcRouter {
   private readonly intentResolver: IntentResolver;
+  private readonly pendingIntentResults = new Map<string, (result?: Fdc3Context) => void>();
 
   constructor(
     private readonly windowManager: WindowManager,
@@ -34,6 +37,7 @@ export class IpcRouter {
     this.handleRemoveContextListener();
     this.handleAddIntentListener();
     this.handleRemoveIntentListener();
+    this.handleCompleteIntent();
     this.handleJoinChannel();
     this.handleLeaveChannel();
     this.handleGetCurrentChannel();
@@ -43,6 +47,10 @@ export class IpcRouter {
     this.handleSaveWorkspace();
     this.handleGetAppList();
     this.handleGetPreloadPath();
+    this.handleOpenWorkspaceWindow();
+    this.handleGetWorkspaceWindowPayload();
+    this.handleUpdateWorkspaceWindowPayload();
+    this.handleCloseCurrentWindow();
   }
 
   // ─── Context broadcasting ─────────────────────────────────────────────────
@@ -95,7 +103,10 @@ export class IpcRouter {
     ipcMain.handle(
       IpcEvents.RAISE_INTENT,
       async (_event, { intent, context }: { intent: string; context?: Fdc3Context }) => {
-        return this.intentResolver.resolve({
+        const expectsCompletion = intent === 'StartPayment';
+        const requestId = expectsCompletion ? randomUUID() : undefined;
+
+        const resolution = await this.intentResolver.resolve({
           intent,
           context,
           registry: this.intentRegistry,
@@ -104,6 +115,7 @@ export class IpcRouter {
             this.windowManager.sendTo(targetId, IpcEvents.INTENT_FIRE, {
               intent: intentName,
               context: ctx,
+              requestId,
             });
           },
           openApp: (appId, ctx) => {
@@ -114,7 +126,7 @@ export class IpcRouter {
             // then deliver — or deliver on timeout if no listener shows up.
             return new Promise<void>((resolve) => {
               const timeout = setTimeout(() => {
-                win.webContents.send(IpcEvents.INTENT_FIRE, { intent, context: ctx });
+                win.webContents.send(IpcEvents.INTENT_FIRE, { intent, context: ctx, requestId });
                 resolve();
               }, 1200);
 
@@ -125,6 +137,7 @@ export class IpcRouter {
                   this.windowManager.sendTo(win.webContents.id, IpcEvents.INTENT_FIRE, {
                     intent,
                     context: ctx,
+                    requestId,
                   });
                   resolve();
                 }
@@ -132,6 +145,29 @@ export class IpcRouter {
             });
           },
         });
+
+        if (!expectsCompletion || !requestId) {
+          return resolution;
+        }
+
+        const result = await new Promise<Fdc3Context | undefined>((resolve) => {
+          this.pendingIntentResults.set(requestId, resolve);
+        });
+
+        this.pendingIntentResults.delete(requestId);
+        return { ...resolution, result } satisfies IntentResolution;
+      },
+    );
+  }
+
+  private handleCompleteIntent(): void {
+    ipcMain.handle(
+      IpcEvents.COMPLETE_INTENT,
+      (_event, { requestId, result }: { requestId: string; result?: Fdc3Context }) => {
+        const resolve = this.pendingIntentResults.get(requestId);
+        if (!resolve) return false;
+        resolve(result);
+        return true;
       },
     );
   }
@@ -212,6 +248,12 @@ export class IpcRouter {
     ipcMain.handle(IpcEvents.GET_WINDOW_ID, (event) => event.sender.id);
   }
 
+  private handleCloseCurrentWindow(): void {
+    ipcMain.handle(IpcEvents.CLOSE_CURRENT_WINDOW, (event) => {
+      return this.windowManager.closeByWebContentsId(event.sender.id);
+    });
+  }
+
   private handleSaveWorkspace(): void {
     ipcMain.handle(IpcEvents.SAVE_WORKSPACE, (_event, name?: string) => {
       return this.workspaceManager.save(name ?? 'default');
@@ -235,6 +277,26 @@ export class IpcRouter {
   private handleGetPreloadPath(): void {
     ipcMain.handle(IpcEvents.GET_PRELOAD_PATH, () => {
       return this.windowManager.getPreloadPath();
+    });
+  }
+
+  private handleOpenWorkspaceWindow(): void {
+    ipcMain.handle(IpcEvents.OPEN_WORKSPACE_WINDOW, (_event, payload: DetachedWorkspacePayload) => {
+      const win = this.windowManager.createWorkspaceWindow(payload);
+      return { opened: !win.isDestroyed(), id: payload.id };
+    });
+  }
+
+  private handleGetWorkspaceWindowPayload(): void {
+    ipcMain.handle(IpcEvents.GET_WORKSPACE_WINDOW_PAYLOAD, (_event, workspaceWindowId: string) => {
+      return this.windowManager.getWorkspaceWindowPayload(workspaceWindowId);
+    });
+  }
+
+  private handleUpdateWorkspaceWindowPayload(): void {
+    ipcMain.handle(IpcEvents.UPDATE_WORKSPACE_WINDOW_PAYLOAD, (_event, payload: DetachedWorkspacePayload) => {
+      this.windowManager.updateWorkspaceWindowPayload(payload);
+      return true;
     });
   }
 
