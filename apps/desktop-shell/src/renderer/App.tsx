@@ -178,6 +178,8 @@ export function App() {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(initialWorkspaceStore.activeWorkspaceId);
   const [workspaceStates, setWorkspaceStates] = useState<Record<string, WorkspaceState>>(initialWorkspaceStore.states);
   const [globalTheme, setGlobalTheme] = useState<ThemeMode>('dark-financial');
+  const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null);
+  const [editingWorkspaceName, setEditingWorkspaceName] = useState('');
   const [openPanelIds, setOpenPanelIds] = useState<string[]>(
     initialWorkspaceStore.tabs.find((tab) => tab.id === initialWorkspaceStore.activeWorkspaceId)?.panelIds
     ?? initialWorkspaceStore.tabs[0]?.panelIds
@@ -367,10 +369,7 @@ export function App() {
   const handleAddWorkspace = useCallback(() => {
     const nextId = `workspace-${Date.now().toString(36)}`;
     const nextName = `Workspace ${workspaceTabs.length + 1}`;
-    const seedPanels = openPanelIds.length > 0
-      ? openPanelIds
-      : activeWorkspaceTab.panelIds;
-    const panelIds = uniquePanelIds(seedPanels);
+    const panelIds: string[] = [];
 
     setWorkspaceTabs((prev) => ([
       ...prev,
@@ -388,7 +387,28 @@ export function App() {
     setActiveMode('workspace');
     setOpenPanelIds(panelIds);
     setWorkspaceEpoch((value) => value + 1);
-  }, [activeWorkspaceState.channelId, activeWorkspaceState.theme, activeWorkspaceTab.panelIds, openPanelIds, workspaceTabs.length]);
+  }, [activeWorkspaceState.channelId, activeWorkspaceState.theme, workspaceTabs.length]);
+
+  const commitWorkspaceRename = useCallback((workspaceId: string) => {
+    const trimmed = editingWorkspaceName.trim();
+    setWorkspaceTabs((prev) => prev.map((tab) => (
+      tab.id === workspaceId
+        ? { ...tab, name: trimmed || tab.name }
+        : tab
+    )));
+    setEditingWorkspaceId(null);
+    setEditingWorkspaceName('');
+  }, [editingWorkspaceName]);
+
+  const cancelWorkspaceRename = useCallback(() => {
+    setEditingWorkspaceId(null);
+    setEditingWorkspaceName('');
+  }, []);
+
+  const handleWorkspaceRenameStart = useCallback((workspaceId: string, currentName: string) => {
+    setEditingWorkspaceId(workspaceId);
+    setEditingWorkspaceName(currentName);
+  }, []);
 
   const handleCloseWorkspace = useCallback((workspaceId: string) => {
     setWorkspaceTabs((prev) => {
@@ -560,7 +580,13 @@ export function App() {
               key={workspace.id}
               active={activeWorkspaceTab.id === workspace.id}
               onClick={() => setActiveWorkspaceId(workspace.id)}
+              onDoubleClick={() => handleWorkspaceRenameStart(workspace.id, workspace.name)}
               onClose={workspaceTabs.length > 1 ? () => handleCloseWorkspace(workspace.id) : undefined}
+              editing={editingWorkspaceId === workspace.id}
+              editingValue={editingWorkspaceName}
+              onEditingChange={setEditingWorkspaceName}
+              onEditingCommit={() => commitWorkspaceRename(workspace.id)}
+              onEditingCancel={cancelWorkspaceRename}
             >
               {workspace.name}
             </WorkspaceTabButton>
@@ -854,17 +880,30 @@ function DetachedWorkspacePlaceholder({
 function WorkspaceTabButton({
   active,
   onClick,
+  onDoubleClick,
   onClose,
+  editing = false,
+  editingValue = '',
+  onEditingChange,
+  onEditingCommit,
+  onEditingCancel,
   children,
 }: {
   active: boolean;
   onClick: () => void;
+  onDoubleClick?: () => void;
   onClose?: () => void;
+  editing?: boolean;
+  editingValue?: string;
+  onEditingChange?: (value: string) => void;
+  onEditingCommit?: () => void;
+  onEditingCancel?: () => void;
   children: React.ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
       style={{
         background: active ? 'var(--shell-accent-soft)' : 'var(--shell-panel-2)',
         border: `1px solid ${active ? 'var(--shell-accent-border)' : 'var(--shell-border)'}`,
@@ -880,7 +919,35 @@ function WorkspaceTabButton({
         gap: 8,
       }}
     >
-      <span>{children}</span>
+      {editing ? (
+        <input
+          autoFocus
+          value={editingValue}
+          onChange={(event) => onEditingChange?.(event.target.value)}
+          onClick={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
+          onBlur={() => onEditingCommit?.()}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            if (event.key === 'Enter') onEditingCommit?.();
+            if (event.key === 'Escape') onEditingCancel?.();
+          }}
+          style={{
+            background: 'rgba(255, 255, 255, 0.9)',
+            border: '1px solid var(--shell-accent-border)',
+            borderRadius: 4,
+            color: '#0b1118',
+            fontSize: 11,
+            fontWeight: 800,
+            height: 20,
+            minWidth: 96,
+            outline: 'none',
+            padding: '0 6px',
+          }}
+        />
+      ) : (
+        <span>{children}</span>
+      )}
       {onClose && (
         <span
           onClick={(event) => {
