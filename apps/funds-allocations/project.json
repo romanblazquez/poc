@@ -1,12 +1,27 @@
 {
   "name": "funds-allocations",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/funds-allocations/src",
   "projectType": "application",
-  "tags": ["type:app", "scope:renderer"],
+  "sourceRoot": "apps/funds-allocations/src",
   "targets": {
-    "serve": { "executor": "nx:run-commands", "options": { "command": "vite --config apps/funds-allocations/vite.config.ts", "cwd": "{workspaceRoot}" } },
-    "build": { "executor": "nx:run-commands", "options": { "command": "vite build --config apps/funds-allocations/vite.config.ts", "cwd": "{workspaceRoot}" } }
+    "serve": {
+      "executor": "@nx/angular:dev-server",
+      "options": {
+        "buildTarget": "funds-allocations:build",
+        "port": 4011,
+        "open": false
+      }
+    },
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "apps/funds-allocations/dist",
+        "index": "apps/funds-allocations/src/index.html",
+        "browser": "apps/funds-allocations/src/main.ts",
+        "tsConfig": "apps/funds-allocations/tsconfig.app.json",
+        "styles": ["apps/funds-allocations/src/styles.scss"],
+        "assets": []
+      }
+    }
   }
 }
-

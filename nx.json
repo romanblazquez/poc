@@ -17,7 +17,7 @@
       "cache": true
     }
   },
-  "plugins": [],
+  "plugins": ["@nx/angular/plugin"],
   "workspaceLayout": {
     "appsDir": "apps",
     "libsDir": "libs"

@@ -96,9 +96,11 @@ export interface OrderContext extends Fdc3Context {
   status: string;
 }
 
+export type ThemeName = 'quartz-dark' | 'quartz-light' | 'alpine-dark' | 'material-dark';
+
 export interface ThemeContext extends Fdc3Context {
   type: 'com.demo.theme';
-  theme: 'light' | 'dark';
+  theme: ThemeName;
 }
 
 // ─── Type guard helpers ─────────────────────────────────────────────────────

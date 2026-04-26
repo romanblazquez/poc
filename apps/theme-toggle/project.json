@@ -1,12 +1,27 @@
 {
   "name": "theme-toggle",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/theme-toggle/src",
   "projectType": "application",
-  "tags": ["type:app", "scope:renderer"],
+  "sourceRoot": "apps/theme-toggle/src",
   "targets": {
-    "serve": { "executor": "nx:run-commands", "options": { "command": "vite --config apps/theme-toggle/vite.config.ts", "cwd": "{workspaceRoot}" } },
-    "build": { "executor": "nx:run-commands", "options": { "command": "vite build --config apps/theme-toggle/vite.config.ts", "cwd": "{workspaceRoot}" } }
+    "serve": {
+      "executor": "@nx/angular:dev-server",
+      "options": {
+        "buildTarget": "theme-toggle:build",
+        "port": 4014,
+        "open": false
+      }
+    },
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "apps/theme-toggle/dist",
+        "index": "apps/theme-toggle/src/index.html",
+        "browser": "apps/theme-toggle/src/main.ts",
+        "tsConfig": "apps/theme-toggle/tsconfig.app.json",
+        "styles": ["apps/theme-toggle/src/styles.scss"],
+        "assets": []
+      }
+    }
   }
 }
-

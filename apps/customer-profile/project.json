@@ -1,11 +1,27 @@
 {
   "name": "customer-profile",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/customer-profile/src",
   "projectType": "application",
-  "tags": ["type:app", "scope:renderer"],
+  "sourceRoot": "apps/customer-profile/src",
   "targets": {
-    "serve": { "executor": "nx:run-commands", "options": { "command": "vite --config apps/customer-profile/vite.config.ts", "cwd": "{workspaceRoot}" } },
-    "build": { "executor": "nx:run-commands", "options": { "command": "vite build --config apps/customer-profile/vite.config.ts", "cwd": "{workspaceRoot}" } }
+    "serve": {
+      "executor": "@nx/angular:dev-server",
+      "options": {
+        "buildTarget": "customer-profile:build",
+        "port": 4002,
+        "open": false
+      }
+    },
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "apps/customer-profile/dist",
+        "index": "apps/customer-profile/src/index.html",
+        "browser": "apps/customer-profile/src/main.ts",
+        "tsConfig": "apps/customer-profile/tsconfig.app.json",
+        "styles": ["apps/customer-profile/src/styles.scss"],
+        "assets": []
+      }
+    }
   }
 }

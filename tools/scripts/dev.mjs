@@ -1,8 +1,8 @@
 /**
  * Development orchestration script (ESM).
  *
- * Starts all Vite dev servers for the demo apps, waits for them to be ready,
- * then launches the Electron shell via electron-vite.
+ * Starts all Angular (nx serve) dev servers for the demo apps, waits for them
+ * to be ready, then launches the Electron shell via electron-vite.
  *
  * Usage: node tools/scripts/dev.mjs
  */
@@ -34,7 +34,7 @@ function tryConnect(port) {
 }
 
 /** Poll a TCP port until open or timeout. */
-async function waitForPort(port, label, maxMs = 40_000) {
+async function waitForPort(port, label, maxMs = 60_000) {
   const deadline = Date.now() + maxMs;
   while (Date.now() < deadline) {
     if (await tryConnect(port)) {
@@ -72,27 +72,27 @@ function killAll() {
 process.on('SIGINT',  () => { killAll(); process.exit(0); });
 process.on('SIGTERM', () => { killAll(); process.exit(0); });
 
-// ─── 1. Start Vite dev servers for each demo app ─────────────────────────────
+// ─── 1. Start Angular dev servers for each demo app ──────────────────────────
 
 const apps = [
-  { name: 'SEARCH',    port: 4001, config: 'apps/customer-search/vite.config.ts' },
-  { name: 'PROFILE',   port: 4002, config: 'apps/customer-profile/vite.config.ts' },
-  { name: 'PORTFOLIO', port: 4003, config: 'apps/portfolio-view/vite.config.ts' },
-  { name: 'MARKET',    port: 4004, config: 'apps/market-watch/vite.config.ts' },
-  { name: 'PAYMENT',   port: 4005, config: 'apps/payment-action/vite.config.ts' },
-  { name: 'FUNDS',     port: 4011, config: 'apps/funds-allocations/vite.config.ts' },
-  { name: 'ORDERS',    port: 4012, config: 'apps/incoming-orders/vite.config.ts' },
-  { name: 'AUDIT',     port: 4013, config: 'apps/audit-log/vite.config.ts' },
-  { name: 'THEME',     port: 4014, config: 'apps/theme-toggle/vite.config.ts' },
+  { name: 'SEARCH',    port: 4001, args: ['nx', 'serve', 'customer-search',    '--port=4001', '--no-open'] },
+  { name: 'PROFILE',   port: 4002, args: ['nx', 'serve', 'customer-profile',   '--port=4002', '--no-open'] },
+  { name: 'PORTFOLIO', port: 4003, args: ['nx', 'serve', 'portfolio-view',     '--port=4003', '--no-open'] },
+  { name: 'MARKET',    port: 4004, args: ['nx', 'serve', 'market-watch',       '--port=4004', '--no-open'] },
+  { name: 'PAYMENT',   port: 4005, args: ['nx', 'serve', 'payment-action',     '--port=4005', '--no-open'] },
+  { name: 'FUNDS',     port: 4011, args: ['nx', 'serve', 'funds-allocations',  '--port=4011', '--no-open'] },
+  { name: 'ORDERS',    port: 4012, args: ['nx', 'serve', 'incoming-orders',    '--port=4012', '--no-open'] },
+  { name: 'AUDIT',     port: 4013, args: ['nx', 'serve', 'audit-log',          '--port=4013', '--no-open'] },
+  { name: 'THEME',     port: 4014, args: ['nx', 'serve', 'theme-toggle',       '--port=4014', '--no-open'] },
 ];
 
 for (const app of apps) {
-  spawnProc(app.name, 'npx', ['vite', '--config', app.config], CYAN);
+  spawnProc(app.name, 'npx', app.args, CYAN);
 }
 
-// ─── 2. Wait for all Vite servers ───────────────────────────────────────────
+// ─── 2. Wait for all Angular dev servers ─────────────────────────────────────
 
-log('DEV', 'Waiting for Vite dev servers to be ready…', YELLOW);
+log('DEV', 'Waiting for Angular dev servers to be ready…', YELLOW);
 await Promise.all(apps.map((a) => waitForPort(a.port, a.name)));
 
 // ─── 3. Launch Electron via electron-vite ────────────────────────────────────

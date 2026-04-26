@@ -1,0 +1,32 @@
+<div class="workstation-app" style="background:#0f1720;color:#e8eef6">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;gap:10px;padding:0 16px;height:48px;background:#0a0f18;border-bottom:1px solid #314158;flex-shrink:0">
+    <span style="font-size:20px;font-weight:700">!</span>
+    <span style="font-weight:700;font-size:15px;color:#e8eef6">Audit Log</span>
+  </div>
+
+  <!-- Filter info -->
+  <div style="background:#182231;border-bottom:1px solid #314158;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+    <div style="min-width:0">
+      <div style="color:#9fb0c2;font-size:10px;font-weight:800;text-transform:uppercase">Listening To Fund Selection</div>
+      <div style="color:#e8eef6;font-size:14px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        {{ selectedFund ? (selectedFund.ticker + ' · ' + selectedFund.name) : 'All fund events' }}
+      </div>
+    </div>
+    <div *ngIf="lastOrderId" style="color:#9fb0c2;font-size:12px;font-weight:700">
+      Last order: {{ lastOrderId }}
+    </div>
+  </div>
+
+  <!-- AG Grid -->
+  <div [class]="agGridTheme" class="workstation-grid">
+    <ag-grid-angular
+      [rowData]="events"
+      [columnDefs]="columnDefs"
+      [defaultColDef]="defaultColDef"
+      [getRowId]="getRowId"
+      style="width:100%;height:100%"
+    ></ag-grid-angular>
+  </div>
+</div>

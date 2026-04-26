@@ -1,11 +1,27 @@
 {
   "name": "portfolio-view",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/portfolio-view/src",
   "projectType": "application",
-  "tags": ["type:app", "scope:renderer"],
+  "sourceRoot": "apps/portfolio-view/src",
   "targets": {
-    "serve": { "executor": "nx:run-commands", "options": { "command": "vite --config apps/portfolio-view/vite.config.ts", "cwd": "{workspaceRoot}" } },
-    "build": { "executor": "nx:run-commands", "options": { "command": "vite build --config apps/portfolio-view/vite.config.ts", "cwd": "{workspaceRoot}" } }
+    "serve": {
+      "executor": "@nx/angular:dev-server",
+      "options": {
+        "buildTarget": "portfolio-view:build",
+        "port": 4003,
+        "open": false
+      }
+    },
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "apps/portfolio-view/dist",
+        "index": "apps/portfolio-view/src/index.html",
+        "browser": "apps/portfolio-view/src/main.ts",
+        "tsConfig": "apps/portfolio-view/tsconfig.app.json",
+        "styles": ["apps/portfolio-view/src/styles.scss"],
+        "assets": []
+      }
+    }
   }
 }

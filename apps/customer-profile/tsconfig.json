@@ -1,13 +1,12 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@fdc3-poc/fdc3-core": ["../../libs/fdc3-core/src/index.ts"],
-      "@fdc3-poc/shared-domain": ["../../libs/shared-domain/src/index.ts"],
-      "@fdc3-poc/shared-ui": ["../../libs/shared-ui/src/index.ts"]
-    }
+    "outDir": "dist",
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": []
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*.ts", "src/**/*.d.ts"]
 }

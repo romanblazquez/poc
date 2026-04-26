@@ -1,11 +1,27 @@
 {
   "name": "market-watch",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/market-watch/src",
   "projectType": "application",
-  "tags": ["type:app", "scope:renderer"],
+  "sourceRoot": "apps/market-watch/src",
   "targets": {
-    "serve": { "executor": "nx:run-commands", "options": { "command": "vite --config apps/market-watch/vite.config.ts", "cwd": "{workspaceRoot}" } },
-    "build": { "executor": "nx:run-commands", "options": { "command": "vite build --config apps/market-watch/vite.config.ts", "cwd": "{workspaceRoot}" } }
+    "serve": {
+      "executor": "@nx/angular:dev-server",
+      "options": {
+        "buildTarget": "market-watch:build",
+        "port": 4004,
+        "open": false
+      }
+    },
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "apps/market-watch/dist",
+        "index": "apps/market-watch/src/index.html",
+        "browser": "apps/market-watch/src/main.ts",
+        "tsConfig": "apps/market-watch/tsconfig.app.json",
+        "styles": ["apps/market-watch/src/styles.scss"],
+        "assets": []
+      }
+    }
   }
 }

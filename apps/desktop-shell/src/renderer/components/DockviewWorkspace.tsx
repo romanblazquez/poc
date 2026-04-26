@@ -3,6 +3,8 @@ import type { DetailedHTMLProps, HTMLAttributes, CSSProperties } from 'react';
 import { DockviewReact, type IDockviewPanelProps, type DockviewApi, type DockviewReadyEvent } from 'dockview';
 import type { AppEntry } from '../App.js';
 import type { UserChannel } from '@fdc3-poc/fdc3-core';
+import { THEMES } from '@fdc3-poc/fdc3-core';
+import type { ThemeName } from '@fdc3-poc/fdc3-core';
 import 'dockview/dist/styles/dockview.css';
 import '../styles/dockview-override.css';
 
@@ -20,7 +22,7 @@ declare global {
   }
 }
 
-type ThemeMode = 'light' | 'dark';
+type ThemeMode = ThemeName;
 
 type EmbeddedWebview = HTMLElement & {
   executeJavaScript(script: string): Promise<unknown>;
@@ -34,6 +36,7 @@ interface DockviewWorkspaceProps {
   initialLayout?: unknown;
   onLayoutChange?: (layout: unknown) => void;
   onOpenPanelsChange?: (panelIds: string[]) => void;
+  onOpenStandalone?: (appId: string) => Promise<void>;
   workspaceName?: string;
   theme: ThemeMode;
 }
@@ -69,8 +72,9 @@ function resolveEmbeddedAppUrl(app: AppEntry): string {
 }
 
 function syncEmbeddedApp(webview: EmbeddedWebview, channelId: string | null, theme: ThemeMode): void {
+  const dataTheme = THEMES[theme].dataTheme;
   const script = [
-    `document.documentElement.dataset.theme = ${JSON.stringify(theme)};`,
+    `document.documentElement.dataset.theme = ${JSON.stringify(dataTheme)};`,
     channelId
       ? `window.fdc3?.joinUserChannel(${JSON.stringify(channelId)});`
       : 'window.fdc3?.leaveCurrentChannel?.();',
@@ -176,6 +180,7 @@ export function DockviewWorkspace({
   initialLayout,
   onLayoutChange,
   onOpenPanelsChange,
+  onOpenStandalone,
   workspaceName,
   theme,
 }: DockviewWorkspaceProps) {
@@ -306,6 +311,16 @@ export function DockviewWorkspace({
     setShowAddMenu(false);
   }, [channelId, preloadPath, theme]);
 
+  const detachAll = useCallback(async () => {
+    if (!onOpenStandalone) return;
+    const api = dockApiRef.current;
+    const ids = Array.from(openPanelIds);
+    for (const appId of ids) {
+      await onOpenStandalone(appId);
+    }
+    api?.clear();
+  }, [onOpenStandalone, openPanelIds]);
+
   const closedApps = apps.filter((app) => !openPanelIds.has(app.appId));
 
   return (
@@ -314,6 +329,11 @@ export function DockviewWorkspace({
         <button onClick={resetLayout} style={secondaryButtonStyle}>
           Reset Layout
         </button>
+        {onOpenStandalone && openPanelIds.size > 0 && (
+          <button onClick={() => void detachAll()} style={detachButtonStyle} title="Open all panels as standalone windows">
+            Detach All
+          </button>
+        )}
         <div style={{ position: 'relative' }}>
           <button onClick={() => setShowAddMenu((value) => !value)} style={primaryButtonStyle}>
             Add App
@@ -349,7 +369,7 @@ export function DockviewWorkspace({
           <DockviewReact
             onReady={onReady}
             components={{ 'app-panel': AppPanelComponent }}
-            className={theme === 'dark' ? 'dockview-theme-dark' : 'dockview-theme-light'}
+            className={THEMES[theme].dockview}
             style={{ height: '100%', width: '100%' }}
           />
         </WebviewContext.Provider>
@@ -394,6 +414,19 @@ const secondaryButtonStyle: CSSProperties = {
   border: '1px solid #29415f',
   borderRadius: 4,
   color: '#b5c7e8',
+  cursor: 'pointer',
+  fontSize: 11,
+  fontWeight: 800,
+  height: 24,
+  padding: '0 10px',
+  textTransform: 'uppercase',
+};
+
+const detachButtonStyle: CSSProperties = {
+  background: '#1a1230',
+  border: '1px solid #4a3a7a',
+  borderRadius: 4,
+  color: '#c4b5fd',
   cursor: 'pointer',
   fontSize: 11,
   fontWeight: 800,

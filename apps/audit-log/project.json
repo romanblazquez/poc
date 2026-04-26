@@ -1,12 +1,27 @@
 {
   "name": "audit-log",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/audit-log/src",
   "projectType": "application",
-  "tags": ["type:app", "scope:renderer"],
+  "sourceRoot": "apps/audit-log/src",
   "targets": {
-    "serve": { "executor": "nx:run-commands", "options": { "command": "vite --config apps/audit-log/vite.config.ts", "cwd": "{workspaceRoot}" } },
-    "build": { "executor": "nx:run-commands", "options": { "command": "vite build --config apps/audit-log/vite.config.ts", "cwd": "{workspaceRoot}" } }
+    "serve": {
+      "executor": "@nx/angular:dev-server",
+      "options": {
+        "buildTarget": "audit-log:build",
+        "port": 4013,
+        "open": false
+      }
+    },
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "apps/audit-log/dist",
+        "index": "apps/audit-log/src/index.html",
+        "browser": "apps/audit-log/src/main.ts",
+        "tsConfig": "apps/audit-log/tsconfig.app.json",
+        "styles": ["apps/audit-log/src/styles.scss"],
+        "assets": []
+      }
+    }
   }
 }
-

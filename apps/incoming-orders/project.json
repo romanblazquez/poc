@@ -1,12 +1,27 @@
 {
   "name": "incoming-orders",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/incoming-orders/src",
   "projectType": "application",
-  "tags": ["type:app", "scope:renderer"],
+  "sourceRoot": "apps/incoming-orders/src",
   "targets": {
-    "serve": { "executor": "nx:run-commands", "options": { "command": "vite --config apps/incoming-orders/vite.config.ts", "cwd": "{workspaceRoot}" } },
-    "build": { "executor": "nx:run-commands", "options": { "command": "vite build --config apps/incoming-orders/vite.config.ts", "cwd": "{workspaceRoot}" } }
+    "serve": {
+      "executor": "@nx/angular:dev-server",
+      "options": {
+        "buildTarget": "incoming-orders:build",
+        "port": 4012,
+        "open": false
+      }
+    },
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "apps/incoming-orders/dist",
+        "index": "apps/incoming-orders/src/index.html",
+        "browser": "apps/incoming-orders/src/main.ts",
+        "tsConfig": "apps/incoming-orders/tsconfig.app.json",
+        "styles": ["apps/incoming-orders/src/styles.scss"],
+        "assets": []
+      }
+    }
   }
 }
-

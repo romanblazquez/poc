@@ -1,11 +1,27 @@
 {
   "name": "payment-action",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/payment-action/src",
   "projectType": "application",
-  "tags": ["type:app", "scope:renderer"],
+  "sourceRoot": "apps/payment-action/src",
   "targets": {
-    "serve": { "executor": "nx:run-commands", "options": { "command": "vite --config apps/payment-action/vite.config.ts", "cwd": "{workspaceRoot}" } },
-    "build": { "executor": "nx:run-commands", "options": { "command": "vite build --config apps/payment-action/vite.config.ts", "cwd": "{workspaceRoot}" } }
+    "serve": {
+      "executor": "@nx/angular:dev-server",
+      "options": {
+        "buildTarget": "payment-action:build",
+        "port": 4005,
+        "open": false
+      }
+    },
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "apps/payment-action/dist",
+        "index": "apps/payment-action/src/index.html",
+        "browser": "apps/payment-action/src/main.ts",
+        "tsConfig": "apps/payment-action/tsconfig.app.json",
+        "styles": ["apps/payment-action/src/styles.scss"],
+        "assets": []
+      }
+    }
   }
 }

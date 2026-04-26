@@ -1,0 +1,40 @@
+<div class="workstation-app" style="background:#101720;color:#e7edf5">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;gap:10px;padding:0 16px;height:48px;background:#0d131e;border-bottom:1px solid #2c3c4f;flex-shrink:0">
+    <span style="font-size:20px">&#9638;</span>
+    <span style="font-weight:700;font-size:15px;color:#e7edf5">Funds Allocations</span>
+  </div>
+
+  <!-- Metrics bar -->
+  <div style="display:flex;gap:12px;padding:12px 14px;background:#17212d;border-bottom:1px solid #2c3c4f">
+    <div style="flex:1;min-width:0">
+      <div style="color:#9aa9ba;font-size:10px;font-weight:700;text-transform:uppercase">Selected Fund</div>
+      <div style="color:#e7edf5;font-size:16px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        {{ selectedFund?.ticker ?? 'None' }}
+      </div>
+    </div>
+    <div style="flex:1;min-width:0">
+      <div style="color:#9aa9ba;font-size:10px;font-weight:700;text-transform:uppercase">Total AUM</div>
+      <div style="color:#e7edf5;font-size:16px;font-weight:800">$4.41B</div>
+    </div>
+    <div style="flex:1;min-width:0">
+      <div style="color:#9aa9ba;font-size:10px;font-weight:700;text-transform:uppercase">Largest Drift</div>
+      <div style="color:#e7edf5;font-size:16px;font-weight:800">+2.7%</div>
+    </div>
+  </div>
+
+  <!-- AG Grid -->
+  <div [class]="agGridTheme" class="workstation-grid">
+    <ag-grid-angular
+      [rowData]="rowData"
+      [columnDefs]="columnDefs"
+      [defaultColDef]="defaultColDef"
+      rowSelection="single"
+      [animateRows]="true"
+      [getRowId]="getRowId"
+      (rowClicked)="onRowClicked($event)"
+      style="width:100%;height:100%"
+    ></ag-grid-angular>
+  </div>
+</div>

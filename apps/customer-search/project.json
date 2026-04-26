@@ -1,17 +1,27 @@
 {
   "name": "customer-search",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/customer-search/src",
   "projectType": "application",
-  "tags": ["type:app", "scope:renderer"],
+  "sourceRoot": "apps/customer-search/src",
   "targets": {
     "serve": {
-      "executor": "nx:run-commands",
-      "options": { "command": "vite --config apps/customer-search/vite.config.ts", "cwd": "{workspaceRoot}" }
+      "executor": "@nx/angular:dev-server",
+      "options": {
+        "buildTarget": "customer-search:build",
+        "port": 4001,
+        "open": false
+      }
     },
     "build": {
-      "executor": "nx:run-commands",
-      "options": { "command": "vite build --config apps/customer-search/vite.config.ts", "cwd": "{workspaceRoot}" }
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "apps/customer-search/dist",
+        "index": "apps/customer-search/src/index.html",
+        "browser": "apps/customer-search/src/main.ts",
+        "tsConfig": "apps/customer-search/tsconfig.app.json",
+        "styles": ["apps/customer-search/src/styles.scss"],
+        "assets": []
+      }
     }
   }
 }

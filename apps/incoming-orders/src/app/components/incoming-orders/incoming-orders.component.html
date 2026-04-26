@@ -1,0 +1,36 @@
+<div class="workstation-app" style="background:#111827;color:#edf2f7">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;gap:10px;padding:0 16px;height:48px;background:#0d131e;border-bottom:1px solid #324154;flex-shrink:0">
+    <span style="font-size:20px">&#8801;</span>
+    <span style="font-weight:700;font-size:15px;color:#edf2f7">Incoming Orders</span>
+  </div>
+
+  <!-- Filter bar -->
+  <div style="padding:10px 14px;background:#192231;border-bottom:1px solid #324154;display:flex;align-items:center;justify-content:space-between;gap:12px">
+    <div>
+      <div style="color:#aab6c5;font-size:10px;font-weight:800;text-transform:uppercase">Filter</div>
+      <div style="color:#edf2f7;font-size:14px;font-weight:700">
+        {{ selectedFund ? selectedFund.name : 'All funds' }}
+      </div>
+    </div>
+    <button (click)="clearFilter()"
+      style="border:1px solid #324154;background:#192231;color:#edf2f7;border-radius:6px;padding:7px 10px;cursor:pointer;font-weight:700">
+      Clear
+    </button>
+  </div>
+
+  <!-- AG Grid -->
+  <div [class]="agGridTheme" class="workstation-grid">
+    <ag-grid-angular
+      [rowData]="orders"
+      [columnDefs]="columnDefs"
+      [defaultColDef]="defaultColDef"
+      rowSelection="single"
+      [animateRows]="true"
+      [getRowId]="getRowId"
+      (rowClicked)="onRowClicked($event)"
+      style="width:100%;height:100%"
+    ></ag-grid-angular>
+  </div>
+</div>
