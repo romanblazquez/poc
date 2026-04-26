@@ -45,7 +45,6 @@ export interface AppEntry {
 
 type ThemeMode = ThemeName;
 type WorkspaceMode = 'launcher' | 'workspace' | 'interop-flow';
-type WorkspaceId = 'trading-flow' | 'market-view';
 
 interface WorkspaceState {
   channelId: string | null;
@@ -53,20 +52,29 @@ interface WorkspaceState {
   layout: unknown | null;
 }
 
-const WORKSPACE_STATE_STORAGE_KEY = 'fdc3.workspace-tabs.v4'; // v4: theme keys changed to ThemeName
+interface WorkspaceTab {
+  id: string;
+  name: string;
+  panelIds: string[];
+}
 
-const WORKSPACE_PRESETS: Record<WorkspaceId, { name: string; panelIds: string[] }> = {
-  'trading-flow': {
+const WORKSPACE_STORAGE_KEY = 'fdc3.workspace-tabs.v5';
+const LEGACY_WORKSPACE_STATE_STORAGE_KEY = 'fdc3.workspace-tabs.v4';
+
+const DEFAULT_WORKSPACE_TABS: WorkspaceTab[] = [
+  {
+    id: 'trading-flow',
     name: 'Trading Flow',
     panelIds: ['incoming-orders', 'funds-allocations', 'audit-log'],
   },
-  'market-view': {
+  {
+    id: 'market-view',
     name: 'Market View',
     panelIds: ['market-watch', 'customer-profile', 'portfolio-view'],
   },
-};
+];
 
-const DEFAULT_WORKSPACE_STATES: Record<WorkspaceId, WorkspaceState> = {
+const DEFAULT_WORKSPACE_STATES: Record<string, WorkspaceState> = {
   'trading-flow': { channelId: 'channel-5', theme: 'quartz-dark', layout: null },
   'market-view': { channelId: null, theme: 'quartz-dark', layout: null },
 };
@@ -77,47 +85,126 @@ function validTheme(t: unknown): ThemeName {
     : 'quartz-dark';
 }
 
-function readWorkspaceStates(): Record<WorkspaceId, WorkspaceState> {
+function uniquePanelIds(panelIds: string[]): string[] {
+  return [...new Set(panelIds.filter((id) => typeof id === 'string' && id.length > 0))];
+}
+
+function readWorkspaceStore(): {
+  tabs: WorkspaceTab[];
+  states: Record<string, WorkspaceState>;
+  activeWorkspaceId: string;
+} {
+  const defaults = {
+    tabs: DEFAULT_WORKSPACE_TABS,
+    states: DEFAULT_WORKSPACE_STATES,
+    activeWorkspaceId: DEFAULT_WORKSPACE_TABS[0].id,
+  };
+
   try {
-    const raw = window.localStorage.getItem(WORKSPACE_STATE_STORAGE_KEY);
-    if (!raw) return DEFAULT_WORKSPACE_STATES;
-    const parsed = JSON.parse(raw) as Partial<Record<WorkspaceId, Partial<WorkspaceState>>>;
-    const tf = parsed['trading-flow'];
-    const mv = parsed['market-view'];
+    const raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as {
+        tabs?: Array<Partial<WorkspaceTab>>;
+        states?: Record<string, Partial<WorkspaceState>>;
+        activeWorkspaceId?: string;
+      };
+
+      const parsedTabs = (parsed.tabs ?? [])
+        .map((tab) => {
+          if (typeof tab.id !== 'string' || typeof tab.name !== 'string') return null;
+          return {
+            id: tab.id,
+            name: tab.name,
+            panelIds: uniquePanelIds(Array.isArray(tab.panelIds) ? tab.panelIds.filter((id): id is string => typeof id === 'string') : []),
+          } satisfies WorkspaceTab;
+        })
+        .filter((tab): tab is WorkspaceTab => tab !== null);
+
+      const tabs = parsedTabs.length > 0 ? parsedTabs : DEFAULT_WORKSPACE_TABS;
+      const states: Record<string, WorkspaceState> = {};
+
+      for (const tab of tabs) {
+        const rawState = parsed.states?.[tab.id];
+        states[tab.id] = {
+          ...(DEFAULT_WORKSPACE_STATES[tab.id] ?? { channelId: null, theme: 'quartz-dark' as ThemeName, layout: null }),
+          ...rawState,
+          theme: validTheme(rawState?.theme),
+        };
+      }
+
+      const activeWorkspaceId = tabs.some((tab) => tab.id === parsed.activeWorkspaceId)
+        ? (parsed.activeWorkspaceId as string)
+        : tabs[0].id;
+
+      return { tabs, states, activeWorkspaceId };
+    }
+
+    const legacyRaw = window.localStorage.getItem(LEGACY_WORKSPACE_STATE_STORAGE_KEY);
+    if (!legacyRaw) return defaults;
+
+    const parsedLegacy = JSON.parse(legacyRaw) as Partial<Record<'trading-flow' | 'market-view', Partial<WorkspaceState>>>;
     return {
-      'trading-flow': {
-        ...DEFAULT_WORKSPACE_STATES['trading-flow'],
-        ...tf,
-        theme: validTheme(tf?.theme),
+      tabs: DEFAULT_WORKSPACE_TABS,
+      states: {
+        'trading-flow': {
+          ...DEFAULT_WORKSPACE_STATES['trading-flow'],
+          ...parsedLegacy['trading-flow'],
+          theme: validTheme(parsedLegacy['trading-flow']?.theme),
+        },
+        'market-view': {
+          ...DEFAULT_WORKSPACE_STATES['market-view'],
+          ...parsedLegacy['market-view'],
+          theme: validTheme(parsedLegacy['market-view']?.theme),
+        },
       },
-      'market-view': {
-        ...DEFAULT_WORKSPACE_STATES['market-view'],
-        ...mv,
-        theme: validTheme(mv?.theme),
-      },
+      activeWorkspaceId: DEFAULT_WORKSPACE_TABS[0].id,
     };
   } catch {
-    return DEFAULT_WORKSPACE_STATES;
+    return defaults;
   }
 }
 
 export function App() {
+  const initialWorkspaceStore = readWorkspaceStore();
   const [apps, setApps] = useState<AppEntry[]>([]);
   const [preloadPath, setPreloadPath] = useState('');
   const [currentChannel, setCurrentChannel] = useState<UserChannel | null>(null);
   const [saveStatus, setSaveStatus] = useState('');
   const [activeMode, setActiveMode] = useState<WorkspaceMode>('workspace');
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<WorkspaceId>('trading-flow');
-  const [workspaceStates, setWorkspaceStates] = useState<Record<WorkspaceId, WorkspaceState>>(() => readWorkspaceStates());
-  const [openPanelIds, setOpenPanelIds] = useState<string[]>(WORKSPACE_PRESETS['trading-flow'].panelIds);
+  const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceTab[]>(initialWorkspaceStore.tabs);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState(initialWorkspaceStore.activeWorkspaceId);
+  const [workspaceStates, setWorkspaceStates] = useState<Record<string, WorkspaceState>>(initialWorkspaceStore.states);
+  const [openPanelIds, setOpenPanelIds] = useState<string[]>(
+    initialWorkspaceStore.tabs.find((tab) => tab.id === initialWorkspaceStore.activeWorkspaceId)?.panelIds
+    ?? initialWorkspaceStore.tabs[0]?.panelIds
+    ?? [],
+  );
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
-  const [detachedWorkspaces, setDetachedWorkspaces] = useState<Partial<Record<WorkspaceId, DetachedWorkspacePayload>>>({});
+  const [detachedWorkspaces, setDetachedWorkspaces] = useState<Partial<Record<string, DetachedWorkspacePayload>>>({});
 
-  const activeWorkspaceState = workspaceStates[activeWorkspaceId];
-  const activeWorkspacePreset = WORKSPACE_PRESETS[activeWorkspaceId];
-  const activeDetachedWorkspace = detachedWorkspaces[activeWorkspaceId];
+  const activeWorkspaceTab = workspaceTabs.find((tab) => tab.id === activeWorkspaceId) ?? workspaceTabs[0];
+  const activeWorkspaceState = workspaceStates[activeWorkspaceTab.id]
+    ?? { channelId: null, theme: 'quartz-dark' as ThemeName, layout: null };
+  const activeDetachedWorkspace = detachedWorkspaces[activeWorkspaceTab.id];
   const theme = activeWorkspaceState.theme;
   const detachedWorkspaceId = new URLSearchParams(window.location.search).get('detachedWorkspaceId');
+
+  useEffect(() => {
+    if (workspaceTabs.length === 0) {
+      setWorkspaceTabs(DEFAULT_WORKSPACE_TABS);
+      setActiveWorkspaceId(DEFAULT_WORKSPACE_TABS[0].id);
+      return;
+    }
+
+    if (!workspaceTabs.some((tab) => tab.id === activeWorkspaceId)) {
+      setActiveWorkspaceId(workspaceTabs[0].id);
+    }
+  }, [activeWorkspaceId, workspaceTabs]);
+
+  useEffect(() => {
+    if (!activeWorkspaceTab) return;
+    setOpenPanelIds(activeWorkspaceTab.panelIds);
+  }, [activeWorkspaceTab]);
 
   useEffect(() => {
     if (!window.fdc3) return;
@@ -133,8 +220,12 @@ export function App() {
   }, [theme]);
 
   useEffect(() => {
-    window.localStorage.setItem(WORKSPACE_STATE_STORAGE_KEY, JSON.stringify(workspaceStates));
-  }, [workspaceStates]);
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({
+      tabs: workspaceTabs,
+      states: workspaceStates,
+      activeWorkspaceId: activeWorkspaceTab.id,
+    }));
+  }, [activeWorkspaceTab.id, workspaceStates, workspaceTabs]);
 
   useEffect(() => {
     if (!window.fdc3) return;
@@ -151,10 +242,14 @@ export function App() {
   }, []);
 
   const handleSave = useCallback(async () => {
-    window.localStorage.setItem(WORKSPACE_STATE_STORAGE_KEY, JSON.stringify(workspaceStates));
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({
+      tabs: workspaceTabs,
+      states: workspaceStates,
+      activeWorkspaceId: activeWorkspaceTab.id,
+    }));
     setSaveStatus('Workspace saved');
     setTimeout(() => setSaveStatus(''), 2000);
-  }, [workspaceStates]);
+  }, [activeWorkspaceTab.id, workspaceStates, workspaceTabs]);
 
   const handleThemeChange = useCallback(async (nextTheme: ThemeMode) => {
     const detached = detachedWorkspaces[activeWorkspaceId];
@@ -213,6 +308,16 @@ export function App() {
     }));
   }, [activeWorkspaceId]);
 
+  const handleOpenPanelsChange = useCallback((panelIds: string[]) => {
+    const nextPanelIds = uniquePanelIds(panelIds);
+    setOpenPanelIds(nextPanelIds);
+    setWorkspaceTabs((prev) => prev.map((tab) => (
+      tab.id === activeWorkspaceId
+        ? { ...tab, panelIds: nextPanelIds }
+        : tab
+    )));
+  }, [activeWorkspaceId]);
+
   const handleDetachWorkspace = useCallback(async (payload: DetachedWorkspacePayload) => {
     const nextPayload = {
       ...payload,
@@ -225,16 +330,92 @@ export function App() {
     }));
   }, [activeWorkspaceId]);
 
-  const handleRecallWorkspace = useCallback(async (workspaceId: WorkspaceId) => {
+  const handleRecallWorkspace = useCallback(async (workspaceId: string) => {
     const detached = detachedWorkspaces[workspaceId];
     if (!detached) return;
     await window.fdc3.recallWorkspaceWindow(detached.id);
   }, [detachedWorkspaces]);
 
+  const handleAddWorkspace = useCallback(() => {
+    const nextId = `workspace-${Date.now().toString(36)}`;
+    const nextName = `Workspace ${workspaceTabs.length + 1}`;
+    const seedPanels = openPanelIds.length > 0
+      ? openPanelIds
+      : activeWorkspaceTab.panelIds;
+    const panelIds = uniquePanelIds(seedPanels);
+
+    setWorkspaceTabs((prev) => ([
+      ...prev,
+      { id: nextId, name: nextName, panelIds },
+    ]));
+    setWorkspaceStates((prev) => ({
+      ...prev,
+      [nextId]: {
+        channelId: activeWorkspaceState.channelId,
+        theme: activeWorkspaceState.theme,
+        layout: null,
+      },
+    }));
+    setActiveWorkspaceId(nextId);
+    setActiveMode('workspace');
+    setOpenPanelIds(panelIds);
+    setWorkspaceEpoch((value) => value + 1);
+  }, [activeWorkspaceState.channelId, activeWorkspaceState.theme, activeWorkspaceTab.panelIds, openPanelIds, workspaceTabs.length]);
+
+  const handleCloseWorkspace = useCallback((workspaceId: string) => {
+    setWorkspaceTabs((prev) => {
+      if (prev.length <= 1) return prev;
+
+      const closingIndex = prev.findIndex((tab) => tab.id === workspaceId);
+      if (closingIndex === -1) return prev;
+
+      const nextTabs = prev.filter((tab) => tab.id !== workspaceId);
+
+      setWorkspaceStates((current) => {
+        const next = { ...current };
+        delete next[workspaceId];
+        return next;
+      });
+
+      setDetachedWorkspaces((current) => {
+        const next = { ...current };
+        delete next[workspaceId];
+        return next;
+      });
+
+      if (activeWorkspaceId === workspaceId) {
+        const fallback = nextTabs[Math.min(closingIndex, nextTabs.length - 1)]?.id ?? nextTabs[0].id;
+        setActiveWorkspaceId(fallback);
+        setWorkspaceEpoch((value) => value + 1);
+      }
+
+      return nextTabs;
+    });
+  }, [activeWorkspaceId]);
+
   useEffect(() => {
     if (!window.fdc3 || detachedWorkspaceId) return;
     return window.fdc3.onWorkspaceWindowClosed((payload) => {
-      const workspaceId = validWorkspaceId(payload.sourceWorkspaceId);
+      const workspaceId = payload.sourceWorkspaceId ?? activeWorkspaceTab.id;
+
+      setWorkspaceTabs((prev) => {
+        const existing = prev.find((tab) => tab.id === workspaceId);
+        if (existing) {
+          return prev.map((tab) => (
+            tab.id === workspaceId
+              ? { ...tab, panelIds: payload.panelIds }
+              : tab
+          ));
+        }
+        return [
+          ...prev,
+          {
+            id: workspaceId,
+            name: payload.name,
+            panelIds: payload.panelIds,
+          },
+        ];
+      });
       setActiveMode('workspace');
       setActiveWorkspaceId(workspaceId);
       setWorkspaceStates((prev) => ({
@@ -254,7 +435,7 @@ export function App() {
       setOpenPanelIds(payload.panelIds);
       setWorkspaceEpoch((value) => value + 1);
     });
-  }, [detachedWorkspaceId]);
+  }, [activeWorkspaceTab.id, detachedWorkspaceId]);
 
   if (detachedWorkspaceId) {
     return (
@@ -346,15 +527,34 @@ export function App() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px 0', flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: 4 }}>
-          {(Object.entries(WORKSPACE_PRESETS) as Array<[WorkspaceId, { name: string; panelIds: string[] }]>).map(([workspaceId, preset]) => (
+          {workspaceTabs.map((workspace) => (
             <WorkspaceTabButton
-              key={workspaceId}
-              active={activeWorkspaceId === workspaceId}
-              onClick={() => setActiveWorkspaceId(workspaceId)}
+              key={workspace.id}
+              active={activeWorkspaceTab.id === workspace.id}
+              onClick={() => setActiveWorkspaceId(workspace.id)}
+              onClose={workspaceTabs.length > 1 ? () => handleCloseWorkspace(workspace.id) : undefined}
             >
-              {preset.name}
+              {workspace.name}
             </WorkspaceTabButton>
           ))}
+          <button
+            onClick={handleAddWorkspace}
+            title="Add workspace"
+            style={{
+              background: 'var(--shell-panel-2)',
+              border: '1px solid var(--shell-border)',
+              borderRadius: '6px 6px 0 0',
+              color: 'var(--shell-text)',
+              cursor: 'pointer',
+              fontSize: 14,
+              fontWeight: 900,
+              height: 28,
+              lineHeight: '24px',
+              padding: '0 10px',
+            }}
+          >
+            +
+          </button>
         </div>
         <div style={{ flex: 1 }} />
         <TabButton active={activeMode === 'workspace'} onClick={() => setActiveMode('workspace')}>
@@ -372,22 +572,22 @@ export function App() {
         {activeMode === 'workspace' ? (
           activeDetachedWorkspace ? (
             <DetachedWorkspacePlaceholder
-              workspaceName={activeWorkspacePreset.name}
+              workspaceName={activeWorkspaceTab.name}
               panelCount={activeDetachedWorkspace.panelIds.length}
-              onRecall={() => void handleRecallWorkspace(activeWorkspaceId)}
+              onRecall={() => void handleRecallWorkspace(activeWorkspaceTab.id)}
             />
           ) : apps.length > 0 && preloadPath ? (
             <DockviewWorkspace
-              key={`${activeWorkspaceId}-${workspaceEpoch}`}
+              key={`${activeWorkspaceTab.id}-${workspaceEpoch}`}
               apps={apps}
               currentChannel={currentChannel}
               preloadPath={preloadPath}
-              initialPanelIds={activeWorkspacePreset.panelIds}
+              initialPanelIds={activeWorkspaceTab.panelIds}
               initialLayout={activeWorkspaceState.layout}
               onLayoutChange={handleLayoutChange}
-              onOpenPanelsChange={setOpenPanelIds}
+              onOpenPanelsChange={handleOpenPanelsChange}
               onDetachWorkspace={handleDetachWorkspace}
-              workspaceName={activeWorkspacePreset.name}
+              workspaceName={activeWorkspaceTab.name}
               theme={theme}
             />
           ) : (
@@ -401,7 +601,7 @@ export function App() {
         ) : activeMode === 'interop-flow' ? (
           <InteropFlowDesigner
             apps={apps}
-            workspaceTabId={activeWorkspaceId}
+            workspaceTabId={activeWorkspaceTab.id}
             appIds={apps.map((a) => a.appId)}
           />
         ) : (
@@ -432,7 +632,7 @@ export function App() {
           flexShrink: 0,
         }}
       >
-        <StatusItem label="Workspace" value={activeWorkspacePreset.name} color="#91b4ff" />
+        <StatusItem label="Workspace" value={activeWorkspaceTab.name} color="#91b4ff" />
         <StatusItem
           label="Channel"
           value={currentChannel?.displayMetadata.name ?? 'None'}
@@ -613,17 +813,15 @@ function DetachedWorkspacePlaceholder({
   );
 }
 
-function validWorkspaceId(value: string | undefined): WorkspaceId {
-  return value === 'market-view' || value === 'trading-flow' ? value : 'trading-flow';
-}
-
 function WorkspaceTabButton({
   active,
   onClick,
+  onClose,
   children,
 }: {
   active: boolean;
   onClick: () => void;
+  onClose?: () => void;
   children: React.ReactNode;
 }) {
   return (
@@ -638,10 +836,39 @@ function WorkspaceTabButton({
         fontSize: 11,
         fontWeight: 800,
         height: 28,
-        padding: '0 12px',
+        padding: '0 8px 0 12px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
       }}
     >
-      {children}
+      <span>{children}</span>
+      {onClose && (
+        <span
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onClose();
+          }}
+          role="button"
+          aria-label="Close workspace"
+          title="Close workspace"
+          style={{
+            alignItems: 'center',
+            borderRadius: 3,
+            color: active ? 'var(--shell-accent-text)' : 'var(--shell-muted)',
+            display: 'inline-flex',
+            fontSize: 12,
+            fontWeight: 900,
+            height: 16,
+            justifyContent: 'center',
+            lineHeight: '12px',
+            width: 16,
+          }}
+        >
+          ×
+        </span>
+      )}
     </button>
   );
 }
