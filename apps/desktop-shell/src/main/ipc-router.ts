@@ -50,6 +50,7 @@ export class IpcRouter {
     this.handleOpenWorkspaceWindow();
     this.handleGetWorkspaceWindowPayload();
     this.handleUpdateWorkspaceWindowPayload();
+    this.handleRecallWorkspaceWindow();
     this.handleCloseCurrentWindow();
   }
 
@@ -297,6 +298,12 @@ export class IpcRouter {
     ipcMain.handle(IpcEvents.UPDATE_WORKSPACE_WINDOW_PAYLOAD, (_event, payload: DetachedWorkspacePayload) => {
       this.windowManager.updateWorkspaceWindowPayload(payload);
       return true;
+    });
+  }
+
+  private handleRecallWorkspaceWindow(): void {
+    ipcMain.handle(IpcEvents.RECALL_WORKSPACE_WINDOW, (_event, workspaceWindowId: string) => {
+      return this.windowManager.recallWorkspaceWindow(workspaceWindowId);
     });
   }
 

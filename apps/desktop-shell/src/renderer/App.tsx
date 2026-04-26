@@ -5,7 +5,7 @@ import { WorkspaceToolbar } from './components/WorkspaceToolbar.js';
 import { DockviewWorkspace } from './components/DockviewWorkspace.js';
 import type { DetachedWorkspacePayload } from './components/DockviewWorkspace.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
-import type { UserChannel } from '@fdc3-poc/fdc3-core';
+import type { ThemeContext, UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { ThemeName } from '@fdc3-poc/fdc3-core';
 
@@ -24,7 +24,9 @@ declare global {
       openWorkspaceWindow(payload: DetachedWorkspacePayload): Promise<{ opened: boolean; id: string }>;
       getWorkspaceWindowPayload(workspaceWindowId: string): Promise<DetachedWorkspacePayload | null>;
       updateWorkspaceWindowPayload(payload: DetachedWorkspacePayload): Promise<boolean>;
+      recallWorkspaceWindow(workspaceWindowId: string): Promise<boolean>;
       onWorkspaceWindowClosed(handler: (payload: DetachedWorkspacePayload) => void): () => void;
+      addContextListener<T>(type: string | null, handler: (context: T) => void): () => void;
       onChannelChanged(handler: (ch: UserChannel | null) => void): () => void;
       broadcast(context: unknown): Promise<void>;
     };
@@ -109,9 +111,11 @@ export function App() {
   const [workspaceStates, setWorkspaceStates] = useState<Record<WorkspaceId, WorkspaceState>>(() => readWorkspaceStates());
   const [openPanelIds, setOpenPanelIds] = useState<string[]>(WORKSPACE_PRESETS['trading-flow'].panelIds);
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
+  const [detachedWorkspaces, setDetachedWorkspaces] = useState<Partial<Record<WorkspaceId, DetachedWorkspacePayload>>>({});
 
   const activeWorkspaceState = workspaceStates[activeWorkspaceId];
   const activeWorkspacePreset = WORKSPACE_PRESETS[activeWorkspaceId];
+  const activeDetachedWorkspace = detachedWorkspaces[activeWorkspaceId];
   const theme = activeWorkspaceState.theme;
   const detachedWorkspaceId = new URLSearchParams(window.location.search).get('detachedWorkspaceId');
 
@@ -153,6 +157,7 @@ export function App() {
   }, [workspaceStates]);
 
   const handleThemeChange = useCallback(async (nextTheme: ThemeMode) => {
+    const detached = detachedWorkspaces[activeWorkspaceId];
     setWorkspaceStates((prev) => ({
       ...prev,
       [activeWorkspaceId]: {
@@ -160,6 +165,14 @@ export function App() {
         theme: nextTheme,
       },
     }));
+    if (detached) {
+      const nextPayload = { ...detached, theme: nextTheme };
+      setDetachedWorkspaces((prev) => ({
+        ...prev,
+        [activeWorkspaceId]: nextPayload,
+      }));
+      void window.fdc3.updateWorkspaceWindowPayload(nextPayload);
+    }
     document.documentElement.dataset.theme = THEMES[nextTheme].dataTheme;
     if (window.fdc3) {
       await window.fdc3.broadcast({
@@ -168,7 +181,7 @@ export function App() {
         theme: nextTheme,
       });
     }
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, detachedWorkspaces]);
 
   useEffect(() => {
     if (!window.fdc3) return;
@@ -201,11 +214,22 @@ export function App() {
   }, [activeWorkspaceId]);
 
   const handleDetachWorkspace = useCallback(async (payload: DetachedWorkspacePayload) => {
-    await window.fdc3.openWorkspaceWindow({
+    const nextPayload = {
       ...payload,
       sourceWorkspaceId: activeWorkspaceId,
-    });
+    };
+    await window.fdc3.openWorkspaceWindow(nextPayload);
+    setDetachedWorkspaces((prev) => ({
+      ...prev,
+      [activeWorkspaceId]: nextPayload,
+    }));
   }, [activeWorkspaceId]);
+
+  const handleRecallWorkspace = useCallback(async (workspaceId: WorkspaceId) => {
+    const detached = detachedWorkspaces[workspaceId];
+    if (!detached) return;
+    await window.fdc3.recallWorkspaceWindow(detached.id);
+  }, [detachedWorkspaces]);
 
   useEffect(() => {
     if (!window.fdc3 || detachedWorkspaceId) return;
@@ -222,6 +246,11 @@ export function App() {
           theme: payload.theme,
         },
       }));
+      setDetachedWorkspaces((prev) => {
+        const next = { ...prev };
+        delete next[workspaceId];
+        return next;
+      });
       setOpenPanelIds(payload.panelIds);
       setWorkspaceEpoch((value) => value + 1);
     });
@@ -341,7 +370,13 @@ export function App() {
 
       <div style={{ flex: 1, minHeight: 0, padding: '10px 12px 12px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {activeMode === 'workspace' ? (
-          apps.length > 0 && preloadPath ? (
+          activeDetachedWorkspace ? (
+            <DetachedWorkspacePlaceholder
+              workspaceName={activeWorkspacePreset.name}
+              panelCount={activeDetachedWorkspace.panelIds.length}
+              onRecall={() => void handleRecallWorkspace(activeWorkspaceId)}
+            />
+          ) : apps.length > 0 && preloadPath ? (
             <DockviewWorkspace
               key={`${activeWorkspaceId}-${workspaceEpoch}`}
               apps={apps}
@@ -441,6 +476,19 @@ function DetachedWorkspaceShell({
     return unsub;
   }, [workspaceId]);
 
+  useEffect(() => {
+    if (!window.fdc3) return;
+    return window.fdc3.addContextListener<ThemeContext>('com.demo.theme', (ctx) => {
+      setPayload((current) => {
+        if (!current || current.theme === ctx.theme) return current;
+        const next = { ...current, theme: ctx.theme };
+        document.documentElement.dataset.theme = THEMES[ctx.theme].dataTheme;
+        void window.fdc3.updateWorkspaceWindowPayload(next);
+        return next;
+      });
+    });
+  }, []);
+
   const handleDetachedLayoutChange = useCallback((layout: unknown) => {
     setPayload((current) => {
       if (!current) return current;
@@ -493,6 +541,74 @@ function DetachedWorkspaceShell({
         theme={payload.theme}
         detached
       />
+    </div>
+  );
+}
+
+function DetachedWorkspacePlaceholder({
+  workspaceName,
+  panelCount,
+  onRecall,
+}: {
+  workspaceName: string;
+  panelCount: number;
+  onRecall: () => void;
+}) {
+  return (
+    <div
+      style={{
+        alignItems: 'center',
+        background: 'var(--shell-panel)',
+        border: '1px solid var(--shell-border)',
+        borderRadius: 8,
+        color: 'var(--shell-text)',
+        display: 'flex',
+        flex: 1,
+        flexDirection: 'column',
+        gap: 12,
+        justifyContent: 'center',
+        minHeight: 0,
+        padding: 24,
+      }}
+    >
+      <div
+        style={{
+          alignItems: 'center',
+          background: 'var(--shell-accent-soft)',
+          border: '1px solid var(--shell-accent-border)',
+          borderRadius: 8,
+          color: 'var(--shell-accent-text)',
+          display: 'flex',
+          fontSize: 14,
+          fontWeight: 900,
+          height: 42,
+          justifyContent: 'center',
+          width: 42,
+        }}
+      >
+        WS
+      </div>
+      <div style={{ fontSize: 16, fontWeight: 900 }}>{workspaceName} is detached</div>
+      <div style={{ color: 'var(--shell-muted)', fontSize: 12, fontWeight: 800 }}>
+        {panelCount} panels are running in the floating workspace window.
+      </div>
+      <button
+        onClick={onRecall}
+        style={{
+          background: 'var(--shell-accent-soft)',
+          border: '1px solid var(--shell-accent-border)',
+          borderRadius: 6,
+          color: 'var(--shell-accent-text)',
+          cursor: 'pointer',
+          fontSize: 12,
+          fontWeight: 900,
+          height: 30,
+          padding: '0 14px',
+          textTransform: 'uppercase',
+        }}
+      >
+        Pull Workspace Back
+      </button>
     </div>
   );
 }

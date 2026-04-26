@@ -28,6 +28,7 @@ export const IpcEvents = {
   OPEN_WORKSPACE_WINDOW: 'fdc3:openWorkspaceWindow',
   GET_WORKSPACE_WINDOW_PAYLOAD: 'fdc3:getWorkspaceWindowPayload',
   UPDATE_WORKSPACE_WINDOW_PAYLOAD: 'fdc3:updateWorkspaceWindowPayload',
+  RECALL_WORKSPACE_WINDOW: 'fdc3:recallWorkspaceWindow',
   CLOSE_CURRENT_WINDOW: 'fdc3:closeCurrentWindow',
 
   // ─── Main → Renderer (webContents.send) ──────────────────────────────────

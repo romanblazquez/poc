@@ -148,6 +148,13 @@ export class WindowManager {
     this.detachedWorkspaces.set(payload.id, payload);
   }
 
+  recallWorkspaceWindow(workspaceWindowId: string): boolean {
+    const win = this.findByAppId(`workspace:${workspaceWindowId}`);
+    if (!win || win.isDestroyed()) return false;
+    win.close();
+    return true;
+  }
+
   private returnDetachedWorkspace(workspaceWindowId: string): void {
     const payload = this.detachedWorkspaces.get(workspaceWindowId);
     this.detachedWorkspaces.delete(workspaceWindowId);

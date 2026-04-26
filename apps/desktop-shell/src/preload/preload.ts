@@ -214,6 +214,11 @@ contextBridge.exposeInMainWorld('fdc3', {
     return ipcRenderer.invoke(IpcEvents.UPDATE_WORKSPACE_WINDOW_PAYLOAD, payload) as Promise<boolean>;
   },
 
+  /** Close a detached workspace window so it returns to its source slot. */
+  recallWorkspaceWindow(workspaceWindowId: string): Promise<boolean> {
+    return ipcRenderer.invoke(IpcEvents.RECALL_WORKSPACE_WINDOW, workspaceWindowId) as Promise<boolean>;
+  },
+
   /** Subscribe when a detached workspace window closes and should return to the shell. */
   onWorkspaceWindowClosed(handler: (payload: DetachedWorkspacePayload) => void): () => void {
     workspaceWindowClosedHandlers.add(handler);

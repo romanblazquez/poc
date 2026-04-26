@@ -340,8 +340,7 @@ export function DockviewWorkspace({
     await onDetachWorkspace(payload);
     api.clear();
     syncOpenPanels(api);
-    onLayoutChange?.(null);
-  }, [channelId, onDetachWorkspace, onLayoutChange, openPanelIds, syncOpenPanels, theme, workspaceName]);
+  }, [channelId, onDetachWorkspace, openPanelIds, syncOpenPanels, theme, workspaceName]);
 
   const closedApps = apps.filter((app) => !openPanelIds.has(app.appId));
 
