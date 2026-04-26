@@ -1,6 +1,7 @@
 import { Component, Input, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AgGridAngular } from 'ag-grid-angular';
+import { TagModule } from 'primeng/tag';
 import type { ColDef, GetRowIdParams } from 'ag-grid-community';
 import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { FundContext, OrderContext, ThemeName } from '@fdc3-poc/fdc3-core';
@@ -16,7 +17,7 @@ function severityColor(severity: string): string {
 @Component({
   selector: 'app-audit-log',
   standalone: true,
-  imports: [CommonModule, AgGridAngular],
+  imports: [CommonModule, AgGridAngular, TagModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './audit-log.component.html',
 })

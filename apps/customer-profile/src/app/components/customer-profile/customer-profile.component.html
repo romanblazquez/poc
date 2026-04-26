@@ -1,45 +1,35 @@
-<div style="display:flex;flex-direction:column;height:100vh;background:#f8f9fc">
-
-  <!-- Header -->
-  <div style="display:flex;align-items:center;gap:10px;padding:0 16px;height:48px;background:#fff;border-bottom:1px solid #e8e8f0;flex-shrink:0">
-    <span style="font-size:20px">&#128100;</span>
-    <span style="font-weight:700;font-size:15px;color:#1a1a3e">Customer Profile</span>
+<div class="workstation-app">
+  <div class="ws-header">
+    <div class="ws-title">
+      <span class="ws-title-mark">CP</span>
+      <span class="ws-title-text">Customer Profile</span>
+    </div>
+    <p-tag *ngIf="customer" [value]="customer.relationship" [severity]="customer.relationship === 'Active' ? 'success' : 'secondary'"></p-tag>
   </div>
 
-  <!-- Empty state -->
-  <div *ngIf="!customer" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#9090b0;gap:12px">
-    <div style="font-size:48px">&#128100;</div>
-    <div style="font-weight:600;font-size:15px">No customer selected</div>
-    <div style="font-size:13px;max-width:260px;text-align:center;line-height:1.5">
-      Join a channel, then click a customer in the <strong>Customer Search</strong> app to see their profile here.
+  <div *ngIf="!customer" class="ws-empty">
+    <div class="ws-empty-icon">CP</div>
+    <div style="font-weight:800">No customer selected</div>
+    <div style="font-size:13px;max-width:300px;line-height:1.5">
+      Join a channel, then click a customer in Customer Search to see the profile.
     </div>
   </div>
 
-  <!-- Profile content -->
-  <div *ngIf="customer" style="flex:1;overflow:auto;padding:16px">
-
-    <!-- Customer hero -->
-    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:14px;border:1px solid #e8e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.05)">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
-        <div style="display:flex;gap:14px;align-items:center">
-          <div style="width:52px;height:52px;border-radius:50%;background:#4080e822;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#4080e8">
-            {{ customer.name.charAt(0) }}
+  <div *ngIf="customer" class="ws-content">
+    <div class="ws-card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;gap:14px;margin-bottom:14px">
+        <div style="min-width:0">
+          <div style="font-size:20px;font-weight:850;color:var(--ws-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ customer.name }}
           </div>
-          <div>
-            <div style="font-weight:700;font-size:18px;color:#1a1a3e">{{ customer.name }}</div>
-            <div style="color:#8080a0;font-size:12px;margin-top:2px">
-              {{ customer.customerId }} · {{ customer.segment }}
-            </div>
+          <div style="font-size:12px;color:var(--ws-muted);margin-top:3px">
+            {{ customer.customerId }} · {{ customer.segment }}
           </div>
         </div>
-        <span [style.background]="customer.relationship === 'Active' ? '#e8f5e9' : '#f5f5f5'"
-              [style.color]="customer.relationship === 'Active' ? '#2e7d32' : '#757575'"
-              style="padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700">
-          {{ customer.relationship }}
-        </span>
+        <button pButton type="button" label="Start Payment" (click)="handleStartPayment()"></button>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div class="ws-kpis" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:10px">
         <div *ngFor="let field of [
           {label:'Email', value: customer.email},
           {label:'Phone', value: customer.phone},
@@ -47,48 +37,37 @@
           {label:'Relationship Manager', value: customer.relationship_manager},
           {label:'Onboarded', value: customer.onboardedDate}
         ]">
-          <div style="font-size:10px;color:#9090b0;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:2px">{{ field.label }}</div>
-          <div style="font-size:13px;color:#2a2a4e;font-weight:500">{{ field.value }}</div>
+          <div class="ws-kpi-label">{{ field.label }}</div>
+          <div style="font-size:13px;font-weight:700;color:var(--ws-text);margin-top:2px">{{ field.value }}</div>
         </div>
       </div>
-
-      <div style="display:flex;gap:8px;align-items:center">
-        <button (click)="handleStartPayment()"
-          style="padding:8px 16px;background:#4080e8;border:none;border-radius:6px;color:#fff;font-weight:600;font-size:13px;cursor:pointer">
-          &#128179; Start Payment
-        </button>
-        <span *ngIf="intentStatus" style="font-size:12px;color:#40c080;font-weight:500">{{ intentStatus }}</span>
-      </div>
+      <p-tag *ngIf="intentStatus" [value]="intentStatus" severity="success"></p-tag>
     </div>
 
-    <!-- Accounts -->
-    <div *ngIf="accounts.length > 0" style="background:#fff;border-radius:10px;padding:14px 16px;margin-bottom:14px;border:1px solid #e8e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.05)">
-      <div style="font-weight:700;font-size:12px;color:#6060a0;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Accounts</div>
-      <div *ngFor="let acc of accounts; trackBy: trackByAccountId"
-        style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f8">
+    <div *ngIf="accounts.length > 0" class="ws-card" style="margin-bottom:12px">
+      <div class="ws-label" style="margin-bottom:8px">Accounts</div>
+      <div *ngFor="let acc of accounts; trackBy: trackByAccountId" style="display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--ws-border-soft)">
         <div>
-          <div style="font-weight:600;font-size:13px;color:#1a1a3e">{{ acc.type }}</div>
-          <div style="font-size:11px;color:#8080a0;font-family:monospace;margin-top:2px">{{ acc.accountNumber }}</div>
+          <div style="font-weight:800">{{ acc.type }}</div>
+          <div style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--ws-muted)">{{ acc.accountNumber }}</div>
         </div>
         <div style="text-align:right">
-          <div [style.color]="acc.balance >= 0 ? '#2e7d32' : '#c62828'" style="font-weight:700;font-size:14px">
+          <div [class.positive]="acc.balance >= 0" [class.negative]="acc.balance < 0" style="font-weight:850">
             {{ acc.currency }} {{ acc.balance | number }}
           </div>
-          <div style="font-size:11px;color:#9090a0">Available: {{ acc.availableBalance | number }}</div>
+          <div style="font-size:11px;color:var(--ws-muted)">Available {{ acc.availableBalance | number }}</div>
         </div>
       </div>
     </div>
 
-    <!-- Transactions -->
-    <div *ngIf="transactions.length > 0" style="background:#fff;border-radius:10px;padding:14px 16px;margin-bottom:14px;border:1px solid #e8e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.05)">
-      <div style="font-weight:700;font-size:12px;color:#6060a0;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Recent Transactions</div>
-      <div *ngFor="let tx of transactions; trackBy: trackByTxId"
-        style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f8">
+    <div *ngIf="transactions.length > 0" class="ws-card">
+      <div class="ws-label" style="margin-bottom:8px">Recent Transactions</div>
+      <div *ngFor="let tx of transactions; trackBy: trackByTxId" style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--ws-border-soft)">
         <div>
-          <div style="font-weight:500;font-size:12px;color:#2a2a4e">{{ tx.description }}</div>
-          <div style="font-size:11px;color:#9090a0;margin-top:2px">{{ tx.date }} · {{ tx.category }}</div>
+          <div style="font-weight:750">{{ tx.description }}</div>
+          <div style="font-size:11px;color:var(--ws-muted)">{{ tx.date }} · {{ tx.category }}</div>
         </div>
-        <div [style.color]="tx.type === 'credit' ? '#2e7d32' : '#c62828'" style="font-weight:700;font-size:13px">
+        <div [class.positive]="tx.type === 'credit'" [class.negative]="tx.type !== 'credit'" style="font-weight:850">
           {{ tx.type === 'credit' ? '+' : '-' }}{{ tx.currency }} {{ tx.amount | number }}
         </div>
       </div>

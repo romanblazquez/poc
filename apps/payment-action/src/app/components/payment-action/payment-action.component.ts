@@ -1,6 +1,9 @@
 import { Component, Input, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ButtonModule } from 'primeng/button';
+import { InputTextModule } from 'primeng/inputtext';
+import { TagModule } from 'primeng/tag';
 import type { PaymentRequestContext } from '@fdc3-poc/fdc3-core';
 import type { ThemeName } from '@fdc3-poc/fdc3-core';
 import { getCustomerById } from '@fdc3-poc/shared-domain';
@@ -32,7 +35,7 @@ const EMPTY_FORM: PaymentForm = {
 @Component({
   selector: 'app-payment-action',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ButtonModule, InputTextModule, TagModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './payment-action.component.html',
 })

@@ -1,6 +1,7 @@
 import { Component, Input, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AgGridAngular } from 'ag-grid-angular';
+import { TagModule } from 'primeng/tag';
 import type { ColDef, RowClickedEvent, GetRowIdParams } from 'ag-grid-community';
 import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { FundContext, ThemeName } from '@fdc3-poc/fdc3-core';
@@ -10,7 +11,7 @@ import type { FundAllocation } from '@fdc3-poc/shared-domain';
 @Component({
   selector: 'app-funds-allocations',
   standalone: true,
-  imports: [CommonModule, AgGridAngular],
+  imports: [CommonModule, AgGridAngular, TagModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './funds-allocations.component.html',
 })

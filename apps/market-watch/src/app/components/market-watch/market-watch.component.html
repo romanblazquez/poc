@@ -1,83 +1,51 @@
-<div style="display:flex;flex-direction:column;height:100vh;background:#0d1117;color:#c9d1d9">
-
-  <!-- Dark header -->
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:48px;background:#0a0e14;border-bottom:1px solid #21262d;flex-shrink:0">
-    <div style="display:flex;align-items:center;gap:10px">
-      <span style="font-size:20px">&#128200;</span>
-      <span style="font-weight:700;font-size:15px;color:#f0f6fc;letter-spacing:0.3px">Market Watch</span>
-      <span style="font-size:10px;color:#238636;background:#12261e;padding:1px 6px;border-radius:4px;font-weight:600">LIVE SIM</span>
+<div class="workstation-app">
+  <div class="ws-header">
+    <div class="ws-title">
+      <span class="ws-title-mark">MW</span>
+      <span class="ws-title-text">Market Watch</span>
+      <p-tag value="Live Sim" severity="success"></p-tag>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;font-size:12px">
-      <span *ngIf="intentStatus" style="color:#58a6ff">{{ intentStatus }}</span>
-
-      <!-- Channel picker -->
-      <div style="position:relative">
-        <button (click)="channelOpen = !channelOpen"
-          [style.border]="'1px solid ' + (currentChannel?.displayMetadata?.color ?? '#444')"
-          style="display:flex;align-items:center;gap:6px;padding:4px 10px;background:transparent;border-radius:5px;color:#c9d1d9;cursor:pointer;font-size:12px">
-          <span [style.background]="currentChannel?.displayMetadata?.color ?? '#444'"
-            style="width:10px;height:10px;border-radius:50%;display:inline-block"></span>
-          {{ currentChannel?.displayMetadata?.name ?? 'No Channel' }}
-        </button>
-        <div *ngIf="channelOpen"
-          style="position:absolute;top:110%;right:0;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:6px;z-index:100;min-width:140px">
-          <button *ngFor="let ch of channels; trackBy: trackByChannelId"
-            (click)="joinChannel(ch)"
-            [style.background]="currentChannel?.id === ch.id ? '#1d2d44' : 'transparent'"
-            style="display:flex;align-items:center;gap:8px;width:100%;border:none;color:#c9d1d9;padding:6px 8px;cursor:pointer;border-radius:4px;font-size:12px">
-            <span [style.background]="ch.displayMetadata.color" style="width:10px;height:10px;border-radius:50%;display:inline-block"></span>
-            {{ ch.displayMetadata.name }}
-          </button>
-          <button *ngIf="currentChannel" (click)="leaveChannel()"
-            style="width:100%;background:transparent;border:none;color:#8b949e;padding:5px 8px;cursor:pointer;border-radius:4px;font-size:11px;text-align:left">
-            Leave
-          </button>
-        </div>
-      </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <p-tag *ngIf="intentStatus" [value]="intentStatus" severity="info"></p-tag>
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [outlined]="true"
+        (click)="channelOpen = !channelOpen"
+        [label]="currentChannel?.displayMetadata?.name ?? 'No Channel'"
+      ></button>
     </div>
   </div>
 
-  <!-- Table -->
-  <div style="flex:1;overflow:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:13px">
-      <thead style="position:sticky;top:0;background:#0d1117;z-index:1">
-        <tr>
-          <th *ngFor="let h of ['Ticker','Name','Last','Change','%','Volume','Exchange']"
-            [style.text-align]="(h==='Ticker'||h==='Name'||h==='Exchange') ? 'left' : 'right'"
-            style="padding:8px 12px;color:#8b949e;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #21262d">
-            {{ h }}
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let q of quotes; trackBy: trackByTicker"
-          (click)="onRowClick(q)"
-          [style.background]="highlighted === q.ticker ? '#1a3a5e' : 'transparent'"
-          style="cursor:pointer;border-bottom:1px solid #161b22;transition:background 0.15s">
-          <td style="padding:9px 12px;font-family:monospace;font-weight:700"
-            [style.color]="highlighted === q.ticker ? '#58a6ff' : '#f0f6fc'">
-            {{ q.ticker }}{{ highlighted === q.ticker ? ' ←' : '' }}
-          </td>
-          <td style="padding:9px 12px;color:#8b949e">{{ q.name }}</td>
-          <td [style.color]="q.change >= 0 ? '#3fb950' : '#f85149'" style="padding:9px 12px;text-align:right;font-weight:700;font-family:monospace">
-            {{ q.price.toFixed(2) }}
-          </td>
-          <td [style.color]="q.change >= 0 ? '#3fb950' : '#f85149'" style="padding:9px 12px;text-align:right;font-family:monospace">
-            {{ q.change >= 0 ? '+' : '' }}{{ q.change.toFixed(2) }}
-          </td>
-          <td [style.color]="q.changePct >= 0 ? '#3fb950' : '#f85149'" style="padding:9px 12px;text-align:right;font-family:monospace;font-weight:600">
-            {{ q.changePct >= 0 ? '+' : '' }}{{ q.changePct.toFixed(2) }}%
-          </td>
-          <td style="padding:9px 12px;text-align:right;color:#8b949e;font-size:12px">
-            {{ (q.volume / 1000000).toFixed(1) }}M
-          </td>
-          <td style="padding:9px 12px;color:#8b949e;font-size:11px">{{ q.exchange }}</td>
-        </tr>
-      </tbody>
-    </table>
+  <div *ngIf="channelOpen" class="ws-toolbar" style="gap:8px;min-height:auto">
+    <button
+      *ngFor="let ch of channels; trackBy: trackByChannelId"
+      pButton
+      type="button"
+      size="small"
+      [label]="ch.displayMetadata.name"
+      [severity]="currentChannel?.id === ch.id ? 'info' : 'secondary'"
+      [outlined]="currentChannel?.id !== ch.id"
+      (click)="joinChannel(ch)"
+    ></button>
+    <button *ngIf="currentChannel" pButton type="button" size="small" label="Leave" severity="secondary" [text]="true" (click)="leaveChannel()"></button>
   </div>
 
-  <div style="padding:6px 12px;border-top:1px solid #21262d;font-size:10px;color:#484f58;background:#0a0e14">
-    Prices simulated · Tick every 2s · Click row to broadcast fdc3.instrument context
+  <div [class]="agGridTheme" class="ws-grid">
+    <ag-grid-angular
+      [rowData]="quotes"
+      [columnDefs]="columnDefs"
+      [defaultColDef]="defaultColDef"
+      [getRowId]="getRowId"
+      rowSelection="single"
+      [animateRows]="true"
+      (rowClicked)="onGridRowClicked($event)"
+      style="width:100%;height:100%"
+    ></ag-grid-angular>
+  </div>
+
+  <div class="ws-statusbar" style="height:26px;padding:0 12px;font-size:11px;color:var(--ws-subtle);background:var(--ws-panel)">
+    Prices simulated. Tick every 2s. Click a row to broadcast fdc3.instrument context.
   </div>
 </div>

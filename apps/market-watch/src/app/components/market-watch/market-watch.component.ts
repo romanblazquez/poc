@@ -1,5 +1,10 @@
 import { Component, Input, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { AgGridAngular } from 'ag-grid-angular';
+import type { ColDef, GetRowIdParams, RowClickedEvent } from 'ag-grid-community';
+import { ButtonModule } from 'primeng/button';
+import { TagModule } from 'primeng/tag';
+import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { InstrumentContext } from '@fdc3-poc/fdc3-core';
 import type { ThemeName } from '@fdc3-poc/fdc3-core';
 import { MARKET_QUOTES } from '@fdc3-poc/shared-domain';
@@ -8,7 +13,7 @@ import type { MarketQuote } from '@fdc3-poc/shared-domain';
 @Component({
   selector: 'app-market-watch',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, AgGridAngular, ButtonModule, TagModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './market-watch.component.html',
 })
@@ -22,6 +27,45 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
   channels: Array<{ id: string; displayMetadata: { name: string; color: string } }> = [];
   currentChannel: { id: string; displayMetadata: { name: string; color: string } } | null = null;
   channelOpen = false;
+  readonly columnDefs: ColDef<MarketQuote>[] = [
+    { field: 'ticker', headerName: 'Ticker', width: 105, pinned: 'left' },
+    { field: 'name', headerName: 'Instrument', minWidth: 210, flex: 1 },
+    {
+      field: 'price',
+      headerName: 'Last',
+      width: 105,
+      type: 'rightAligned',
+      valueFormatter: ({ value }) => Number(value).toFixed(2),
+    },
+    {
+      field: 'change',
+      width: 105,
+      type: 'rightAligned',
+      valueFormatter: ({ value }) => `${Number(value) >= 0 ? '+' : ''}${Number(value).toFixed(2)}`,
+      cellStyle: ({ value }) => ({ color: Number(value) >= 0 ? 'var(--ws-positive)' : 'var(--ws-negative)', fontWeight: 800 }),
+    },
+    {
+      field: 'changePct',
+      headerName: '%',
+      width: 95,
+      type: 'rightAligned',
+      valueFormatter: ({ value }) => `${Number(value) >= 0 ? '+' : ''}${Number(value).toFixed(2)}%`,
+      cellStyle: ({ value }) => ({ color: Number(value) >= 0 ? 'var(--ws-positive)' : 'var(--ws-negative)', fontWeight: 800 }),
+    },
+    {
+      field: 'volume',
+      width: 110,
+      type: 'rightAligned',
+      valueFormatter: ({ value }) => `${(Number(value) / 1_000_000).toFixed(1)}M`,
+    },
+    { field: 'exchange', width: 115 },
+  ];
+
+  readonly defaultColDef: ColDef = {
+    sortable: true,
+    filter: true,
+    resizable: true,
+  };
 
   private tickInterval?: ReturnType<typeof setInterval>;
   private unsub1?: () => void;
@@ -96,6 +140,16 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
     await window.fdc3.broadcast(ctx);
     this.intentStatus = '';
     this.cdr.markForCheck();
+  }
+
+  get agGridTheme(): string {
+    return THEMES[this.theme].agGrid;
+  }
+
+  getRowId = (params: GetRowIdParams<MarketQuote>): string => params.data.ticker;
+
+  async onGridRowClicked(event: RowClickedEvent<MarketQuote>): Promise<void> {
+    if (event.data) await this.onRowClick(event.data);
   }
 
   async joinChannel(ch: { id: string; displayMetadata: { name: string; color: string } }): Promise<void> {

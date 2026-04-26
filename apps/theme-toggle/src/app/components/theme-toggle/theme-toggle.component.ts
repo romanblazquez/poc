@@ -1,13 +1,15 @@
 import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { SelectModule } from 'primeng/select';
+import { TagModule } from 'primeng/tag';
 import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { ThemeContext, ThemeName } from '@fdc3-poc/fdc3-core';
 
 @Component({
   selector: 'app-theme-toggle',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SelectModule, TagModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './theme-toggle.component.html',
 })

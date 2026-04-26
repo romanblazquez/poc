@@ -1,6 +1,11 @@
 import { Component, Input, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { AgGridAngular } from 'ag-grid-angular';
+import type { ColDef, GetRowIdParams, RowClickedEvent } from 'ag-grid-community';
+import { InputTextModule } from 'primeng/inputtext';
+import { TagModule } from 'primeng/tag';
+import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { ContactContext } from '@fdc3-poc/fdc3-core';
 import type { ThemeName } from '@fdc3-poc/fdc3-core';
 import { CUSTOMERS } from '@fdc3-poc/shared-domain';
@@ -16,7 +21,7 @@ const SEGMENT_COLORS: Record<string, string> = {
 @Component({
   selector: 'app-customer-search',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AgGridAngular, InputTextModule, TagModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './customer-search.component.html',
 })
@@ -28,6 +33,20 @@ export class CustomerSearchComponent {
   hoveredId: string | null = null;
 
   readonly segmentColors = SEGMENT_COLORS;
+  readonly columnDefs: ColDef<Customer>[] = [
+    { field: 'name', headerName: 'Customer', minWidth: 210, flex: 1 },
+    { field: 'customerId', headerName: 'ID', width: 115 },
+    { field: 'segment', width: 150 },
+    { field: 'relationship_manager', headerName: 'RM', width: 150 },
+    { field: 'country', width: 110 },
+    { field: 'relationship', headerName: 'Status', width: 115 },
+  ];
+
+  readonly defaultColDef: ColDef = {
+    sortable: true,
+    filter: true,
+    resizable: true,
+  };
 
   constructor(private cdr: ChangeDetectorRef) {}
 
@@ -39,6 +58,16 @@ export class CustomerSearchComponent {
         c.customerId.toLowerCase().includes(q) ||
         c.segment.toLowerCase().includes(q),
     );
+  }
+
+  getRowId = (params: GetRowIdParams<Customer>): string => params.data.customerId;
+
+  get agGridTheme(): string {
+    return THEMES[this.theme].agGrid;
+  }
+
+  async onGridRowClicked(event: RowClickedEvent<Customer>): Promise<void> {
+    if (event.data) await this.onSelect(event.data);
   }
 
   async onSelect(customer: Customer): Promise<void> {

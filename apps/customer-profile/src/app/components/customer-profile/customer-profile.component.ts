@@ -1,5 +1,7 @@
 import { Component, Input, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ButtonModule } from 'primeng/button';
+import { TagModule } from 'primeng/tag';
 import type { ContactContext, PaymentRequestContext } from '@fdc3-poc/fdc3-core';
 import type { ThemeName } from '@fdc3-poc/fdc3-core';
 import {
@@ -12,7 +14,7 @@ import type { Customer, Account, Transaction } from '@fdc3-poc/shared-domain';
 @Component({
   selector: 'app-customer-profile',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ButtonModule, TagModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './customer-profile.component.html',
 })
