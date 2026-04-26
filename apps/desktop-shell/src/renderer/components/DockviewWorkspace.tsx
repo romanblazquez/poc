@@ -112,6 +112,10 @@ function AppPanelComponent({ params }: IDockviewPanelProps<AppPanelParams>) {
   );
 }
 
+function panelTitle(app: AppEntry): string {
+  return app.icon ? `${app.icon} ${app.title}` : app.title;
+}
+
 function populatePanels(
   api: DockviewApi,
   panelApps: AppEntry[],
@@ -124,7 +128,7 @@ function populatePanels(
   api.addPanel<AppPanelParams>({
     id: panelApps[0].appId,
     component: 'app-panel',
-    title: panelApps[0].title,
+    title: panelTitle(panelApps[0]),
     params: {
       appId: panelApps[0].appId,
       appUrl: resolveEmbeddedAppUrl(panelApps[0]),
@@ -138,7 +142,7 @@ function populatePanels(
     api.addPanel<AppPanelParams>({
       id: panelApps[1].appId,
       component: 'app-panel',
-      title: panelApps[1].title,
+      title: panelTitle(panelApps[1]),
       params: {
         appId: panelApps[1].appId,
         appUrl: resolveEmbeddedAppUrl(panelApps[1]),
@@ -154,7 +158,7 @@ function populatePanels(
     api.addPanel<AppPanelParams>({
       id: panelApps[2].appId,
       component: 'app-panel',
-      title: panelApps[2].title,
+      title: panelTitle(panelApps[2]),
       params: {
         appId: panelApps[2].appId,
         appUrl: resolveEmbeddedAppUrl(panelApps[2]),
@@ -171,7 +175,7 @@ function populatePanels(
     api.addPanel<AppPanelParams>({
       id: app.appId,
       component: 'app-panel',
-      title: app.title,
+      title: panelTitle(app),
       params: {
         appId: app.appId,
         appUrl: resolveEmbeddedAppUrl(app),
@@ -197,12 +201,35 @@ export function DockviewWorkspace({
   detached = false,
 }: DockviewWorkspaceProps) {
   const channelId = currentChannel?.id ?? null;
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const dockApiRef = useRef<DockviewApi | null>(null);
   const listenersRef = useRef<Array<{ dispose: () => void }>>([]);
+  const tabObserverRef = useRef<MutationObserver | null>(null);
   const webviewsRef = useRef(new Map<string, EmbeddedWebview>());
   const readyIdsRef = useRef(new Set<string>());
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [openPanelIds, setOpenPanelIds] = useState<Set<string>>(new Set());
+
+  const syncPanelTitles = useCallback((api: DockviewApi) => {
+    for (const panel of api.panels) {
+      const app = apps.find((entry) => entry.appId === panel.id);
+      if (!app) continue;
+      (panel as { api?: { setTitle?: (title: string) => void } }).api?.setTitle?.(panelTitle(app));
+    }
+  }, [apps]);
+
+  const syncDetachedTabTooltips = useCallback(() => {
+    if (!detached || !rootRef.current) return;
+
+    const tabs = rootRef.current.querySelectorAll<HTMLElement>('.dv-tab, .dockview-tab');
+    tabs.forEach((tab) => {
+      const label = tab.querySelector<HTMLElement>('.dv-tab-label, .dockview-tab-label');
+      const labelText = label?.textContent?.trim();
+      if (!labelText) return;
+      tab.setAttribute('title', labelText);
+      tab.setAttribute('aria-label', labelText);
+    });
+  }, [detached]);
 
   const registerWebview = useCallback((appId: string, node: EmbeddedWebview | null) => {
     if (node) {
@@ -261,6 +288,7 @@ export function DockviewWorkspace({
     if (initialLayout) {
       try {
         api.fromJSON(initialLayout as never);
+        syncPanelTitles(api);
       } catch {
         resetLayout();
       }
@@ -269,14 +297,46 @@ export function DockviewWorkspace({
     }
 
     clearListeners();
-    listenersRef.current.push(api.onDidAddPanel(() => syncOpenPanels(api)));
-    listenersRef.current.push(api.onDidRemovePanel(() => syncOpenPanels(api)));
-    listenersRef.current.push(api.onDidLayoutFromJSON(() => syncOpenPanels(api)));
-    listenersRef.current.push(api.onDidLayoutChange(() => onLayoutChange?.(api.toJSON())));
+    listenersRef.current.push(api.onDidAddPanel(() => {
+      syncOpenPanels(api);
+      syncDetachedTabTooltips();
+    }));
+    listenersRef.current.push(api.onDidRemovePanel(() => {
+      syncOpenPanels(api);
+      syncDetachedTabTooltips();
+    }));
+    listenersRef.current.push(api.onDidLayoutFromJSON(() => {
+      syncOpenPanels(api);
+      syncPanelTitles(api);
+      syncDetachedTabTooltips();
+    }));
+    listenersRef.current.push(api.onDidLayoutChange(() => {
+      onLayoutChange?.(api.toJSON());
+      syncDetachedTabTooltips();
+    }));
     syncOpenPanels(api);
-  }, [clearListeners, initialLayout, onLayoutChange, resetLayout, syncOpenPanels]);
+    syncDetachedTabTooltips();
+  }, [clearListeners, initialLayout, onLayoutChange, resetLayout, syncDetachedTabTooltips, syncOpenPanels, syncPanelTitles]);
 
   useEffect(() => clearListeners, [clearListeners]);
+
+  useEffect(() => {
+    tabObserverRef.current?.disconnect();
+    tabObserverRef.current = null;
+    if (!detached || !rootRef.current) return;
+
+    const observer = new MutationObserver(() => {
+      syncDetachedTabTooltips();
+    });
+    observer.observe(rootRef.current, { childList: true, subtree: true });
+    tabObserverRef.current = observer;
+
+    syncDetachedTabTooltips();
+    return () => {
+      observer.disconnect();
+      tabObserverRef.current = null;
+    };
+  }, [detached, syncDetachedTabTooltips]);
 
   // If onReady fired before apps were available (e.g. apps loaded async after mount),
   // populate panels once the app list arrives.
@@ -311,7 +371,7 @@ export function DockviewWorkspace({
     api.addPanel<AppPanelParams>({
       id: app.appId,
       component: 'app-panel',
-      title: app.title,
+      title: panelTitle(app),
       params: {
         appId: app.appId,
         appUrl: resolveEmbeddedAppUrl(app),
@@ -320,8 +380,9 @@ export function DockviewWorkspace({
         theme,
       },
     });
+    syncDetachedTabTooltips();
     setShowAddMenu(false);
-  }, [channelId, preloadPath, theme]);
+  }, [channelId, preloadPath, syncDetachedTabTooltips, theme]);
 
   const detachWorkspace = useCallback(async () => {
     if (!onDetachWorkspace) return;
@@ -345,7 +406,7 @@ export function DockviewWorkspace({
   const closedApps = apps.filter((app) => !openPanelIds.has(app.appId));
 
   return (
-    <div style={rootStyle}>
+    <div ref={rootRef} className={detached ? 'detached-workspace' : undefined} style={rootStyle}>
       {!detached && (
         <div style={toolbarStyle}>
           <button onClick={resetLayout} style={secondaryButtonStyle}>
