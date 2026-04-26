@@ -1,7 +1,7 @@
-import React, { useCallback, useRef } from 'react';
-import type { DetailedHTMLProps, HTMLAttributes } from 'react';
-import { DockviewReact, type IDockviewPanelProps, type DockviewReadyEvent } from 'dockview';
-import type { AppEntry, WorkspaceWindowDraft } from '../App.js';
+import React, { useCallback, useRef, useState } from 'react';
+import type { DetailedHTMLProps, HTMLAttributes, CSSProperties } from 'react';
+import { DockviewReact, type IDockviewPanelProps, type DockviewReadyEvent, type DockviewApi } from 'dockview';
+import type { AppEntry, WorkspaceRuntimePayload, WorkspaceWindowDraft } from '../App.js';
 import type { UserChannel } from '@fdc3-poc/fdc3-core';
 import '../styles/dockview-override.css';
 
@@ -23,15 +23,16 @@ interface DockviewWorkspaceEditorProps {
   apps: AppEntry[];
   currentChannel: UserChannel | null;
   preloadPath: string;
+  initialPanelIds?: string[];
   onApply: (payload: {
     name: string;
     windows: WorkspaceWindowDraft[];
     closeOtherApps: boolean;
     save: boolean;
   }) => Promise<void>;
+  onOpenWorkspaceWindow: (payload: WorkspaceRuntimePayload) => Promise<void>;
 }
 
-// Panel params passed to each app panel
 interface AppPanelParams {
   appId: string;
   appUrl: string;
@@ -39,16 +40,16 @@ interface AppPanelParams {
   channelId: string | null;
 }
 
-// Component rendered inside each Dockview panel
+// Each Dockview panel renders the FDC3 app as an embedded webview — single window, no popup
 function AppPanelComponent({ params }: IDockviewPanelProps<AppPanelParams>) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', background: '#0a0a18' }}>
+    <div style={{ height: '100%', width: '100%', background: '#07070f' }}>
       <webview
         src={params.appUrl}
         preload={`file://${params.preloadPath}`}
-        partition={`persist:dockview-${params.channelId ?? 'default'}-${params.appId}`}
+        partition={`persist:ws-${params.channelId ?? 'default'}-${params.appId}`}
         allowpopups="true"
-        style={{ flex: 1, border: 'none', width: '100%' } as React.CSSProperties}
+        style={{ height: '100%', width: '100%', border: 'none' } as CSSProperties}
         onDomReady={(event) => {
           if (params.channelId) {
             void event.currentTarget.executeJavaScript(
@@ -61,129 +62,153 @@ function AppPanelComponent({ params }: IDockviewPanelProps<AppPanelParams>) {
   );
 }
 
-// Default 3-panel layout: incoming-orders left, funds-allocations top-right, audit-log bottom-right
-const DEFAULT_PANEL_IDS = ['incoming-orders', 'funds-allocations', 'audit-log'];
+/**
+ * Adds panels to the Dockview API in a smart grid layout.
+ * - Col 0: panels 0, 3, 6  (leftmost column)
+ * - Col 1: panels 1, 4, 7  (split right of col 0)
+ * - Col 2: panels 2, 5, 8  (split right of col 1)
+ * Within each column, panels are stacked below each other.
+ */
+function populatePanels(
+  api: DockviewApi,
+  panelApps: AppEntry[],
+  preloadPath: string,
+  channelId: string | null
+) {
+  if (panelApps.length === 0) return;
+
+  const COLS = 3;
+  // Track the first panel added to each column (needed as position reference)
+  const colFirstPanel: Record<number, string> = {};
+
+  panelApps.forEach((app, idx) => {
+    const col = idx % COLS;
+    const isFirstInCol = Math.floor(idx / COLS) === 0;
+
+    let position: { referencePanel: string; direction: 'right' | 'below' } | undefined;
+
+    if (idx === 0) {
+      // Very first panel — no position needed
+      position = undefined;
+    } else if (isFirstInCol) {
+      // First panel of a new column: split right of the first panel of the previous column
+      position = { referencePanel: colFirstPanel[col - 1], direction: 'right' };
+    } else {
+      // Stack below the previous panel in the same column
+      position = { referencePanel: panelApps[idx - COLS].appId, direction: 'below' };
+    }
+
+    api.addPanel<AppPanelParams>({
+      id: app.appId,
+      component: 'app-panel',
+      title: app.title,
+      params: { appId: app.appId, appUrl: app.url, preloadPath, channelId },
+      ...(position ? { position } : {}),
+    });
+
+    if (isFirstInCol) colFirstPanel[col] = app.appId;
+  });
+}
 
 export function DockviewWorkspaceEditor({
   apps,
   currentChannel,
   preloadPath,
+  initialPanelIds,
   onApply,
 }: DockviewWorkspaceEditorProps) {
   const channelId = currentChannel?.id ?? null;
+  const dockApiRef = useRef<DockviewApi | null>(null);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [openPanelIds, setOpenPanelIds] = useState<Set<string>>(new Set());
+
+  // Resolve which apps to show initially
+  const resolveInitialApps = useCallback((): AppEntry[] => {
+    if (initialPanelIds && initialPanelIds.length > 0) {
+      // Use the specified list, preserving order, filtering to known apps
+      return initialPanelIds
+        .map((id) => apps.find((a) => a.appId === id))
+        .filter((a): a is AppEntry => !!a);
+    }
+    // No list specified → show all apps
+    return apps;
+  }, [apps, initialPanelIds]);
 
   const onReady = useCallback((event: DockviewReadyEvent) => {
     const api = event.api;
+    dockApiRef.current = api;
+    const panelApps = resolveInitialApps();
+    setOpenPanelIds(new Set(panelApps.map((a) => a.appId)));
+    populatePanels(api, panelApps, preloadPath, channelId);
+  }, [resolveInitialApps, preloadPath, channelId]);
 
-    // Find apps to add (use defaults if available, otherwise first 3 apps)
-    const panelApps = DEFAULT_PANEL_IDS
-      .map((id) => apps.find((a) => a.appId === id))
-      .filter((a): a is AppEntry => !!a);
+  const addPanel = useCallback((app: AppEntry) => {
+    const api = dockApiRef.current;
+    if (!api) return;
+    // If panel already open, just activate it
+    const existing = api.getPanel(app.appId);
+    if (existing) { existing.focus(); setShowAddMenu(false); return; }
 
-    // Fill with remaining apps if defaults not found
-    if (panelApps.length === 0) {
-      apps.slice(0, 3).forEach((a) => panelApps.push(a));
-    }
-
-    if (panelApps.length === 0) return;
-
-    // Add first panel (left column, full height)
-    const first = api.addPanel<AppPanelParams>({
-      id: panelApps[0].appId,
+    api.addPanel<AppPanelParams>({
+      id: app.appId,
       component: 'app-panel',
-      title: panelApps[0].title,
-      params: {
-        appId: panelApps[0].appId,
-        appUrl: panelApps[0].url,
-        preloadPath,
-        channelId,
-      },
+      title: app.title,
+      params: { appId: app.appId, appUrl: app.url, preloadPath, channelId },
     });
+    setOpenPanelIds((prev) => new Set([...prev, app.appId]));
+    setShowAddMenu(false);
+  }, [preloadPath, channelId]);
 
-    // Add second panel to the right of the first
-    if (panelApps[1]) {
-      api.addPanel<AppPanelParams>({
-        id: panelApps[1].appId,
-        component: 'app-panel',
-        title: panelApps[1].title,
-        params: {
-          appId: panelApps[1].appId,
-          appUrl: panelApps[1].url,
-          preloadPath,
-          channelId,
-        },
-        position: { referencePanel: first.id, direction: 'right' },
-      });
-    }
+  const handleSave = useCallback(async () => {
+    const windows: WorkspaceWindowDraft[] = [...openPanelIds].map((id, i) => {
+      const app = apps.find((a) => a.appId === id);
+      if (!app) return null;
+      return {
+        appId: app.appId,
+        channelId,
+        bounds: { x: 40 + (i % 3) * 520, y: 70 + Math.floor(i / 3) * 420, width: 500, height: 400 },
+        isMinimized: false,
+      };
+    }).filter((w): w is WorkspaceWindowDraft => w !== null);
 
-    // Add third panel below the second
-    if (panelApps[2]) {
-      api.addPanel<AppPanelParams>({
-        id: panelApps[2].appId,
-        component: 'app-panel',
-        title: panelApps[2].title,
-        params: {
-          appId: panelApps[2].appId,
-          appUrl: panelApps[2].url,
-          preloadPath,
-          channelId,
-        },
-        position: { referencePanel: panelApps[1].appId, direction: 'below' },
-      });
-    }
-  }, [apps, channelId, preloadPath]);
+    await onApply({ name: 'Saved Workspace', windows, closeOtherApps: false, save: true });
+  }, [openPanelIds, apps, channelId, onApply]);
 
-  const handleLaunchWorkspace = useCallback(async () => {
-    const windows: WorkspaceWindowDraft[] = DEFAULT_PANEL_IDS
-      .map((id, i) => {
-        const app = apps.find((a) => a.appId === id);
-        if (!app) return null;
-        return {
-          appId: app.appId,
-          channelId,
-          bounds: { x: 40 + i * 520, y: 70, width: 500, height: 600 },
-          isMinimized: false,
-        };
-      })
-      .filter((w): w is WorkspaceWindowDraft => w !== null);
-
-    await onApply({ name: 'Funds Workflow', windows, closeOtherApps: true, save: false });
-  }, [apps, channelId, onApply]);
-
-  const handleSaveLayout = useCallback(async () => {
-    const windows: WorkspaceWindowDraft[] = DEFAULT_PANEL_IDS
-      .map((id, i) => {
-        const app = apps.find((a) => a.appId === id);
-        if (!app) return null;
-        return {
-          appId: app.appId,
-          channelId,
-          bounds: { x: 40 + i * 520, y: 70, width: 500, height: 600 },
-          isMinimized: false,
-        };
-      })
-      .filter((w): w is WorkspaceWindowDraft => w !== null);
-
-    await onApply({ name: 'Funds Workflow (Saved)', windows, closeOtherApps: false, save: true });
-  }, [apps, channelId, onApply]);
+  const closedApps = apps.filter((a) => !openPanelIds.has(a.appId));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', minHeight: 0 }}>
+    <div style={rootStyle}>
       {/* Toolbar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '8px 14px', background: '#0a0a18',
-        borderBottom: '1px solid #1e1e3e', flexShrink: 0,
-      }}>
-        <button onClick={handleLaunchWorkspace} style={btnPrimary}>Launch as Windows</button>
-        <button onClick={handleSaveLayout} style={btnSecondary}>Save Layout</button>
+      <div style={toolbarStyle}>
+        <div style={{ position: 'relative' }}>
+          <button onClick={() => setShowAddMenu((v) => !v)} style={btnPrimary}>
+            + Add App
+          </button>
+          {showAddMenu && (
+            <div style={addMenuStyle}>
+              {closedApps.length === 0 && (
+                <div style={{ padding: '8px 12px', color: '#607090', fontSize: 11 }}>All apps open</div>
+              )}
+              {closedApps.map((app) => (
+                <button
+                  key={app.appId}
+                  onClick={() => addPanel(app)}
+                  style={addMenuItemStyle}
+                >
+                  {app.title}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button onClick={handleSave} style={btnSecondary}>Save Layout</button>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 11, color: '#606080' }}>
-          Drag tabs to rearrange · Drag borders to resize
+        <span style={{ fontSize: 11, color: '#404060' }}>
+          Drag panel tabs to rearrange · Drag borders to resize
         </span>
       </div>
 
-      {/* Dockview */}
+      {/* Dockview — all apps as embedded webview panels */}
       <div style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
         <DockviewReact
           onReady={onReady}
@@ -196,11 +221,30 @@ export function DockviewWorkspaceEditor({
   );
 }
 
-const btnPrimary: React.CSSProperties = {
-  padding: '5px 12px', background: '#1d4ed8', border: 'none',
+/* ── Styles ── */
+const rootStyle: CSSProperties = {
+  display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, width: '100%',
+};
+const toolbarStyle: CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 8,
+  padding: '6px 12px', background: '#0a0a18',
+  borderBottom: '1px solid #1a1a32', flexShrink: 0,
+};
+const btnPrimary: CSSProperties = {
+  padding: '4px 11px', background: '#1d4ed8', border: 'none',
   borderRadius: 4, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
 };
-const btnSecondary: React.CSSProperties = {
-  padding: '5px 12px', background: '#18233f', border: '1px solid #385ea8',
-  borderRadius: 4, color: '#dbe6ff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+const btnSecondary: CSSProperties = {
+  padding: '4px 11px', background: '#111827', border: '1px solid #2d4a80',
+  borderRadius: 4, color: '#c0d4ff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+};
+const addMenuStyle: CSSProperties = {
+  position: 'absolute', top: '100%', left: 0, zIndex: 999,
+  background: '#0e1628', border: '1px solid #1e3060', borderRadius: 6,
+  boxShadow: '0 8px 24px rgba(0,0,0,.6)', minWidth: 180, marginTop: 4,
+  display: 'flex', flexDirection: 'column',
+};
+const addMenuItemStyle: CSSProperties = {
+  background: 'none', border: 'none', color: '#c0d4ff',
+  cursor: 'pointer', fontSize: 12, padding: '7px 14px', textAlign: 'left',
 };
