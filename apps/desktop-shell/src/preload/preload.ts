@@ -167,49 +167,9 @@ contextBridge.exposeInMainWorld('fdc3', {
     return ipcRenderer.invoke(IpcEvents.GET_PRELOAD_PATH) as Promise<string>;
   },
 
-  /** Open a full workspace runtime window for a saved/composed layout. */
-  openWorkspaceWindow(payload: {
-    id: string;
-    name: string;
-    channelId: string;
-    items: Array<{ appId: string; x: number; y: number; width: number; height: number }>;
-  }): Promise<void> {
-    return ipcRenderer.invoke(IpcEvents.OPEN_WORKSPACE_WINDOW, payload) as Promise<void>;
-  },
-
-  /** Get the workspace payload assigned to this runtime window. */
-  getWorkspaceWindowPayload(id: string): Promise<{
-    id: string;
-    name: string;
-    channelId: string;
-    items: Array<{ appId: string; x: number; y: number; width: number; height: number }>;
-  } | null> {
-    return ipcRenderer.invoke(IpcEvents.GET_WORKSPACE_WINDOW_PAYLOAD, id) as Promise<{
-      id: string;
-      name: string;
-      channelId: string;
-      items: Array<{ appId: string; x: number; y: number; width: number; height: number }>;
-    } | null>;
-  },
-
   /** Save the current workspace layout. */
   saveWorkspace(name?: string): Promise<void> {
     return ipcRenderer.invoke(IpcEvents.SAVE_WORKSPACE, name) as Promise<void>;
-  },
-
-  /** Apply a composed workspace layout from the shell renderer. */
-  applyWorkspace(payload: {
-    name: string;
-    windows: Array<{
-      appId: string;
-      channelId: string | null;
-      bounds: { x: number; y: number; width: number; height: number };
-      isMinimized: boolean;
-    }>;
-    closeOtherApps?: boolean;
-    save?: boolean;
-  }): Promise<void> {
-    return ipcRenderer.invoke(IpcEvents.APPLY_WORKSPACE, payload) as Promise<void>;
   },
 
   /**

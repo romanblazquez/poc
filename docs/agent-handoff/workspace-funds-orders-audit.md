@@ -71,6 +71,14 @@ Build a split workspace for a funds workflow:
   - Runtime header has `Edit Layout` / `Lock Layout` and `Save Layout` actions.
   - In edit mode, panes can be dragged by their compact header and resized from right, bottom, or corner handles while embedded webviews remain live.
   - Runtime window layout edits persist to `localStorage` under `fdc3.workspaceRuntime.<workspaceWindowId>`.
+- Reoriented the shell back to the intended product path:
+  - Added `apps/desktop-shell/src/renderer/components/DockviewWorkspace.tsx` as the active workspace engine for embedded webview panels.
+  - `apps/desktop-shell/src/renderer/App.tsx` now owns compact workspace tabs, per-workspace Dockview layout persistence, per-workspace theme persistence, and the active single-window workspace mode.
+  - Embedded webviews are resynchronized on channel/theme changes after they are already open, not only on first `dom-ready`.
+  - `apps/desktop-shell/src/renderer/components/DockviewWorkspaceEditor.tsx` is now only a deprecated compatibility wrapper around the main Dockview workspace component.
+  - Deprecated the popup/freeform path in source comments for `WorkspaceBuilder.tsx`, `WorkspaceRuntimeWindow.tsx`, `window-manager.ts`, `ipc-router.ts`, and `ipc-events.ts`.
+  - Removed popup workspace APIs from the exposed preload `window.fdc3` surface so the main renderer no longer has an active runtime popup path.
+  - Converted `config/workspace.default.json` from BrowserWindow rectangle snapshots to a workspace-tab Dockview-oriented default model.
 
 ## Implementation Notes
 
@@ -119,6 +127,11 @@ Build a split workspace for a funds workflow:
 - `npm run build:shell` and `npx tsc --noEmit -p apps/desktop-shell/tsconfig.main.json` pass after editable runtime workspace windows.
 - `npm run typecheck` still fails on pre-existing repo-wide strict TypeScript issues in older React apps/shared UI and the existing renderer `window.fdc3` global declaration mismatch. New app-specific errors were fixed before this status was written.
 - `npm run build:shell`, `npm run build:apps`, and `npx tsc --noEmit -p apps/desktop-shell/tsconfig.main.json` pass after Interop Flow Designer implementation (React Flow canvas, config panel, toolbar) and Dockview foundation setup.
+- `npm run build:shell` passes after routing the active shell workspace back onto the single-window Dockview runtime and removing popup workspace APIs from the preload surface.
+- `npx tsc --noEmit -p apps/desktop-shell/tsconfig.main.json` and `npm run build:shell` and `npm run build:apps` all pass after removing the deprecated dead private methods from `IpcRouter` that were flagged as never-read by the strict TypeScript compiler.
+- `npm run build:shell` passes after fixing the blank workspace bug: `DockviewWorkspace` was mounting before `getAppList` and `getPreloadPath` resolved, so `onReady` fired with `apps=[]` and no panels were added. Fixed by gating the workspace render in `App.tsx` until both `apps.length > 0` and `preloadPath` are truthy, and adding a defensive `useEffect` inside `DockviewWorkspace` that calls `resetLayout()` if panels are still empty when the app list first arrives.
+- `npm run build:shell` passes after fixing a second blank-screen bug: `index.html` referenced Dockview's base CSS at `../../../node_modules/dockview/dist/dockview.css` which does not exist (file is at `dist/styles/dockview.css`). Without base CSS, Dockview panels render with 0px height. Fixed by removing the broken `<link>` tag from `index.html` and adding `import 'dockview/dist/styles/dockview.css'` directly in `DockviewWorkspace.tsx` so Vite bundles it correctly. CSS bundle size confirms styles are now included (53 kB vs 26 kB before).
+- `npm run build:shell` passes after fixing `params.registerWebview is not a function` crash: Dockview's `fromJSON`/`toJSON` serialises panel params to JSON, which silently drops functions. `registerWebview` was stored in params and came back as `undefined` on restore. Fixed by introducing `RegisterWebviewContext` (React context) and delivering `registerWebview` via context provider wrapping `DockviewReact`. Panel params now contain only JSON-safe values. localStorage key bumped from `v2` to `v3` to discard stale saved layouts containing the old params shape.
 
 ## Implementation Phase 1 Complete (Apr 26, 2026)
 

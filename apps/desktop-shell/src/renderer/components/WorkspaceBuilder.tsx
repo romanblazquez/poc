@@ -1,4 +1,6 @@
-import React, { useState, useCallback, useRef } from 'react';
+// Deprecated: replaced by single-window Dockview workspace.
+// Do not use for main workspace runtime.
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { CSSProperties, KeyboardEvent } from 'react';
 import type { UserChannel } from '@fdc3-poc/fdc3-core';
 import type { AppEntry, WorkspaceRuntimePayload, WorkspaceWindowDraft } from '../App.js';
@@ -9,6 +11,7 @@ interface WorkspaceTab {
   name: string;
   channelId: string | null;
   initialPanelIds: string[];
+  layoutJson?: unknown;
 }
 
 interface WorkspaceBuilderProps {
@@ -40,23 +43,39 @@ const DEFAULT_TABS: WorkspaceTab[] = [
   },
 ];
 
+const STORAGE_KEY = 'fdc3-dockview-workspace-tabs-v1';
+
 export function WorkspaceBuilder({
   apps,
   channels,
   currentChannel,
   preloadPath,
-  onApply,
-  onOpenWorkspaceWindow,
+  onApply: _onApply,
+  onOpenWorkspaceWindow: _onOpenWorkspaceWindow,
 }: WorkspaceBuilderProps) {
-  const [tabs, setTabs] = useState<WorkspaceTab[]>(() =>
-    DEFAULT_TABS.map((t) => ({ ...t, channelId: currentChannel?.id ?? null }))
-  );
+  const [tabs, setTabs] = useState<WorkspaceTab[]>(() => {
+    const fallback = DEFAULT_TABS.map((t) => ({ ...t, channelId: currentChannel?.id ?? null }));
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw) as WorkspaceTab[];
+      if (!Array.isArray(parsed) || parsed.length === 0) return fallback;
+      return parsed;
+    } catch {
+      return fallback;
+    }
+  });
   const [activeTabId, setActiveTabId] = useState<string>(DEFAULT_TABS[0].id);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
+
+  useEffect(() => {
+    if (tabs.length === 0) return;
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tabs));
+  }, [tabs]);
 
   const addTab = useCallback(() => {
     const id = `tab-${Date.now()}`;
@@ -112,6 +131,10 @@ export function WorkspaceBuilder({
 
   const setTabChannel = useCallback((tabId: string, channelId: string | null) => {
     setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, channelId } : t)));
+  }, []);
+
+  const setTabLayout = useCallback((tabId: string, layoutJson: unknown) => {
+    setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, layoutJson } : t)));
   }, []);
 
   const activeChannel =
@@ -193,6 +216,9 @@ export function WorkspaceBuilder({
           currentChannel={activeChannel}
           preloadPath={preloadPath}
           initialPanelIds={activeTab.initialPanelIds}
+          initialLayout={activeTab.layoutJson}
+          onLayoutChange={(layout) => setTabLayout(activeTab.id, layout)}
+          workspaceName={activeTab.name}
         />
       )}
     </div>

@@ -1,3 +1,5 @@
+// Deprecated: replaced by single-window Dockview workspace.
+// Do not use for main workspace runtime.
 import { useEffect, useRef, useState } from 'react';
 import type {
   CSSProperties,

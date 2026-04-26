@@ -2,8 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { AppLauncher } from './components/AppLauncher.js';
 import { ChannelBar } from './components/ChannelBar.js';
 import { WorkspaceToolbar } from './components/WorkspaceToolbar.js';
-import { WorkspaceBuilder } from './components/WorkspaceBuilder.js';
-import { WorkspaceRuntimeWindow } from './components/WorkspaceRuntimeWindow.js';
+import { DockviewWorkspace } from './components/DockviewWorkspace.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
 import type { UserChannel } from '@fdc3-poc/fdc3-core';
 
@@ -13,20 +12,12 @@ declare global {
     fdc3: {
       getAppList(): Promise<AppEntry[]>;
       getPreloadPath(): Promise<string>;
-      openWorkspaceWindow(payload: WorkspaceRuntimePayload): Promise<void>;
-      getWorkspaceWindowPayload(id: string): Promise<WorkspaceRuntimePayload | null>;
       open(app: { appId: string }): Promise<void>;
       getUserChannels(): Promise<UserChannel[]>;
       getCurrentChannel(): Promise<UserChannel | null>;
       joinUserChannel(channelId: string): Promise<void>;
       leaveCurrentChannel(): Promise<void>;
       saveWorkspace(name?: string): Promise<void>;
-      applyWorkspace(payload: {
-        name: string;
-        windows: WorkspaceWindowDraft[];
-        closeOtherApps?: boolean;
-        save?: boolean;
-      }): Promise<void>;
       onChannelChanged(handler: (ch: UserChannel | null) => void): () => void;
       broadcast(context: unknown): Promise<void>;
     };
@@ -43,104 +34,145 @@ export interface AppEntry {
   devPort: number;
 }
 
-export interface WorkspaceWindowDraft {
-  appId: string;
+type ThemeMode = 'light' | 'dark';
+type WorkspaceMode = 'launcher' | 'workspace' | 'interop-flow';
+type WorkspaceId = 'trading-flow' | 'market-view';
+
+interface WorkspaceState {
   channelId: string | null;
-  bounds: { x: number; y: number; width: number; height: number };
-  isMinimized: boolean;
+  theme: ThemeMode;
+  layout: unknown | null;
 }
 
-export interface WorkspaceLayoutItem {
-  appId: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+const WORKSPACE_STATE_STORAGE_KEY = 'fdc3.workspace-tabs.v3'; // bumped from v2 to drop stale serialised function params
 
-export interface WorkspaceRuntimePayload {
-  id: string;
-  name: string;
-  channelId: string;
-  items: WorkspaceLayoutItem[];
+const WORKSPACE_PRESETS: Record<WorkspaceId, { name: string; panelIds: string[] }> = {
+  'trading-flow': {
+    name: 'Trading Flow',
+    panelIds: ['incoming-orders', 'funds-allocations', 'audit-log'],
+  },
+  'market-view': {
+    name: 'Market View',
+    panelIds: ['market-watch', 'customer-profile', 'portfolio-view'],
+  },
+};
+
+const DEFAULT_WORKSPACE_STATES: Record<WorkspaceId, WorkspaceState> = {
+  'trading-flow': { channelId: 'channel-5', theme: 'dark', layout: null },
+  'market-view': { channelId: null, theme: 'dark', layout: null },
+};
+
+function readWorkspaceStates(): Record<WorkspaceId, WorkspaceState> {
+  try {
+    const raw = window.localStorage.getItem(WORKSPACE_STATE_STORAGE_KEY);
+    if (!raw) return DEFAULT_WORKSPACE_STATES;
+    const parsed = JSON.parse(raw) as Partial<Record<WorkspaceId, Partial<WorkspaceState>>>;
+    return {
+      'trading-flow': { ...DEFAULT_WORKSPACE_STATES['trading-flow'], ...parsed['trading-flow'] },
+      'market-view': { ...DEFAULT_WORKSPACE_STATES['market-view'], ...parsed['market-view'] },
+    };
+  } catch {
+    return DEFAULT_WORKSPACE_STATES;
+  }
 }
 
 export function App() {
-  const workspaceWindowId = new URLSearchParams(window.location.search).get('workspaceWindowId');
   const [apps, setApps] = useState<AppEntry[]>([]);
-  const [channels, setChannels] = useState<UserChannel[]>([]);
   const [preloadPath, setPreloadPath] = useState('');
-  const [runtimePayload, setRuntimePayload] = useState<WorkspaceRuntimePayload | null>(null);
   const [currentChannel, setCurrentChannel] = useState<UserChannel | null>(null);
   const [saveStatus, setSaveStatus] = useState('');
-  const [activeTab, setActiveTab] = useState<'launcher' | 'workspace' | 'interop-flow'>('workspace');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [activeMode, setActiveMode] = useState<WorkspaceMode>('workspace');
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<WorkspaceId>('trading-flow');
+  const [workspaceStates, setWorkspaceStates] = useState<Record<WorkspaceId, WorkspaceState>>(() => readWorkspaceStates());
+  const [openPanelIds, setOpenPanelIds] = useState<string[]>(WORKSPACE_PRESETS['trading-flow'].panelIds);
+
+  const activeWorkspaceState = workspaceStates[activeWorkspaceId];
+  const activeWorkspacePreset = WORKSPACE_PRESETS[activeWorkspaceId];
+  const theme = activeWorkspaceState.theme;
 
   useEffect(() => {
+    if (!window.fdc3) return;
     void window.fdc3.getAppList().then(setApps);
     void window.fdc3.getPreloadPath().then(setPreloadPath);
-    void window.fdc3.getUserChannels().then(setChannels);
     void window.fdc3.getCurrentChannel().then(setCurrentChannel);
     const unsub = window.fdc3.onChannelChanged(setCurrentChannel);
     return unsub;
   }, []);
 
   useEffect(() => {
-    if (!workspaceWindowId) return;
-    void window.fdc3.getWorkspaceWindowPayload(workspaceWindowId).then(setRuntimePayload);
-  }, [workspaceWindowId]);
-
-  useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    window.localStorage.setItem(WORKSPACE_STATE_STORAGE_KEY, JSON.stringify(workspaceStates));
+  }, [workspaceStates]);
+
+  useEffect(() => {
+    if (!window.fdc3) return;
+    const desiredChannelId = activeWorkspaceState.channelId;
+    if (desiredChannelId) {
+      void window.fdc3.joinUserChannel(desiredChannelId);
+      return;
+    }
+    void window.fdc3.leaveCurrentChannel();
+  }, [activeWorkspaceState.channelId, activeWorkspaceId]);
 
   const handleOpen = useCallback(async (appId: string) => {
     await window.fdc3.open({ appId });
   }, []);
 
   const handleSave = useCallback(async () => {
-    await window.fdc3.saveWorkspace('default');
-    setSaveStatus('Saved ✓');
+    window.localStorage.setItem(WORKSPACE_STATE_STORAGE_KEY, JSON.stringify(workspaceStates));
+    setSaveStatus('Workspace saved');
     setTimeout(() => setSaveStatus(''), 2000);
-  }, []);
+  }, [workspaceStates]);
 
-  const handleApplyWorkspace = useCallback(async (payload: {
-    name: string;
-    windows: WorkspaceWindowDraft[];
-    closeOtherApps: boolean;
-    save: boolean;
-  }) => {
-    await window.fdc3.applyWorkspace(payload);
-    setSaveStatus(payload.save ? 'Workspace saved ✓' : 'Workspace launched ✓');
-    setTimeout(() => setSaveStatus(''), 2200);
-  }, []);
+  const handleThemeChange = useCallback(async (nextTheme: ThemeMode) => {
+    setWorkspaceStates((prev) => ({
+      ...prev,
+      [activeWorkspaceId]: {
+        ...prev[activeWorkspaceId],
+        theme: nextTheme,
+      },
+    }));
+    if (window.fdc3) {
+      await window.fdc3.broadcast({
+        type: 'com.demo.theme',
+        name: `${nextTheme} theme`,
+        theme: nextTheme,
+      });
+    }
+  }, [activeWorkspaceId]);
 
-  const handleOpenWorkspaceWindow = useCallback(async (payload: WorkspaceRuntimePayload) => {
-    await window.fdc3.openWorkspaceWindow(payload);
-    setSaveStatus('Workspace window opened ✓');
-    setTimeout(() => setSaveStatus(''), 2200);
-  }, []);
-
-  const handleThemeChange = useCallback(async (nextTheme: 'light' | 'dark') => {
-    setTheme(nextTheme);
-    await window.fdc3.broadcast({
+  useEffect(() => {
+    if (!window.fdc3) return;
+    void window.fdc3.broadcast({
       type: 'com.demo.theme',
-      name: `${nextTheme} theme`,
-      theme: nextTheme,
+      name: `${theme} theme`,
+      theme,
     });
-  }, []);
+  }, [activeWorkspaceId, theme]);
 
-  if (workspaceWindowId) {
-    return (
-      <WorkspaceRuntimeWindow
-        apps={apps}
-        preloadPath={preloadPath}
-        payload={runtimePayload}
-        theme={theme}
-        onThemeChange={handleThemeChange}
-      />
-    );
-  }
+  const handleChannelChange = useCallback((channel: UserChannel | null) => {
+    setCurrentChannel(channel);
+    setWorkspaceStates((prev) => ({
+      ...prev,
+      [activeWorkspaceId]: {
+        ...prev[activeWorkspaceId],
+        channelId: channel?.id ?? null,
+      },
+    }));
+  }, [activeWorkspaceId]);
+
+  const handleLayoutChange = useCallback((layout: unknown) => {
+    setWorkspaceStates((prev) => ({
+      ...prev,
+      [activeWorkspaceId]: {
+        ...prev[activeWorkspaceId],
+        layout,
+      },
+    }));
+  }, [activeWorkspaceId]);
 
   return (
     <div
@@ -148,49 +180,50 @@ export function App() {
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
-        background: 'linear-gradient(160deg, #0f0f1a 0%, #16213e 100%)',
+        background: theme === 'dark'
+          ? 'linear-gradient(180deg, #06111d 0%, #0d1827 100%)'
+          : 'linear-gradient(180deg, #dde6f2 0%, #cfd9e8 100%)',
       }}
     >
-      {/* Header */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 24px',
-          height: 56,
-          background: '#0a0a18',
-          borderBottom: '1px solid #1e1e3e',
+          padding: '0 14px',
+          height: 30,
+          background: theme === 'dark' ? '#07111d' : '#eef3f8',
+          borderBottom: `1px solid ${theme === 'dark' ? '#1c2b3d' : '#b4c2d3'}`,
           flexShrink: 0,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div
             style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: 'linear-gradient(135deg, #4080e8, #9040e8)',
+              width: 18,
+              height: 18,
+              borderRadius: 4,
+              background: 'linear-gradient(135deg, #1f6feb, #3ba0ff)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 16,
+              fontSize: 10,
             }}
           >
             ⚡
           </div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: '#e0e0ff', letterSpacing: 0.5 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <div style={{ fontWeight: 800, fontSize: 12, color: theme === 'dark' ? '#dce8f8' : '#11253c', letterSpacing: 0.4 }}>
               FDC3 Desktop Shell
             </div>
-            <div style={{ fontSize: 10, color: '#6060a0', letterSpacing: 1 }}>
-              ENTERPRISE INTEROP POC
+            <div style={{ fontSize: 10, color: theme === 'dark' ? '#7b90a8' : '#526a82', letterSpacing: 0.8 }}>
+              TRADER WORKSTATION
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <label style={{ alignItems: 'center', color: '#a8acd8', display: 'flex', fontSize: 11, fontWeight: 800, gap: 7 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ alignItems: 'center', color: theme === 'dark' ? '#a8b8cb' : '#42566d', display: 'flex', fontSize: 10, fontWeight: 800, gap: 6, textTransform: 'uppercase' }}>
             <span>Theme</span>
             <button
               role="switch"
@@ -200,16 +233,16 @@ export function App() {
               title="Toggle workspace theme"
               style={{
                 alignItems: 'center',
-                background: theme === 'dark' ? '#25304f' : '#dbeafe',
-                border: '1px solid #3d5f9f',
+                background: theme === 'dark' ? '#1c3047' : '#dce8f5',
+                border: `1px solid ${theme === 'dark' ? '#35597e' : '#9fb2c5'}`,
                 borderRadius: 999,
-                color: theme === 'dark' ? '#dbeafe' : '#1e3a8a',
+                color: theme === 'dark' ? '#dbeafe' : '#20405e',
                 cursor: 'pointer',
                 display: 'flex',
                 fontSize: 10,
                 fontWeight: 900,
                 gap: 6,
-                height: 24,
+                height: 20,
                 padding: '2px 8px 2px 3px',
               }}
             >
@@ -219,8 +252,8 @@ export function App() {
                   borderRadius: '50%',
                   boxShadow: '0 1px 4px rgba(0,0,0,.35)',
                   display: 'inline-block',
-                  height: 16,
-                  width: 16,
+                  height: 12,
+                  width: 12,
                 }}
               />
               <span>{theme === 'dark' ? 'Dark' : 'Light'}</span>
@@ -229,38 +262,62 @@ export function App() {
           <WorkspaceToolbar onSave={handleSave} saveStatus={saveStatus} />
           <ChannelBar
             currentChannel={currentChannel}
-            onChannelChange={setCurrentChannel}
+            onChannelChange={handleChannelChange}
           />
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, padding: '14px 24px 0', flexShrink: 0 }}>
-        <TabButton active={activeTab === 'workspace'} onClick={() => setActiveTab('workspace')}>
-          Workspace Builder
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px 0', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {(Object.entries(WORKSPACE_PRESETS) as Array<[WorkspaceId, { name: string; panelIds: string[] }]>).map(([workspaceId, preset]) => (
+            <WorkspaceTabButton
+              key={workspaceId}
+              active={activeWorkspaceId === workspaceId}
+              onClick={() => setActiveWorkspaceId(workspaceId)}
+            >
+              {preset.name}
+            </WorkspaceTabButton>
+          ))}
+        </div>
+        <div style={{ flex: 1 }} />
+        <TabButton active={activeMode === 'workspace'} onClick={() => setActiveMode('workspace')}>
+          Workspace
         </TabButton>
-        <TabButton active={activeTab === 'interop-flow'} onClick={() => setActiveTab('interop-flow')}>
+        <TabButton active={activeMode === 'interop-flow'} onClick={() => setActiveMode('interop-flow')}>
           Interop Flow
         </TabButton>
-        <TabButton active={activeTab === 'launcher'} onClick={() => setActiveTab('launcher')}>
+        <TabButton active={activeMode === 'launcher'} onClick={() => setActiveMode('launcher')}>
           App Launcher
         </TabButton>
       </div>
 
-      {/* Main content */}
-      <div style={{ flex: 1, minHeight: 0, padding: '16px 24px 20px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {activeTab === 'workspace' ? (
-          <WorkspaceBuilder
-            apps={apps}
-            channels={channels}
-            currentChannel={currentChannel}
-            preloadPath={preloadPath}
-            onApply={handleApplyWorkspace}
-            onOpenWorkspaceWindow={handleOpenWorkspaceWindow}
-          />
-        ) : activeTab === 'interop-flow' ? (
+      <div style={{ flex: 1, minHeight: 0, padding: '10px 12px 12px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {activeMode === 'workspace' ? (
+          apps.length > 0 && preloadPath ? (
+            <DockviewWorkspace
+              key={activeWorkspaceId}
+              apps={apps}
+              currentChannel={currentChannel}
+              preloadPath={preloadPath}
+              initialPanelIds={activeWorkspacePreset.panelIds}
+              initialLayout={activeWorkspaceState.layout}
+              onLayoutChange={handleLayoutChange}
+              onOpenPanelsChange={setOpenPanelIds}
+              workspaceName={activeWorkspacePreset.name}
+              theme={theme}
+            />
+          ) : (
+            <div style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: theme === 'dark' ? '#4a6080' : '#8aa0b8', fontSize: 12, letterSpacing: 1,
+            }}>
+              Connecting to FDC3 bus…
+            </div>
+          )
+        ) : activeMode === 'interop-flow' ? (
           <InteropFlowDesigner
             apps={apps}
-            workspaceTabId={currentChannel?.id ?? 'default-channel'}
+            workspaceTabId={activeWorkspaceId}
             appIds={apps.map((a) => a.appId)}
           />
         ) : (
@@ -291,15 +348,45 @@ export function App() {
           flexShrink: 0,
         }}
       >
+        <StatusItem label="Workspace" value={activeWorkspacePreset.name} color="#91b4ff" />
         <StatusItem
           label="Channel"
           value={currentChannel?.displayMetadata.name ?? 'None'}
           color={currentChannel?.displayMetadata.color ?? '#555'}
         />
-        <StatusItem label="Runtime" value="Electron / FDC3" color="#4080e8" />
-        <StatusItem label="Apps" value={String(apps.length)} color="#40c080" />
+        <StatusItem label="Bus" value="Electron / FDC3" color="#4080e8" />
+        <StatusItem label="Panels" value={String(openPanelIds.length)} color="#40c080" />
       </div>
     </div>
+  );
+}
+
+function WorkspaceTabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: active ? '#143152' : '#0d1520',
+        border: `1px solid ${active ? '#2d5f97' : '#213247'}`,
+        borderRadius: '6px 6px 0 0',
+        color: active ? '#e4efff' : '#8ea1b7',
+        cursor: 'pointer',
+        fontSize: 11,
+        fontWeight: 800,
+        height: 28,
+        padding: '0 12px',
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -316,14 +403,16 @@ function TabButton({
     <button
       onClick={onClick}
       style={{
-        background: active ? '#1e2a4a' : '#101024',
-        border: `1px solid ${active ? '#3a5ca8' : '#25254a'}`,
-        borderRadius: 7,
-        color: active ? '#e0e8ff' : '#8585b0',
+        background: active ? '#173454' : '#0d1520',
+        border: `1px solid ${active ? '#2f648f' : '#223347'}`,
+        borderRadius: 5,
+        color: active ? '#e0e8ff' : '#90a4bb',
         cursor: 'pointer',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 800,
-        padding: '8px 12px',
+        height: 26,
+        padding: '0 10px',
+        textTransform: 'uppercase',
       }}
     >
       {children}

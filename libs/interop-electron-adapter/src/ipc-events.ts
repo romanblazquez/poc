@@ -24,6 +24,8 @@ export const IpcEvents = {
   APPLY_WORKSPACE: 'fdc3:applyWorkspace',
   GET_APP_LIST: 'fdc3:getAppList',
   GET_PRELOAD_PATH: 'fdc3:getPreloadPath',
+  // Deprecated: replaced by single-window Dockview workspace.
+  // Do not use for main workspace runtime.
   OPEN_WORKSPACE_WINDOW: 'fdc3:openWorkspaceWindow',
   GET_WORKSPACE_WINDOW_PAYLOAD: 'fdc3:getWorkspaceWindowPayload',
 

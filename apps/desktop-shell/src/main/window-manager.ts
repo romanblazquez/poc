@@ -35,6 +35,8 @@ export interface WindowEntry {
   appId: string;
 }
 
+// Deprecated: replaced by single-window Dockview workspace.
+// Do not use for main workspace runtime.
 const SNAP_THRESHOLD = 18;
 const ATTACH_THRESHOLD = 6;
 const SNAP_DEBOUNCE_MS = 120;
@@ -58,6 +60,8 @@ export class WindowManager {
 
   constructor(private readonly appDefs: AppDefinition[]) {
     this.preloadPath = path.join(__dirname, '../preload/index.js');
+    // Magnetic behavior is disabled for workspace composition, but keep helpers compiled for optional app windows.
+    void this.handleWindowMove;
   }
 
   createShellWindow(): BrowserWindow {
@@ -89,6 +93,18 @@ export class WindowManager {
     return win;
   }
 
+  focusOrCreateShellWindow(): BrowserWindow {
+    const existing = this.findByAppId('shell');
+    if (existing) {
+      if (existing.isMinimized()) existing.restore();
+      existing.focus();
+      return existing;
+    }
+    return this.createShellWindow();
+  }
+
+  // Deprecated: replaced by single-window Dockview workspace.
+  // Do not use for main workspace runtime.
   createWorkspaceWindow(workspaceWindowId: string, title: string): BrowserWindow {
     const win = new BrowserWindow({
       width: 1800,
@@ -161,12 +177,6 @@ export class WindowManager {
     const id = win.webContents.id;
     this.windows.set(id, { window: win, appId });
     this.lastBounds.set(id, win.getBounds());
-
-    if (appId !== 'shell') {
-      win.on('move', () => {
-        this.handleWindowMove(win);
-      });
-    }
 
     win.on('closed', () => {
       const timer = this.snapTimers.get(id);
@@ -244,6 +254,8 @@ export class WindowManager {
     }
   }
 
+  // Deprecated: replaced by single-window Dockview workspace.
+  // Do not use for main workspace runtime.
   private handleWindowMove(activeWindow: BrowserWindow): void {
     if (activeWindow.isDestroyed() || activeWindow.isMinimized()) return;
 

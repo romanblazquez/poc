@@ -11,6 +11,7 @@ export function ChannelBar({ currentChannel, onChannelChange }: ChannelBarProps)
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    if (!window.fdc3) return;
     void window.fdc3.getUserChannels().then(setChannels);
   }, []);
 

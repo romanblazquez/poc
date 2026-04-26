@@ -16,7 +16,6 @@ import type { AppDefinition } from '@fdc3-poc/fdc3-core';
  */
 export class IpcRouter {
   private readonly intentResolver: IntentResolver;
-  private readonly workspaceWindowPayloads = new Map<string, unknown>();
 
   constructor(
     private readonly windowManager: WindowManager,
@@ -42,11 +41,8 @@ export class IpcRouter {
     this.handleOpenApp();
     this.handleGetWindowId();
     this.handleSaveWorkspace();
-    this.handleApplyWorkspace();
     this.handleGetAppList();
     this.handleGetPreloadPath();
-    this.handleOpenWorkspaceWindow();
-    this.handleGetWorkspaceWindowPayload();
   }
 
   // ─── Context broadcasting ─────────────────────────────────────────────────
@@ -222,28 +218,6 @@ export class IpcRouter {
     });
   }
 
-  private handleApplyWorkspace(): void {
-    ipcMain.handle(
-      IpcEvents.APPLY_WORKSPACE,
-      (
-        _event,
-        payload: {
-          name: string;
-          windows: Parameters<WorkspaceManager['apply']>[1];
-          closeOtherApps?: boolean;
-          save?: boolean;
-        },
-      ) => {
-        return this.workspaceManager.apply(
-          payload.name,
-          payload.windows,
-          payload.closeOtherApps ?? false,
-          payload.save ?? false,
-        );
-      },
-    );
-  }
-
   private handleGetAppList(): void {
     ipcMain.handle(IpcEvents.GET_APP_LIST, () => {
       return this.appDirectory.map((a) => ({
@@ -261,23 +235,6 @@ export class IpcRouter {
   private handleGetPreloadPath(): void {
     ipcMain.handle(IpcEvents.GET_PRELOAD_PATH, () => {
       return this.windowManager.getPreloadPath();
-    });
-  }
-
-  private handleOpenWorkspaceWindow(): void {
-    ipcMain.handle(
-      IpcEvents.OPEN_WORKSPACE_WINDOW,
-      (_event, payload: { id: string; name: string; channelId: string; items: unknown[] }) => {
-        this.workspaceWindowPayloads.set(payload.id, payload);
-        this.windowManager.createWorkspaceWindow(payload.id, payload.name);
-        return { opened: true };
-      },
-    );
-  }
-
-  private handleGetWorkspaceWindowPayload(): void {
-    ipcMain.handle(IpcEvents.GET_WORKSPACE_WINDOW_PAYLOAD, (_event, id: string) => {
-      return this.workspaceWindowPayloads.get(id) ?? null;
     });
   }
 

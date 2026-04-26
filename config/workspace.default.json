@@ -1,11 +1,33 @@
 {
-  "id": "default",
-  "name": "Funds Workflow Layout",
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "windows": [
-    { "appId": "incoming-orders",    "channelId": "channel-5", "bounds": { "x": 50,  "y": 80,  "width": 850, "height": 420 }, "isMinimized": false },
-    { "appId": "audit-log",          "channelId": "channel-5", "bounds": { "x": 50,  "y": 530, "width": 850, "height": 420 }, "isMinimized": false },
-    { "appId": "funds-allocations",  "channelId": "channel-5", "bounds": { "x": 930, "y": 80,  "width": 780, "height": 620 }, "isMinimized": false },
-    { "appId": "theme-toggle",       "channelId": "channel-5", "bounds": { "x": 930, "y": 730, "width": 360, "height": 220 }, "isMinimized": false }
+  "version": "2.0",
+  "workspaceTabs": [
+    {
+      "id": "trading-flow",
+      "name": "Trading Flow",
+      "channelId": "channel-5",
+      "theme": "dark",
+      "openAppIds": ["incoming-orders", "funds-allocations", "audit-log"],
+      "activePanelId": "incoming-orders",
+      "dockviewLayout": null,
+      "interopFlow": {
+        "enabled": true,
+        "nodes": [],
+        "connectors": []
+      }
+    },
+    {
+      "id": "market-view",
+      "name": "Market View",
+      "channelId": null,
+      "theme": "dark",
+      "openAppIds": ["market-watch", "customer-profile", "portfolio-view"],
+      "activePanelId": "market-watch",
+      "dockviewLayout": null,
+      "interopFlow": {
+        "enabled": true,
+        "nodes": [],
+        "connectors": []
+      }
+    }
   ]
 }
