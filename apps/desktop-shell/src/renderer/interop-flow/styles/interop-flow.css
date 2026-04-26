@@ -1,0 +1,206 @@
+/* Interop Flow Designer Styles */
+
+.interop-app-node {
+  background: linear-gradient(135deg, #1a1a30 0%, #0f0f20 100%);
+  border: 1px solid #2a3a60;
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 160px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  font-size: 11px;
+  color: #a0a0d0;
+}
+
+.interop-app-node-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: #e0e0ff;
+  font-size: 12px;
+}
+
+.interop-app-node-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #4080e8, #9040e8);
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.interop-app-node-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  border-top: 1px solid #1e1e3e;
+  padding-top: 8px;
+}
+
+.interop-port-heading {
+  font-size: 9px;
+  font-weight: 700;
+  color: #606080;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.interop-port-heading-right {
+  text-align: right;
+}
+
+.interop-port {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 10px;
+  color: #a0a0d0;
+  position: relative;
+  height: 20px;
+}
+
+.interop-port-left {
+  flex-direction: row;
+}
+
+.interop-port-right {
+  flex-direction: row-reverse;
+}
+
+.interop-handle {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #4080e8;
+  border: 2px solid #0a0a18;
+  cursor: grab;
+  transition: all 0.2s;
+}
+
+.interop-handle:hover {
+  width: 16px;
+  height: 16px;
+  background: #60a0ff;
+  box-shadow: 0 0 8px rgba(96, 160, 255, 0.6);
+}
+
+.interop-handle-context {
+  background: #60c0ff;
+}
+
+.interop-handle-context:hover {
+  background: #80d0ff;
+}
+
+.interop-handle-intent {
+  background: #c060ff;
+}
+
+.interop-handle-intent:hover {
+  background: #d080ff;
+}
+
+.interop-handle.connecting {
+  background: #ffb040;
+  box-shadow: 0 0 12px rgba(255, 176, 64, 0.8);
+}
+
+/* Edge labels */
+.interop-edge-label {
+  background: rgba(10, 10, 24, 0.95);
+  border: 1px solid #2a2a50;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #a0a0d0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.interop-edge-label-invalid {
+  border-color: #ff6060;
+  color: #ff9090;
+  background: rgba(255, 96, 96, 0.1);
+}
+
+/* React Flow overrides */
+.react-flow__edge-path {
+  stroke-width: 1.6;
+}
+
+.react-flow__edge-path.animated {
+  animation: dash 20s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+
+.react-flow__handle {
+  opacity: 0;
+}
+
+.react-flow__node.selected .interop-app-node {
+  border-color: #4080e8;
+  box-shadow: 0 4px 24px rgba(64, 128, 232, 0.3);
+}
+
+.react-flow__edge.selected {
+  stroke-width: 2.4;
+}
+
+/* Background panel */
+.react-flow__background {
+  background: linear-gradient(135deg, #0a0a18 0%, #0f0f20 100%);
+}
+
+/* Controls styling */
+.react-flow__controls {
+  background: #0a0a18;
+  border: 1px solid #1e1e3e;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.react-flow__controls button {
+  background: #1a1a30;
+  border: 1px solid #2a2a50;
+  color: #a0a0d0;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.react-flow__controls button:hover {
+  background: #2a2a40;
+  border-color: #4080e8;
+  color: #4080e8;
+}
+
+/* MiniMap styling */
+.react-flow__minimap {
+  background: rgba(10, 10, 24, 0.8);
+  border: 1px solid #1e1e3e;
+  border-radius: 6px;
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(64, 128, 232, 0.1);
+  stroke: #4080e8;
+}

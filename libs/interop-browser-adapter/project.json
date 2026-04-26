@@ -1,0 +1,8 @@
+{
+  "name": "interop-browser-adapter",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/interop-browser-adapter/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:browser"],
+  "implicitDependencies": ["fdc3-core"]
+}

@@ -1,0 +1,141 @@
+/**
+ * FDC3 Desktop Shell — Electron Main Process entry point.
+ *
+ * Bootstraps the entire desktop interoperability shell:
+ *   1. Security hardening
+ *   2. App registry load
+ *   3. Channel manager
+ *   4. Intent registry
+ *   5. Window manager
+ *   6. IPC router (wires all FDC3 handlers)
+ *   7. Workspace manager
+ *   8. Shell window creation
+ *   9. Optional workspace restore
+ */
+
+import { app, BrowserWindow } from 'electron';
+import fs from 'fs';
+import path from 'path';
+
+import { setupSecurity } from './security.js';
+import { AppRegistryLoader } from './app-registry-loader.js';
+import { WindowManager } from './window-manager.js';
+import { IpcRouter } from './ipc-router.js';
+import { WorkspaceManager } from './workspace-manager.js';
+import { ChannelManager } from '@fdc3-poc/channel-engine';
+import { IntentRegistry } from '@fdc3-poc/intent-engine';
+import type { WorkspaceSnapshot } from '@fdc3-poc/workspace-engine';
+
+const isDev = process.env.NODE_ENV === 'development';
+
+// Prevent multiple instances
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+  process.exit(0);
+}
+
+async function bootstrap(): Promise<void> {
+  await app.whenReady();
+
+  // 1. Security
+  setupSecurity();
+
+  // 2. App directory
+  const configPath = isDev
+    ? path.join(__dirname, '../../../../config/app-directory.json')
+    : path.join(process.resourcesPath, 'config', 'app-directory.json');
+
+  const appDefs = AppRegistryLoader.load(configPath);
+
+  // 3. Core engines
+  const channelManager = new ChannelManager();
+  const intentRegistry = new IntentRegistry();
+
+  // 4. Window manager
+  const windowManager = new WindowManager(appDefs);
+
+  // 5. Workspace manager
+  const workspaceManager = new WorkspaceManager(windowManager, channelManager);
+
+  // 6. IPC router — must be registered before any window loads
+  const ipcRouter = new IpcRouter(
+    windowManager,
+    channelManager,
+    intentRegistry,
+    workspaceManager,
+    appDefs,
+  );
+  ipcRouter.register();
+
+  // Clean up engine state when a window closes
+  app.on('web-contents-created', (_, wc) => {
+    wc.on('destroyed', () => {
+      ipcRouter.cleanupWindow(wc.id);
+    });
+  });
+
+  // 7. Create the shell launcher window
+  windowManager.createShellWindow();
+
+  // 8. Restore a saved workspace when it still matches the configured default app set.
+  // Otherwise, use the configured default so generated workspaces are visible on startup.
+  const defaultWorkspace = loadDefaultWorkspace();
+  const saved = workspaceManager.loadLatest();
+  if (saved && snapshotContainsApps(saved, defaultWorkspace)) {
+    workspaceManager.restore(saved);
+  } else if (defaultWorkspace) {
+    workspaceManager.restore(defaultWorkspace);
+  }
+
+  // macOS: re-create window when dock icon clicked with no windows open
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      windowManager.createShellWindow();
+    }
+  });
+}
+
+// Quit when all windows are closed (except macOS)
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+// Focus existing window if second instance is launched
+app.on('second-instance', () => {
+  const wins = BrowserWindow.getAllWindows();
+  if (wins.length > 0) {
+    const win = wins[0];
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  }
+});
+
+bootstrap().catch((err) => {
+  console.error('[main] Bootstrap failed:', err);
+  app.quit();
+});
+
+function loadDefaultWorkspace(): WorkspaceSnapshot | null {
+  const workspacePath = isDev
+    ? path.join(__dirname, '../../../../config/workspace.default.json')
+    : path.join(process.resourcesPath, 'config', 'workspace.default.json');
+
+  try {
+    return JSON.parse(fs.readFileSync(workspacePath, 'utf-8')) as WorkspaceSnapshot;
+  } catch (err) {
+    console.warn('[main] Failed to load default workspace:', err);
+    return null;
+  }
+}
+
+function snapshotContainsApps(
+  snapshot: WorkspaceSnapshot,
+  requiredSnapshot: WorkspaceSnapshot | null,
+): boolean {
+  if (!requiredSnapshot) return true;
+  const savedAppIds = new Set(snapshot.windows.map((windowState) => windowState.appId));
+  return requiredSnapshot.windows.every((windowState) => savedAppIds.has(windowState.appId));
+}

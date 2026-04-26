@@ -1,0 +1,182 @@
+:root {
+  --ws-bg: #f6f8fb;
+  --ws-panel: #ffffff;
+  --ws-text: #172033;
+  --ws-text-muted: #667085;
+  --ws-border: #d8e0ec;
+  --ws-hover: #eef4ff;
+  --ws-selected: #dbeafe;
+  --ws-accent: #2563eb;
+  --ws-positive: #087443;
+  --ws-negative: #b42318;
+  --ws-warning: #b76e00;
+  --ws-grid-header: #eef2f7;
+  --ws-grid-row: #ffffff;
+  --ws-grid-row-alt: #fbfdff;
+}
+
+:root[data-theme='dark'] {
+  --ws-bg: #0f1720;
+  --ws-panel: #172231;
+  --ws-text: #e8eef6;
+  --ws-text-muted: #a3afbf;
+  --ws-border: #314158;
+  --ws-hover: #1d2b40;
+  --ws-selected: #173c66;
+  --ws-accent: #60a5fa;
+  --ws-positive: #32d583;
+  --ws-negative: #f97066;
+  --ws-warning: #fdb022;
+  --ws-grid-header: #111c29;
+  --ws-grid-row: #0f1720;
+  --ws-grid-row-alt: #121d2a;
+}
+
+html,
+body {
+  background: var(--ws-bg);
+  color: var(--ws-text);
+}
+
+.workstation-app {
+  background: var(--ws-bg);
+  color: var(--ws-text);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 0;
+}
+
+.workstation-strip {
+  align-items: center;
+  background: var(--ws-panel);
+  border-bottom: 1px solid var(--ws-border);
+  color: var(--ws-text);
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  min-height: 30px;
+  padding: 5px 8px;
+}
+
+.workstation-label {
+  color: var(--ws-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.workstation-value {
+  color: var(--ws-text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.workstation-button {
+  background: var(--ws-panel);
+  border: 1px solid var(--ws-border);
+  border-radius: 4px;
+  color: var(--ws-text);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 8px;
+}
+
+.workstation-switch {
+  align-items: center;
+  background: var(--ws-hover);
+  border: 1px solid var(--ws-border);
+  border-radius: 999px;
+  color: var(--ws-text);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 800;
+  gap: 6px;
+  min-width: 66px;
+  padding: 2px 8px 2px 3px;
+}
+
+.workstation-switch__knob {
+  background: var(--ws-accent);
+  border-radius: 50%;
+  display: inline-block;
+  height: 16px;
+  transform: translateX(0);
+  transition: transform 120ms ease;
+  width: 16px;
+}
+
+.workstation-switch[aria-checked='true'] {
+  padding-left: 8px;
+  padding-right: 3px;
+}
+
+.workstation-switch[aria-checked='true'] .workstation-switch__knob {
+  order: 2;
+}
+
+.workstation-grid {
+  flex: 1;
+  min-height: 0;
+  padding: 6px;
+}
+
+.ag-theme-quartz,
+.ag-theme-quartz-dark,
+.workstation-grid .ag-root-wrapper {
+  --ag-background-color: var(--ws-grid-row);
+  --ag-foreground-color: var(--ws-text);
+  --ag-border-color: var(--ws-border);
+  --ag-secondary-border-color: var(--ws-border);
+  --ag-header-background-color: var(--ws-grid-header);
+  --ag-header-foreground-color: var(--ws-text-muted);
+  --ag-odd-row-background-color: var(--ws-grid-row-alt);
+  --ag-row-hover-color: var(--ws-hover);
+  --ag-selected-row-background-color: var(--ws-selected);
+  --ag-range-selection-border-color: var(--ws-accent);
+  --ag-font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ag-font-size: 11px;
+  --ag-row-height: 24px;
+  --ag-header-height: 26px;
+  --ag-list-item-height: 22px;
+  --ag-grid-size: 3px;
+  --ag-cell-horizontal-padding: 6px;
+}
+
+.ag-theme-quartz .ag-root-wrapper,
+.ag-theme-quartz-dark .ag-root-wrapper {
+  background: var(--ws-grid-row);
+  border-color: var(--ws-border);
+  color: var(--ws-text);
+}
+
+.ag-theme-quartz .ag-header,
+.ag-theme-quartz-dark .ag-header {
+  background: var(--ws-grid-header);
+  border-bottom-color: var(--ws-border);
+}
+
+.ag-theme-quartz .ag-row,
+.ag-theme-quartz-dark .ag-row {
+  background: var(--ws-grid-row);
+  border-bottom-color: var(--ws-border);
+  color: var(--ws-text);
+}
+
+.ag-theme-quartz .ag-row-odd,
+.ag-theme-quartz-dark .ag-row-odd {
+  background: var(--ws-grid-row-alt);
+}
+
+.ag-theme-quartz .ag-row-hover,
+.ag-theme-quartz-dark .ag-row-hover {
+  background: var(--ws-hover) !important;
+}
+
+.ag-theme-quartz .ag-row-selected,
+.ag-theme-quartz-dark .ag-row-selected {
+  background: var(--ws-selected) !important;
+}
+

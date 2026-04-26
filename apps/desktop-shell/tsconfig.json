@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@fdc3-poc/fdc3-core": ["../../libs/fdc3-core/src/index.ts"],
+      "@fdc3-poc/app-registry": ["../../libs/app-registry/src/index.ts"],
+      "@fdc3-poc/channel-engine": ["../../libs/channel-engine/src/index.ts"],
+      "@fdc3-poc/intent-engine": ["../../libs/intent-engine/src/index.ts"],
+      "@fdc3-poc/workspace-engine": ["../../libs/workspace-engine/src/index.ts"],
+      "@fdc3-poc/interop-electron-adapter": ["../../libs/interop-electron-adapter/src/index.ts"],
+      "@fdc3-poc/shared-domain": ["../../libs/shared-domain/src/index.ts"],
+      "@fdc3-poc/shared-ui": ["../../libs/shared-ui/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "electron.vite.config.ts"],
+  "exclude": ["node_modules", "out"]
+}

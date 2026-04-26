@@ -1,0 +1,240 @@
+/* Dockview Theme Override - Professional Trader Workstation */
+
+.dockview {
+  --dv-bg-color: #0a0a18;
+  --dv-groupcontrol-bg-color: #0a0a18;
+  --dv-groupcontrol-border-color: #1e1e3e;
+  --dv-tab-bg-color: #0f0f25;
+  --dv-tab-active-bg-color: #1a2a45;
+  --dv-tab-active-border-color: #3a5ca8;
+  --dv-tab-text-color: #a0a0d0;
+  --dv-tab-active-text-color: #e0e8ff;
+  --dv-scrollbar-thumb-bg-color: #2a3a60;
+  --dv-scrollbar-track-bg-color: #0f0f20;
+  --dv-drop-indicator-bg-color: rgba(64, 128, 232, 0.2);
+  --dv-drop-indicator-border-color: #4080e8;
+}
+
+.dockview {
+  background: linear-gradient(135deg, #0a0a18 0%, #0f0f20 100%);
+  border: 1px solid #1e1e3e;
+  border-radius: 0;
+}
+
+.dockview-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+/* Tab styling */
+.dockview-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0;
+  background: #0f0f25;
+  border-bottom: 1px solid #1e1e3e;
+  min-height: 32px;
+}
+
+.dockview-tab {
+  padding: 8px 12px;
+  margin: 0;
+  background: #0f0f25;
+  border: none;
+  border-right: 1px solid #1e1e3e;
+  color: #a0a0d0;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 200px;
+}
+
+.dockview-tab:hover {
+  background: #151533;
+  color: #c0c0f0;
+}
+
+.dockview-tab.active {
+  background: #1a2a45;
+  border-bottom: 2px solid #4080e8;
+  color: #e0e8ff;
+  font-weight: 600;
+}
+
+.dockview-tab-close-action {
+  margin-left: 8px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.dockview-tab-close-action:hover {
+  opacity: 1;
+  color: #ff6060;
+}
+
+/* Panel styling */
+.dockview-panel {
+  background: #0a0a18;
+  border: 1px solid #1e1e3e;
+  display: flex;
+  flex-direction: column;
+}
+
+.dockview-panel-content {
+  flex: 1;
+  overflow: hidden;
+  background: #0a0a18;
+}
+
+/* Resizers (split handles) */
+.dockview-resizer {
+  background: #1e1e3e;
+  cursor: col-resize;
+  width: 1px;
+  transition: background 0.2s;
+}
+
+.dockview-resizer:hover,
+.dockview-resizer.active {
+  background: #4080e8;
+  width: 2px;
+}
+
+.dockview-resizer-vertical {
+  cursor: row-resize;
+  height: 1px;
+}
+
+.dockview-resizer-vertical:hover,
+.dockview-resizer-vertical.active {
+  height: 2px;
+}
+
+/* Group styling */
+.dockview-group {
+  background: transparent;
+  border: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.dockview-group-control {
+  background: #0a0a18;
+  border-bottom: 1px solid #1e1e3e;
+}
+
+/* Scrollbars */
+.dockview-scrollbar-track {
+  background: #0f0f20;
+}
+
+.dockview-scrollbar-thumb {
+  background: #2a3a60;
+  border-radius: 3px;
+}
+
+.dockview-scrollbar-thumb:hover {
+  background: #3a5a80;
+}
+
+/* Drop indicator */
+.dockview-drop-indicator {
+  background: rgba(64, 128, 232, 0.2);
+  border: 2px solid #4080e8;
+  border-radius: 4px;
+}
+
+.dockview-drop-indicator-top,
+.dockview-drop-indicator-bottom,
+.dockview-drop-indicator-left,
+.dockview-drop-indicator-right {
+  background: rgba(64, 128, 232, 0.3);
+  border: 2px solid #4080e8;
+}
+
+/* Floating indicator */
+.dockview-floating {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+  border: 1px solid #3a5ca8;
+  border-radius: 8px;
+}
+
+/* Hide extras */
+.dockview-tab-action-container {
+  display: flex;
+  gap: 4px;
+}
+
+.dockview-tab-action {
+  opacity: 0.5;
+  transition: opacity 0.2s;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.dockview-tab-action:hover {
+  opacity: 1;
+}
+
+/* Title/Header styling */
+.dockview-title {
+  padding: 8px 12px;
+  background: #0f0f25;
+  border-bottom: 1px solid #1e1e3e;
+  color: #a0a0d0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Overflow menu */
+.dockview-overflow-container {
+  background: #0a0a18;
+  border: 1px solid #2a2a50;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+.dockview-overflow-item {
+  padding: 6px 12px;
+  color: #a0a0d0;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.dockview-overflow-item:hover {
+  background: #1a2a45;
+  color: #e0e8ff;
+}
+
+/* Disabled state */
+.dockview-tab.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Animation */
+@keyframes dockview-float-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.dockview-floating.animated {
+  animation: dockview-float-in 0.2s ease-out;
+}

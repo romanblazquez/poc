@@ -1,0 +1,198 @@
+{
+  "version": "1.0",
+  "applications": [
+    {
+      "appId": "customer-search",
+      "title": "Customer Search",
+      "description": "Search and browse customers by name, ID, or segment.",
+      "url": "file://apps/customer-search/dist/index.html",
+      "devPort": 4001,
+      "icon": "🔍",
+      "category": "CRM",
+      "initialLayout": { "x": 50, "y": 80, "width": 480, "height": 560 },
+      "listensForContexts": ["fdc3.contact"],
+      "capabilities": {
+        "broadcasts": ["fdc3.contact"],
+        "listensTo": [],
+        "raisesIntents": [],
+        "handlesIntents": []
+      }
+    },
+    {
+      "appId": "customer-profile",
+      "title": "Customer Profile",
+      "description": "Full customer profile including KYC, accounts, and recent activity.",
+      "url": "file://apps/customer-profile/dist/index.html",
+      "devPort": 4002,
+      "icon": "👤",
+      "category": "CRM",
+      "initialLayout": { "x": 560, "y": 80, "width": 560, "height": 560 },
+      "listensForContexts": ["fdc3.contact"],
+      "intents": [
+        {
+          "intent": "ViewContact",
+          "contextTypes": ["fdc3.contact"],
+          "appId": "customer-profile",
+          "displayName": "View Customer Profile"
+        }
+      ],
+      "capabilities": {
+        "broadcasts": ["fdc3.contact", "com.demo.paymentRequest"],
+        "listensTo": ["fdc3.contact", "com.demo.theme"],
+        "raisesIntents": ["StartPayment"],
+        "handlesIntents": ["ViewContact"]
+      }
+    },
+    {
+      "appId": "portfolio-view",
+      "title": "Portfolio View",
+      "description": "Real-time portfolio positions, P&L, and allocation.",
+      "url": "file://apps/portfolio-view/dist/index.html",
+      "devPort": 4003,
+      "icon": "📊",
+      "category": "Investments",
+      "initialLayout": { "x": 1150, "y": 80, "width": 560, "height": 560 },
+      "listensForContexts": ["fdc3.contact", "fdc3.portfolio"],
+      "intents": [
+        {
+          "intent": "ViewPortfolio",
+          "contextTypes": ["fdc3.contact"],
+          "appId": "portfolio-view",
+          "displayName": "View Portfolio"
+        }
+      ],
+      "capabilities": {
+        "broadcasts": ["fdc3.portfolio"],
+        "listensTo": ["fdc3.contact", "fdc3.portfolio", "com.demo.theme"],
+        "raisesIntents": ["ViewPortfolio"],
+        "handlesIntents": ["ViewPortfolio"]
+      }
+    },
+    {
+      "appId": "market-watch",
+      "title": "Market Watch",
+      "description": "Live instrument prices, news, and market data.",
+      "url": "file://apps/market-watch/dist/index.html",
+      "devPort": 4004,
+      "icon": "📈",
+      "category": "Markets",
+      "initialLayout": { "x": 50, "y": 680, "width": 700, "height": 460 },
+      "listensForContexts": ["fdc3.instrument"],
+      "intents": [
+        {
+          "intent": "ViewInstrument",
+          "contextTypes": ["fdc3.instrument"],
+          "appId": "market-watch",
+          "displayName": "View in Market Watch"
+        }
+      ],
+      "capabilities": {
+        "broadcasts": ["fdc3.instrument"],
+        "listensTo": ["fdc3.instrument", "com.demo.theme"],
+        "raisesIntents": ["ViewInstrument"],
+        "handlesIntents": ["ViewInstrument"]
+      }
+    },
+    {
+      "appId": "payment-action",
+      "title": "Payment Action",
+      "description": "Initiate and authorise customer payment instructions.",
+      "url": "file://apps/payment-action/dist/index.html",
+      "devPort": 4005,
+      "icon": "💳",
+      "category": "Payments",
+      "initialLayout": { "x": 780, "y": 680, "width": 500, "height": 460 },
+      "listensForContexts": ["com.demo.paymentRequest"],
+      "intents": [
+        {
+          "intent": "StartPayment",
+          "contextTypes": ["com.demo.paymentRequest"],
+          "appId": "payment-action",
+          "displayName": "Start Payment"
+        }
+      ],
+      "capabilities": {
+        "broadcasts": [],
+        "listensTo": ["com.demo.paymentRequest", "com.demo.theme"],
+        "raisesIntents": [],
+        "handlesIntents": ["StartPayment"]
+      }
+    },
+    {
+      "appId": "funds-allocations",
+      "title": "Funds Allocations",
+      "description": "AG Grid allocation monitor for fund weights, drift, risk, and manager ownership.",
+      "url": "file://apps/funds-allocations/dist/index.html",
+      "devPort": 4011,
+      "icon": "▦",
+      "category": "Funds",
+      "initialLayout": { "x": 930, "y": 80, "width": 780, "height": 620 },
+      "listensForContexts": ["com.demo.theme"],
+      "intents": [
+        {
+          "intent": "ViewFund",
+          "contextTypes": ["com.demo.fund"],
+          "appId": "funds-allocations",
+          "displayName": "View Fund Allocations"
+        }
+      ],
+      "capabilities": {
+        "broadcasts": ["com.demo.fund"],
+        "listensTo": ["com.demo.order", "com.demo.fund", "com.demo.theme"],
+        "raisesIntents": ["ViewFund"],
+        "handlesIntents": ["ViewFund"]
+      }
+    },
+    {
+      "appId": "incoming-orders",
+      "title": "Incoming Orders",
+      "description": "AG Grid blotter for incoming fund orders, filtered by selected fund context.",
+      "url": "file://apps/incoming-orders/dist/index.html",
+      "devPort": 4012,
+      "icon": "≡",
+      "category": "Funds",
+      "initialLayout": { "x": 50, "y": 80, "width": 850, "height": 420 },
+      "listensForContexts": ["com.demo.fund", "com.demo.theme"],
+      "capabilities": {
+        "broadcasts": ["com.demo.order", "com.demo.fund"],
+        "listensTo": ["com.demo.fund", "com.demo.theme"],
+        "raisesIntents": ["ViewOrder"],
+        "handlesIntents": []
+      }
+    },
+    {
+      "appId": "audit-log",
+      "title": "Audit",
+      "description": "AG Grid audit trail that listens to fund and order context.",
+      "url": "file://apps/audit-log/dist/index.html",
+      "devPort": 4013,
+      "icon": "!",
+      "category": "Funds",
+      "initialLayout": { "x": 50, "y": 530, "width": 850, "height": 420 },
+      "listensForContexts": ["com.demo.fund", "com.demo.order", "com.demo.theme"],
+      "capabilities": {
+        "broadcasts": [],
+        "listensTo": ["com.demo.order", "com.demo.fund", "com.demo.theme"],
+        "raisesIntents": [],
+        "handlesIntents": ["OpenAudit", "ViewFund"]
+      }
+    },
+    {
+      "appId": "theme-toggle",
+      "title": "Theme Toggle",
+      "description": "Broadcasts workspace theme context so participating apps switch light or dark mode together.",
+      "url": "file://apps/theme-toggle/dist/index.html",
+      "devPort": 4014,
+      "icon": "◐",
+      "category": "Workspace",
+      "initialLayout": { "x": 930, "y": 730, "width": 360, "height": 220 },
+      "listensForContexts": ["com.demo.theme"],
+      "capabilities": {
+        "broadcasts": ["com.demo.theme"],
+        "listensTo": ["com.demo.theme"],
+        "raisesIntents": ["ApplyTheme"],
+        "handlesIntents": ["ApplyTheme"]
+      }
+    }
+  ]
+}

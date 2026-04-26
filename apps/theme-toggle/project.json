@@ -1,0 +1,12 @@
+{
+  "name": "theme-toggle",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/theme-toggle/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:renderer"],
+  "targets": {
+    "serve": { "executor": "nx:run-commands", "options": { "command": "vite --config apps/theme-toggle/vite.config.ts", "cwd": "{workspaceRoot}" } },
+    "build": { "executor": "nx:run-commands", "options": { "command": "vite build --config apps/theme-toggle/vite.config.ts", "cwd": "{workspaceRoot}" } }
+  }
+}
+

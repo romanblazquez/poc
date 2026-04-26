@@ -1,0 +1,7 @@
+{
+  "name": "shared-domain",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared-domain/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared"]
+}

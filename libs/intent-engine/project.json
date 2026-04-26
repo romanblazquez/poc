@@ -1,0 +1,8 @@
+{
+  "name": "intent-engine",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/intent-engine/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared"],
+  "implicitDependencies": ["fdc3-core", "app-registry"]
+}

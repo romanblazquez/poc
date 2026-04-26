@@ -1,0 +1,8 @@
+{
+  "name": "channel-engine",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/channel-engine/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared"],
+  "implicitDependencies": ["fdc3-core"]
+}

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "rootDir": ".",
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    "moduleResolution": "bundler",
+    "module": "ESNext",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "target": "ES2022",
+    "baseUrl": ".",
+    "paths": {
+      "@fdc3-poc/fdc3-core": ["libs/fdc3-core/src/index.ts"],
+      "@fdc3-poc/app-registry": ["libs/app-registry/src/index.ts"],
+      "@fdc3-poc/channel-engine": ["libs/channel-engine/src/index.ts"],
+      "@fdc3-poc/intent-engine": ["libs/intent-engine/src/index.ts"],
+      "@fdc3-poc/workspace-engine": ["libs/workspace-engine/src/index.ts"],
+      "@fdc3-poc/interop-electron-adapter": ["libs/interop-electron-adapter/src/index.ts"],
+      "@fdc3-poc/interop-browser-adapter": ["libs/interop-browser-adapter/src/index.ts"],
+      "@fdc3-poc/interop-ioconnect-adapter": ["libs/interop-ioconnect-adapter/src/index.ts"],
+      "@fdc3-poc/shared-domain": ["libs/shared-domain/src/index.ts"],
+      "@fdc3-poc/shared-ui": ["libs/shared-ui/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "**/node_modules", "**/dist", "**/out", "**/.nx"]
+}

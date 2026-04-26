@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "target": "ES2022",
+    "outDir": "./out/main",
+    "noEmit": false
+  },
+  "include": ["src/main/**/*.ts", "src/preload/**/*.ts"]
+}

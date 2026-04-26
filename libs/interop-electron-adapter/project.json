@@ -1,0 +1,17 @@
+{
+  "name": "interop-electron-adapter",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/interop-electron-adapter/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:electron"],
+  "implicitDependencies": ["fdc3-core"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p tsconfig.json",
+        "cwd": "libs/interop-electron-adapter"
+      }
+    }
+  }
+}

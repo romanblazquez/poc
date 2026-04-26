@@ -1,0 +1,24 @@
+node_modules/
+out/
+dist/
+*.js.map
+.nx/
+.env
+.env.local
+
+# Electron build artifacts
+apps/desktop-shell/out/
+dist/electron/
+
+# Workspace state (user-specific)
+apps/desktop-shell/workspace-state.json
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

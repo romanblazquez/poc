@@ -1,0 +1,11 @@
+{
+  "name": "portfolio-view",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/portfolio-view/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:renderer"],
+  "targets": {
+    "serve": { "executor": "nx:run-commands", "options": { "command": "vite --config apps/portfolio-view/vite.config.ts", "cwd": "{workspaceRoot}" } },
+    "build": { "executor": "nx:run-commands", "options": { "command": "vite build --config apps/portfolio-view/vite.config.ts", "cwd": "{workspaceRoot}" } }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "app-registry",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/app-registry/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared"],
+  "implicitDependencies": ["fdc3-core"]
+}

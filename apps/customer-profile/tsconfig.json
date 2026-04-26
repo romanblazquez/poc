@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@fdc3-poc/fdc3-core": ["../../libs/fdc3-core/src/index.ts"],
+      "@fdc3-poc/shared-domain": ["../../libs/shared-domain/src/index.ts"],
+      "@fdc3-poc/shared-ui": ["../../libs/shared-ui/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["node_modules", "dist"]
+}

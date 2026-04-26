@@ -1,0 +1,7 @@
+{
+  "name": "workspace-engine",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/workspace-engine/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:electron"]
+}

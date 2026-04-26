@@ -1,0 +1,33 @@
+{
+  "name": "desktop-shell",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/desktop-shell/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:electron"],
+  "implicitDependencies": [
+    "fdc3-core",
+    "app-registry",
+    "channel-engine",
+    "intent-engine",
+    "workspace-engine",
+    "interop-electron-adapter",
+    "shared-domain",
+    "shared-ui"
+  ],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "electron-vite dev --config apps/desktop-shell/electron.vite.config.ts",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "electron-vite build --config apps/desktop-shell/electron.vite.config.ts",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}

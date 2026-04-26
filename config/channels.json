@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "userChannels": [
+    { "id": "channel-1", "type": "user", "displayMetadata": { "name": "Red",    "color": "#e84040" } },
+    { "id": "channel-2", "type": "user", "displayMetadata": { "name": "Orange", "color": "#e87040" } },
+    { "id": "channel-3", "type": "user", "displayMetadata": { "name": "Yellow", "color": "#e8d840" } },
+    { "id": "channel-4", "type": "user", "displayMetadata": { "name": "Green",  "color": "#40c080" } },
+    { "id": "channel-5", "type": "user", "displayMetadata": { "name": "Blue",   "color": "#4080e8" } },
+    { "id": "channel-6", "type": "user", "displayMetadata": { "name": "Purple", "color": "#9040e8" } }
+  ]
+}
