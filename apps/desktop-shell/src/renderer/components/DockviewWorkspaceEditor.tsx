@@ -1,6 +1,7 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { DockviewReact, type DockviewDefaultTab, type DockviewApi, type DockviewPanelApi } from 'dockview';
-import type { AppEntry, WorkspaceRuntimePayload, WorkspaceWindowDraft } from '../../App.js';
+import React, { useCallback, useRef } from 'react';
+import type { DetailedHTMLProps, HTMLAttributes } from 'react';
+import { DockviewReact, type IDockviewPanelProps, type DockviewReadyEvent } from 'dockview';
+import type { AppEntry, WorkspaceWindowDraft } from '../App.js';
 import type { UserChannel } from '@fdc3-poc/fdc3-core';
 import '../styles/dockview-override.css';
 
@@ -18,8 +19,6 @@ declare global {
   }
 }
 
-import type { DetailedHTMLProps, HTMLAttributes } from 'react';
-
 interface DockviewWorkspaceEditorProps {
   apps: AppEntry[];
   currentChannel: UserChannel | null;
@@ -32,46 +31,29 @@ interface DockviewWorkspaceEditorProps {
   }) => Promise<void>;
 }
 
-// Panel component for embedding apps
-function AppPanel({
-  app,
-  preloadPath,
-  currentChannel,
-}: {
-  app: AppEntry;
+// Panel params passed to each app panel
+interface AppPanelParams {
+  appId: string;
+  appUrl: string;
   preloadPath: string;
-  currentChannel: UserChannel | null;
-}) {
-  const webviewRef = useRef<HTMLElement | null>(null);
+  channelId: string | null;
+}
 
+// Component rendered inside each Dockview panel
+function AppPanelComponent({ params }: IDockviewPanelProps<AppPanelParams>) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        width: '100%',
-        background: '#0a0a18',
-      }}
-    >
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', background: '#0a0a18' }}>
       <webview
-        ref={webviewRef as any}
-        src={app.url}
-        preload={preloadPath}
-        partition={`persist:${currentChannel?.id ?? 'default'}`}
+        src={params.appUrl}
+        preload={`file://${params.preloadPath}`}
+        partition={`persist:dockview-${params.channelId ?? 'default'}-${params.appId}`}
         allowpopups="true"
-        style={{
-          flex: 1,
-          border: 'none',
-          background: '#0a0a18',
-        }}
+        style={{ flex: 1, border: 'none', width: '100%' } as React.CSSProperties}
         onDomReady={(event) => {
-          if (event.currentTarget && currentChannel) {
-            void event.currentTarget.executeJavaScript(`
-              window.fdc3 = window.fdc3 || {};
-              window.fdc3.__appId = "${app.appId}";
-              window.fdc3.__channelId = "${currentChannel.id}";
-            `);
+          if (params.channelId) {
+            void event.currentTarget.executeJavaScript(
+              `window.fdc3?.joinUserChannel(${JSON.stringify(params.channelId)})`
+            );
           }
         }}
       />
@@ -79,274 +61,146 @@ function AppPanel({
   );
 }
 
+// Default 3-panel layout: incoming-orders left, funds-allocations top-right, audit-log bottom-right
+const DEFAULT_PANEL_IDS = ['incoming-orders', 'funds-allocations', 'audit-log'];
+
 export function DockviewWorkspaceEditor({
   apps,
   currentChannel,
   preloadPath,
   onApply,
 }: DockviewWorkspaceEditorProps) {
-  const dockviewRef = useRef<DockviewApi | null>(null);
-  const [selectedLayout, setSelectedLayout] = useState<'default' | 'custom'>('default');
+  const channelId = currentChannel?.id ?? null;
 
-  // Define default layout structure
-  const defaultLayout = useMemo(() => {
-    const demoApps = ['incoming-orders', 'funds-allocations', 'audit-log'];
-    return {
-      direction: 'horizontal',
-      panels: [
-        {
-          id: 'incoming-orders',
-          title: 'Incoming Orders',
-          description: 'incoming-orders',
-          component: 'app-panel',
-          size: 0.33,
-        },
-        {
-          direction: 'vertical',
-          size: 0.67,
-          panels: [
-            {
-              id: 'funds-allocations',
-              title: 'Funds Allocations',
-              description: 'funds-allocations',
-              component: 'app-panel',
-              size: 0.5,
-            },
-            {
-              id: 'audit-log',
-              title: 'Audit Log',
-              description: 'audit-log',
-              component: 'app-panel',
-              size: 0.5,
-            },
-          ],
-        },
-      ],
-    };
-  }, []);
+  const onReady = useCallback((event: DockviewReadyEvent) => {
+    const api = event.api;
 
-  const handleResetLayout = useCallback(async () => {
-    if (confirm('Reset workspace layout to default 3-panel arrangement?')) {
-      if (dockviewRef.current) {
-        // Recreate the default layout
-        setSelectedLayout('default');
-        // Reload dockview with default layout
-        window.location.reload();
-      }
+    // Find apps to add (use defaults if available, otherwise first 3 apps)
+    const panelApps = DEFAULT_PANEL_IDS
+      .map((id) => apps.find((a) => a.appId === id))
+      .filter((a): a is AppEntry => !!a);
+
+    // Fill with remaining apps if defaults not found
+    if (panelApps.length === 0) {
+      apps.slice(0, 3).forEach((a) => panelApps.push(a));
     }
-  }, []);
+
+    if (panelApps.length === 0) return;
+
+    // Add first panel (left column, full height)
+    const first = api.addPanel<AppPanelParams>({
+      id: panelApps[0].appId,
+      component: 'app-panel',
+      title: panelApps[0].title,
+      params: {
+        appId: panelApps[0].appId,
+        appUrl: panelApps[0].url,
+        preloadPath,
+        channelId,
+      },
+    });
+
+    // Add second panel to the right of the first
+    if (panelApps[1]) {
+      api.addPanel<AppPanelParams>({
+        id: panelApps[1].appId,
+        component: 'app-panel',
+        title: panelApps[1].title,
+        params: {
+          appId: panelApps[1].appId,
+          appUrl: panelApps[1].url,
+          preloadPath,
+          channelId,
+        },
+        position: { referencePanel: first.id, direction: 'right' },
+      });
+    }
+
+    // Add third panel below the second
+    if (panelApps[2]) {
+      api.addPanel<AppPanelParams>({
+        id: panelApps[2].appId,
+        component: 'app-panel',
+        title: panelApps[2].title,
+        params: {
+          appId: panelApps[2].appId,
+          appUrl: panelApps[2].url,
+          preloadPath,
+          channelId,
+        },
+        position: { referencePanel: panelApps[1].appId, direction: 'below' },
+      });
+    }
+  }, [apps, channelId, preloadPath]);
 
   const handleLaunchWorkspace = useCallback(async () => {
-    // Gather current panel layout and launch as workspace
-    const windows: WorkspaceWindowDraft[] = [
-      {
-        appId: 'incoming-orders',
-        channelId: currentChannel?.id ?? null,
-        bounds: { x: 40, y: 70, width: 500, height: 600 },
-        isMinimized: false,
-      },
-      {
-        appId: 'funds-allocations',
-        channelId: currentChannel?.id ?? null,
-        bounds: { x: 560, y: 70, width: 500, height: 600 },
-        isMinimized: false,
-      },
-      {
-        appId: 'audit-log',
-        channelId: currentChannel?.id ?? null,
-        bounds: { x: 40, y: 700, width: 500, height: 400 },
-        isMinimized: false,
-      },
-    ];
+    const windows: WorkspaceWindowDraft[] = DEFAULT_PANEL_IDS
+      .map((id, i) => {
+        const app = apps.find((a) => a.appId === id);
+        if (!app) return null;
+        return {
+          appId: app.appId,
+          channelId,
+          bounds: { x: 40 + i * 520, y: 70, width: 500, height: 600 },
+          isMinimized: false,
+        };
+      })
+      .filter((w): w is WorkspaceWindowDraft => w !== null);
 
-    await onApply({
-      name: 'Funds Workflow',
-      windows,
-      closeOtherApps: true,
-      save: false,
-    });
-  }, [currentChannel, onApply]);
+    await onApply({ name: 'Funds Workflow', windows, closeOtherApps: true, save: false });
+  }, [apps, channelId, onApply]);
 
   const handleSaveLayout = useCallback(async () => {
-    const windows: WorkspaceWindowDraft[] = [
-      {
-        appId: 'incoming-orders',
-        channelId: currentChannel?.id ?? null,
-        bounds: { x: 40, y: 70, width: 500, height: 600 },
-        isMinimized: false,
-      },
-      {
-        appId: 'funds-allocations',
-        channelId: currentChannel?.id ?? null,
-        bounds: { x: 560, y: 70, width: 500, height: 600 },
-        isMinimized: false,
-      },
-      {
-        appId: 'audit-log',
-        channelId: currentChannel?.id ?? null,
-        bounds: { x: 40, y: 700, width: 500, height: 400 },
-        isMinimized: false,
-      },
-    ];
+    const windows: WorkspaceWindowDraft[] = DEFAULT_PANEL_IDS
+      .map((id, i) => {
+        const app = apps.find((a) => a.appId === id);
+        if (!app) return null;
+        return {
+          appId: app.appId,
+          channelId,
+          bounds: { x: 40 + i * 520, y: 70, width: 500, height: 600 },
+          isMinimized: false,
+        };
+      })
+      .filter((w): w is WorkspaceWindowDraft => w !== null);
 
-    await onApply({
-      name: 'Funds Workflow (Saved)',
-      windows,
-      closeOtherApps: false,
-      save: true,
-    });
-  }, [currentChannel, onApply]);
+    await onApply({ name: 'Funds Workflow (Saved)', windows, closeOtherApps: false, save: true });
+  }, [apps, channelId, onApply]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', minHeight: 0, gap: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', minHeight: 0 }}>
       {/* Toolbar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '12px 16px',
-          background: '#0a0a18',
-          borderBottom: '1px solid #1e1e3e',
-          flexShrink: 0,
-        }}
-      >
-        <button
-          onClick={handleLaunchWorkspace}
-          style={{
-            padding: '6px 12px',
-            background: '#4080e8',
-            border: 'none',
-            borderRadius: 4,
-            color: '#fff',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          Launch Workspace
-        </button>
-
-        <button
-          onClick={handleSaveLayout}
-          style={{
-            padding: '6px 12px',
-            background: '#2a5aa8',
-            border: 'none',
-            borderRadius: 4,
-            color: '#a0c0ff',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          Save Layout
-        </button>
-
-        <button
-          onClick={handleResetLayout}
-          style={{
-            padding: '6px 12px',
-            background: '#2a2a40',
-            border: '1px solid #3a3a60',
-            borderRadius: 4,
-            color: '#a0a0d0',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          Reset Layout
-        </button>
-
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '8px 14px', background: '#0a0a18',
+        borderBottom: '1px solid #1e1e3e', flexShrink: 0,
+      }}>
+        <button onClick={handleLaunchWorkspace} style={btnPrimary}>Launch as Windows</button>
+        <button onClick={handleSaveLayout} style={btnSecondary}>Save Layout</button>
         <div style={{ flex: 1 }} />
-
-        <span style={{ fontSize: 11, color: '#808090' }}>
-          <strong style={{ color: '#a0a0d0' }}>3-Panel Professional Layout</strong>
+        <span style={{ fontSize: 11, color: '#606080' }}>
+          Drag tabs to rearrange · Drag borders to resize
         </span>
       </div>
 
-      {/* Dockview container */}
-      <div style={{ flex: 1, minHeight: 0 }}>
+      {/* Dockview */}
+      <div style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
         <DockviewReact
-          ref={dockviewRef}
-          layout={{
-            root: {
-              kind: 'group',
-              direction: 'horizontal',
-              size: 100,
-              children: [
-                {
-                  kind: 'group',
-                  direction: 'vertical',
-                  size: 33,
-                  children: [
-                    {
-                      kind: 'leaf',
-                      panel: 'incoming-orders',
-                      size: 100,
-                    },
-                  ],
-                },
-                {
-                  kind: 'group',
-                  direction: 'vertical',
-                  size: 67,
-                  children: [
-                    {
-                      kind: 'leaf',
-                      panel: 'funds-allocations',
-                      size: 50,
-                    },
-                    {
-                      kind: 'leaf',
-                      panel: 'audit-log',
-                      size: 50,
-                    },
-                  ],
-                },
-              ],
-            },
-          }}
-          panels={{
-            'incoming-orders': {
-              title: 'Incoming Orders',
-              component: 'app-panel',
-              params: { appId: 'incoming-orders' },
-            },
-            'funds-allocations': {
-              title: 'Funds Allocations',
-              component: 'app-panel',
-              params: { appId: 'funds-allocations' },
-            },
-            'audit-log': {
-              title: 'Audit Log',
-              component: 'app-panel',
-              params: { appId: 'audit-log' },
-            },
-          }}
-          components={{
-            'app-panel': ({
-              params,
-            }: {
-              params: { appId: string };
-            }) => {
-              const app = apps.find((a) => a.appId === params.appId);
-              if (!app) return <div>App not found</div>;
-              return (
-                <AppPanel app={app} preloadPath={preloadPath} currentChannel={currentChannel} />
-              );
-            },
-          }}
-          showAccessoriesView={false}
-          showHiddenOnDrop={true}
-          disableFloatingGroups={true}
-          disableFullscreenToggle={true}
-          style={{
-            background: 'linear-gradient(135deg, #0a0a18 0%, #0f0f20 100%)',
-          }}
+          onReady={onReady}
+          components={{ 'app-panel': AppPanelComponent }}
+          className="dockview-theme-dark"
+          style={{ height: '100%', width: '100%' }}
         />
       </div>
     </div>
   );
 }
+
+const btnPrimary: React.CSSProperties = {
+  padding: '5px 12px', background: '#1d4ed8', border: 'none',
+  borderRadius: 4, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+};
+const btnSecondary: React.CSSProperties = {
+  padding: '5px 12px', background: '#18233f', border: '1px solid #385ea8',
+  borderRadius: 4, color: '#dbe6ff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+};
