@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import type { DetailedHTMLProps, HTMLAttributes, CSSProperties } from 'react';
 import { DockviewReact, type IDockviewPanelProps, type DockviewReadyEvent, type DockviewApi } from 'dockview';
-import type { AppEntry, WorkspaceRuntimePayload, WorkspaceWindowDraft } from '../App.js';
+import type { AppEntry } from '../App.js';
 import type { UserChannel } from '@fdc3-poc/fdc3-core';
 import '../styles/dockview-override.css';
 
@@ -24,13 +24,6 @@ interface DockviewWorkspaceEditorProps {
   currentChannel: UserChannel | null;
   preloadPath: string;
   initialPanelIds?: string[];
-  onApply: (payload: {
-    name: string;
-    windows: WorkspaceWindowDraft[];
-    closeOtherApps: boolean;
-    save: boolean;
-  }) => Promise<void>;
-  onOpenWorkspaceWindow: (payload: WorkspaceRuntimePayload) => Promise<void>;
 }
 
 interface AppPanelParams {
@@ -38,6 +31,13 @@ interface AppPanelParams {
   appUrl: string;
   preloadPath: string;
   channelId: string | null;
+}
+
+function resolveEmbeddedAppUrl(app: AppEntry): string {
+  if (window.location.protocol.startsWith('http')) {
+    return `http://localhost:${app.devPort}`;
+  }
+  return app.url;
 }
 
 // Each Dockview panel renders the FDC3 app as an embedded webview — single window, no popup
@@ -102,7 +102,12 @@ function populatePanels(
       id: app.appId,
       component: 'app-panel',
       title: app.title,
-      params: { appId: app.appId, appUrl: app.url, preloadPath, channelId },
+      params: {
+        appId: app.appId,
+        appUrl: resolveEmbeddedAppUrl(app),
+        preloadPath,
+        channelId,
+      },
       ...(position ? { position } : {}),
     });
 
@@ -115,7 +120,6 @@ export function DockviewWorkspaceEditor({
   currentChannel,
   preloadPath,
   initialPanelIds,
-  onApply,
 }: DockviewWorkspaceEditorProps) {
   const channelId = currentChannel?.id ?? null;
   const dockApiRef = useRef<DockviewApi | null>(null);
@@ -153,26 +157,16 @@ export function DockviewWorkspaceEditor({
       id: app.appId,
       component: 'app-panel',
       title: app.title,
-      params: { appId: app.appId, appUrl: app.url, preloadPath, channelId },
+      params: {
+        appId: app.appId,
+        appUrl: resolveEmbeddedAppUrl(app),
+        preloadPath,
+        channelId,
+      },
     });
     setOpenPanelIds((prev) => new Set([...prev, app.appId]));
     setShowAddMenu(false);
   }, [preloadPath, channelId]);
-
-  const handleSave = useCallback(async () => {
-    const windows: WorkspaceWindowDraft[] = [...openPanelIds].map((id, i) => {
-      const app = apps.find((a) => a.appId === id);
-      if (!app) return null;
-      return {
-        appId: app.appId,
-        channelId,
-        bounds: { x: 40 + (i % 3) * 520, y: 70 + Math.floor(i / 3) * 420, width: 500, height: 400 },
-        isMinimized: false,
-      };
-    }).filter((w): w is WorkspaceWindowDraft => w !== null);
-
-    await onApply({ name: 'Saved Workspace', windows, closeOtherApps: false, save: true });
-  }, [openPanelIds, apps, channelId, onApply]);
 
   const closedApps = apps.filter((a) => !openPanelIds.has(a.appId));
 
@@ -201,7 +195,6 @@ export function DockviewWorkspaceEditor({
             </div>
           )}
         </div>
-        <button onClick={handleSave} style={btnSecondary}>Save Layout</button>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 11, color: '#404060' }}>
           Drag panel tabs to rearrange · Drag borders to resize
@@ -233,10 +226,6 @@ const toolbarStyle: CSSProperties = {
 const btnPrimary: CSSProperties = {
   padding: '4px 11px', background: '#1d4ed8', border: 'none',
   borderRadius: 4, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-};
-const btnSecondary: CSSProperties = {
-  padding: '4px 11px', background: '#111827', border: '1px solid #2d4a80',
-  borderRadius: 4, color: '#c0d4ff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
 };
 const addMenuStyle: CSSProperties = {
   position: 'absolute', top: '100%', left: 0, zIndex: 999,

@@ -192,8 +192,6 @@ export function WorkspaceBuilder({
           apps={apps}
           currentChannel={activeChannel}
           preloadPath={preloadPath}
-          onApply={onApply}
-          onOpenWorkspaceWindow={onOpenWorkspaceWindow}
           initialPanelIds={activeTab.initialPanelIds}
         />
       )}

@@ -14,7 +14,6 @@
  */
 
 import { app, BrowserWindow } from 'electron';
-import fs from 'fs';
 import path from 'path';
 
 import { setupSecurity } from './security.js';
@@ -24,7 +23,6 @@ import { IpcRouter } from './ipc-router.js';
 import { WorkspaceManager } from './workspace-manager.js';
 import { ChannelManager } from '@fdc3-poc/channel-engine';
 import { IntentRegistry } from '@fdc3-poc/intent-engine';
-import type { WorkspaceSnapshot } from '@fdc3-poc/workspace-engine';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -78,15 +76,8 @@ async function bootstrap(): Promise<void> {
   // 7. Create the shell launcher window
   windowManager.createShellWindow();
 
-  // 8. Restore a saved workspace when it still matches the configured default app set.
-  // Otherwise, use the configured default so generated workspaces are visible on startup.
-  const defaultWorkspace = loadDefaultWorkspace();
-  const saved = workspaceManager.loadLatest();
-  if (saved && snapshotContainsApps(saved, defaultWorkspace)) {
-    workspaceManager.restore(saved);
-  } else if (defaultWorkspace) {
-    workspaceManager.restore(defaultWorkspace);
-  }
+  // 8. Do not auto-restore external workspace windows.
+  // The current UX keeps all apps embedded in the single shell window via Dockview.
 
   // macOS: re-create window when dock icon clicked with no windows open
   app.on('activate', () => {
@@ -117,25 +108,3 @@ bootstrap().catch((err) => {
   console.error('[main] Bootstrap failed:', err);
   app.quit();
 });
-
-function loadDefaultWorkspace(): WorkspaceSnapshot | null {
-  const workspacePath = isDev
-    ? path.join(__dirname, '../../../../config/workspace.default.json')
-    : path.join(process.resourcesPath, 'config', 'workspace.default.json');
-
-  try {
-    return JSON.parse(fs.readFileSync(workspacePath, 'utf-8')) as WorkspaceSnapshot;
-  } catch (err) {
-    console.warn('[main] Failed to load default workspace:', err);
-    return null;
-  }
-}
-
-function snapshotContainsApps(
-  snapshot: WorkspaceSnapshot,
-  requiredSnapshot: WorkspaceSnapshot | null,
-): boolean {
-  if (!requiredSnapshot) return true;
-  const savedAppIds = new Set(snapshot.windows.map((windowState) => windowState.appId));
-  return requiredSnapshot.windows.every((windowState) => savedAppIds.has(windowState.appId));
-}
