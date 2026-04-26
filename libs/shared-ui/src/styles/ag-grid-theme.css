@@ -15,6 +15,7 @@
   --ws-grid-row-alt: #fbfdff;
 }
 
+:root[data-theme='dark-financial'],
 :root[data-theme='dark'] {
   --ws-bg: #0f1720;
   --ws-panel: #172231;
@@ -124,7 +125,7 @@ body {
 }
 
 .ag-theme-quartz,
-.ag-theme-quartz-dark,
+.ag-theme-dark-financial,
 .workstation-grid .ag-root-wrapper {
   --ag-background-color: var(--ws-grid-row);
   --ag-foreground-color: var(--ws-text);
@@ -146,37 +147,37 @@ body {
 }
 
 .ag-theme-quartz .ag-root-wrapper,
-.ag-theme-quartz-dark .ag-root-wrapper {
+.ag-theme-dark-financial .ag-root-wrapper {
   background: var(--ws-grid-row);
   border-color: var(--ws-border);
   color: var(--ws-text);
 }
 
 .ag-theme-quartz .ag-header,
-.ag-theme-quartz-dark .ag-header {
+.ag-theme-dark-financial .ag-header {
   background: var(--ws-grid-header);
   border-bottom-color: var(--ws-border);
 }
 
 .ag-theme-quartz .ag-row,
-.ag-theme-quartz-dark .ag-row {
+.ag-theme-dark-financial .ag-row {
   background: var(--ws-grid-row);
   border-bottom-color: var(--ws-border);
   color: var(--ws-text);
 }
 
 .ag-theme-quartz .ag-row-odd,
-.ag-theme-quartz-dark .ag-row-odd {
+.ag-theme-dark-financial .ag-row-odd {
   background: var(--ws-grid-row-alt);
 }
 
 .ag-theme-quartz .ag-row-hover,
-.ag-theme-quartz-dark .ag-row-hover {
+.ag-theme-dark-financial .ag-row-hover {
   background: var(--ws-hover) !important;
 }
 
 .ag-theme-quartz .ag-row-selected,
-.ag-theme-quartz-dark .ag-row-selected {
+.ag-theme-dark-financial .ag-row-selected {
   background: var(--ws-selected) !important;
 }
 

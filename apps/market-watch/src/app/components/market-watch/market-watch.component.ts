@@ -18,7 +18,7 @@ import type { MarketQuote } from '@fdc3-poc/shared-domain';
   templateUrl: './market-watch.component.html',
 })
 export class MarketWatchComponent implements OnInit, OnDestroy {
-  @Input() theme: ThemeName = 'quartz-dark';
+  @Input() theme: ThemeName = 'dark-financial';
 
   quotes: MarketQuote[] = MARKET_QUOTES.map((q) => ({ ...q }));
   highlighted: string | null = null;
@@ -42,7 +42,10 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
       width: 105,
       type: 'rightAligned',
       valueFormatter: ({ value }) => `${Number(value) >= 0 ? '+' : ''}${Number(value).toFixed(2)}`,
-      cellStyle: ({ value }) => ({ color: Number(value) >= 0 ? 'var(--ws-positive)' : 'var(--ws-negative)', fontWeight: 800 }),
+      cellStyle: ({ value, node }) => ({
+        color: node?.isSelected() ? 'var(--ws-selection-text)' : Number(value) >= 0 ? 'var(--ws-positive)' : 'var(--ws-negative)',
+        fontWeight: 800,
+      }),
     },
     {
       field: 'changePct',
@@ -50,7 +53,10 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
       width: 95,
       type: 'rightAligned',
       valueFormatter: ({ value }) => `${Number(value) >= 0 ? '+' : ''}${Number(value).toFixed(2)}%`,
-      cellStyle: ({ value }) => ({ color: Number(value) >= 0 ? 'var(--ws-positive)' : 'var(--ws-negative)', fontWeight: 800 }),
+      cellStyle: ({ value, node }) => ({
+        color: node?.isSelected() ? 'var(--ws-selection-text)' : Number(value) >= 0 ? 'var(--ws-positive)' : 'var(--ws-negative)',
+        fontWeight: 800,
+      }),
     },
     {
       field: 'volume',

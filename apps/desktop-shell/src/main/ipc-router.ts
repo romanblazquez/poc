@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { randomUUID } from 'crypto';
-import type { Fdc3Context, IntentResolution } from '@fdc3-poc/fdc3-core';
+import type { Fdc3Context, IntentResolution, ThemeContext, ThemeName } from '@fdc3-poc/fdc3-core';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
 import type { ChannelManager } from '@fdc3-poc/channel-engine';
 import type { IntentRegistry } from '@fdc3-poc/intent-engine';
@@ -8,6 +8,7 @@ import { IntentResolver } from '@fdc3-poc/intent-engine';
 import type { WindowManager } from './window-manager.js';
 import type { DetachedWorkspacePayload } from './window-manager.js';
 import type { WorkspaceManager } from './workspace-manager.js';
+import type { ThemeManager } from './theme-manager.js';
 import type { AppDefinition } from '@fdc3-poc/fdc3-core';
 
 /**
@@ -25,6 +26,7 @@ export class IpcRouter {
     private readonly channelManager: ChannelManager,
     private readonly intentRegistry: IntentRegistry,
     private readonly workspaceManager: WorkspaceManager,
+    private readonly themeManager: ThemeManager,
     private readonly appDirectory: AppDefinition[],
   ) {
     this.intentResolver = new IntentResolver();
@@ -47,6 +49,8 @@ export class IpcRouter {
     this.handleSaveWorkspace();
     this.handleGetAppList();
     this.handleGetPreloadPath();
+    this.handleGetTheme();
+    this.handleSetTheme();
     this.handleOpenWorkspaceWindow();
     this.handleGetWorkspaceWindowPayload();
     this.handleUpdateWorkspaceWindowPayload();
@@ -278,6 +282,33 @@ export class IpcRouter {
   private handleGetPreloadPath(): void {
     ipcMain.handle(IpcEvents.GET_PRELOAD_PATH, () => {
       return this.windowManager.getPreloadPath();
+    });
+  }
+
+  private handleGetTheme(): void {
+    ipcMain.handle(IpcEvents.GET_THEME, () => {
+      return this.themeManager.getTheme();
+    });
+  }
+
+  private handleSetTheme(): void {
+    ipcMain.handle(IpcEvents.SET_THEME, (_event, nextTheme: ThemeName) => {
+      const theme = this.themeManager.setTheme(nextTheme);
+
+      for (const id of this.windowManager.getAllWebContentsIds()) {
+        this.windowManager.sendTo(id, IpcEvents.THEME_CHANGED, theme);
+      }
+
+      const themeContext: ThemeContext = {
+        type: 'com.demo.theme',
+        name: `Theme: ${theme}`,
+        theme,
+      };
+      for (const id of this.windowManager.getAllWebContentsIds()) {
+        this.windowManager.sendTo(id, IpcEvents.CONTEXT_UPDATE, themeContext);
+      }
+
+      return theme;
     });
   }
 

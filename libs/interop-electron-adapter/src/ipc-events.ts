@@ -30,6 +30,8 @@ export const IpcEvents = {
   UPDATE_WORKSPACE_WINDOW_PAYLOAD: 'fdc3:updateWorkspaceWindowPayload',
   RECALL_WORKSPACE_WINDOW: 'fdc3:recallWorkspaceWindow',
   CLOSE_CURRENT_WINDOW: 'fdc3:closeCurrentWindow',
+  GET_THEME: 'fdc3:getTheme',
+  SET_THEME: 'fdc3:setTheme',
 
   // ─── Main → Renderer (webContents.send) ──────────────────────────────────
   CONTEXT_UPDATE: 'fdc3:contextUpdate',
@@ -37,6 +39,7 @@ export const IpcEvents = {
   CHANNEL_CHANGED: 'fdc3:channelChanged',
   APP_LIST_CHANGED: 'fdc3:appListChanged',
   WORKSPACE_WINDOW_CLOSED: 'fdc3:workspaceWindowClosed',
+  THEME_CHANGED: 'fdc3:themeChanged',
 } as const;
 
 export type IpcEventKey = keyof typeof IpcEvents;

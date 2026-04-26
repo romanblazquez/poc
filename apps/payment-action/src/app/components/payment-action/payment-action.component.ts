@@ -40,7 +40,7 @@ const EMPTY_FORM: PaymentForm = {
   templateUrl: './payment-action.component.html',
 })
 export class PaymentActionComponent implements OnInit, OnDestroy {
-  @Input() theme: ThemeName = 'quartz-dark';
+  @Input() theme: ThemeName = 'dark-financial';
 
   form: PaymentForm = { ...EMPTY_FORM };
   status: PaymentStatus = 'idle';

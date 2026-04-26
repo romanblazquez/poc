@@ -21,6 +21,7 @@ import { AppRegistryLoader } from './app-registry-loader.js';
 import { WindowManager } from './window-manager.js';
 import { IpcRouter } from './ipc-router.js';
 import { WorkspaceManager } from './workspace-manager.js';
+import { ThemeManager } from './theme-manager.js';
 import { ChannelManager } from '@fdc3-poc/channel-engine';
 import { IntentRegistry } from '@fdc3-poc/intent-engine';
 
@@ -56,12 +57,16 @@ async function bootstrap(): Promise<void> {
   // 5. Workspace manager
   const workspaceManager = new WorkspaceManager(windowManager, channelManager);
 
-  // 6. IPC router — must be registered before any window loads
+  // 6. Theme manager (global persisted theme)
+  const themeManager = new ThemeManager();
+
+  // 7. IPC router — must be registered before any window loads
   const ipcRouter = new IpcRouter(
     windowManager,
     channelManager,
     intentRegistry,
     workspaceManager,
+    themeManager,
     appDefs,
   );
   ipcRouter.register();
@@ -73,10 +78,10 @@ async function bootstrap(): Promise<void> {
     });
   });
 
-  // 7. Create the shell launcher window
+  // 8. Create the shell launcher window
   windowManager.createShellWindow();
 
-  // 8. Do not auto-restore external workspace windows.
+  // 9. Do not auto-restore external workspace windows.
   // The current UX keeps all apps embedded in the single shell window via Dockview.
 
   // macOS: re-create window when dock icon clicked with no windows open

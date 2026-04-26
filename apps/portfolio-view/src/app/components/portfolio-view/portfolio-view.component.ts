@@ -17,7 +17,7 @@ import type { PortfolioPosition } from '@fdc3-poc/shared-domain';
   templateUrl: './portfolio-view.component.html',
 })
 export class PortfolioViewComponent implements OnInit, OnDestroy {
-  @Input() theme: ThemeName = 'quartz-dark';
+  @Input() theme: ThemeName = 'dark-financial';
 
   positions: PortfolioPosition[] = [];
   customerName = '';
@@ -34,7 +34,10 @@ export class PortfolioViewComponent implements OnInit, OnDestroy {
       type: 'rightAligned',
       valueGetter: ({ data }) => data ? this.pnl(data) : 0,
       valueFormatter: ({ value }) => `${Number(value) >= 0 ? '+' : ''}${Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
-      cellStyle: ({ value }) => ({ color: Number(value) >= 0 ? 'var(--ws-positive)' : 'var(--ws-negative)', fontWeight: 800 }),
+      cellStyle: ({ value, node }) => ({
+        color: node?.isSelected() ? 'var(--ws-selection-text)' : Number(value) >= 0 ? 'var(--ws-positive)' : 'var(--ws-negative)',
+        fontWeight: 800,
+      }),
     },
     {
       headerName: 'P&L %',
@@ -42,7 +45,10 @@ export class PortfolioViewComponent implements OnInit, OnDestroy {
       type: 'rightAligned',
       valueGetter: ({ data }) => data ? this.pnlPct(data) : 0,
       valueFormatter: ({ value }) => `${Number(value) >= 0 ? '+' : ''}${Number(value).toFixed(1)}%`,
-      cellStyle: ({ value }) => ({ color: Number(value) >= 0 ? 'var(--ws-positive)' : 'var(--ws-negative)', fontWeight: 800 }),
+      cellStyle: ({ value, node }) => ({
+        color: node?.isSelected() ? 'var(--ws-selection-text)' : Number(value) >= 0 ? 'var(--ws-positive)' : 'var(--ws-negative)',
+        fontWeight: 800,
+      }),
     },
   ];
 

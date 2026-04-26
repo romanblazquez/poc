@@ -1,0 +1,131 @@
+:root {
+  --font-ui: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  --color-bg: #0b1118;
+  --color-surface: #111a25;
+  --color-surface-2: #162231;
+  --color-border: #2b3d52;
+  --color-border-strong: #3d5671;
+  --color-text: #ecf3fb;
+  --color-text-muted: #9aacbd;
+  --color-accent: #4f8cff;
+  --color-accent-hover: #6ea3ff;
+  --color-danger: #ef5f5f;
+  --color-warning: #f3a33b;
+  --color-success: #2fb370;
+  --shadow-panel: 0 12px 28px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-theme='dark-financial'],
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-bg: #0b1118;
+  --color-surface: #111a25;
+  --color-surface-2: #162231;
+  --color-border: #2b3d52;
+  --color-border-strong: #3d5671;
+  --color-text: #ecf3fb;
+  --color-text-muted: #9aacbd;
+  --color-accent: #4f8cff;
+  --color-accent-hover: #6ea3ff;
+  --color-danger: #ef5f5f;
+  --color-warning: #f3a33b;
+  --color-success: #2fb370;
+  --shadow-panel: 0 12px 28px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-theme='light-financial'],
+:root[data-theme='light'] {
+  color-scheme: light;
+  --color-bg: #eef3f8;
+  --color-surface: #ffffff;
+  --color-surface-2: #f6f8fb;
+  --color-border: #cfd8e3;
+  --color-border-strong: #b8c5d5;
+  --color-text: #162234;
+  --color-text-muted: #5d7085;
+  --color-accent: #1f6feb;
+  --color-accent-hover: #1964d8;
+  --color-danger: #b42318;
+  --color-warning: #b76e00;
+  --color-success: #087443;
+  --shadow-panel: 0 12px 28px rgba(37, 52, 72, 0.12);
+}
+
+:root[data-theme='high-contrast'] {
+  color-scheme: dark;
+  --color-bg: #000000;
+  --color-surface: #0f0f0f;
+  --color-surface-2: #171717;
+  --color-border: #8f8f8f;
+  --color-border-strong: #ffffff;
+  --color-text: #ffffff;
+  --color-text-muted: #d0d0d0;
+  --color-accent: #00d1ff;
+  --color-accent-hover: #6be7ff;
+  --color-danger: #ff6b6b;
+  --color-warning: #ffd166;
+  --color-success: #53d769;
+  --shadow-panel: 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
+:root[data-theme='luxury-neutral'] {
+  color-scheme: light;
+  --color-bg: #f3f0eb;
+  --color-surface: #fcfaf7;
+  --color-surface-2: #f0eae2;
+  --color-border: #d5c9b8;
+  --color-border-strong: #bda989;
+  --color-text: #2f2a22;
+  --color-text-muted: #6a5c4a;
+  --color-accent: #7a5c2f;
+  --color-accent-hover: #8c6b3a;
+  --color-danger: #a94442;
+  --color-warning: #9b7d0a;
+  --color-success: #3d7c4a;
+  --shadow-panel: 0 12px 28px rgba(70, 56, 36, 0.12);
+}
+
+:root {
+  --shell-bg: var(--color-bg);
+  --shell-panel: var(--color-surface);
+  --shell-panel-2: var(--color-surface-2);
+  --shell-panel-3: var(--color-surface-2);
+  --shell-border: var(--color-border);
+  --shell-border-soft: var(--color-border);
+  --shell-text: var(--color-text);
+  --shell-muted: var(--color-text-muted);
+  --shell-subtle: color-mix(in srgb, var(--color-text-muted) 70%, transparent);
+  --shell-accent: var(--color-accent);
+  --shell-accent-soft: color-mix(in srgb, var(--color-accent) 22%, transparent);
+  --shell-accent-border: color-mix(in srgb, var(--color-accent) 42%, transparent);
+  --shell-accent-text: color-mix(in srgb, var(--color-accent) 24%, var(--color-text));
+  --shell-positive: var(--color-success);
+  --shell-negative: var(--color-danger);
+  --shell-shadow: var(--shadow-panel);
+
+  --ws-bg: var(--color-bg);
+  --ws-panel: var(--color-surface);
+  --ws-panel-2: var(--color-surface-2);
+  --ws-panel-3: var(--color-surface-2);
+  --ws-border: var(--color-border);
+  --ws-border-soft: var(--color-border);
+  --ws-text: var(--color-text);
+  --ws-muted: var(--color-text-muted);
+  --ws-subtle: color-mix(in srgb, var(--color-text-muted) 70%, transparent);
+  --ws-accent: var(--color-accent);
+  --ws-accent-soft: color-mix(in srgb, var(--color-accent) 22%, transparent);
+  --ws-positive: var(--color-success);
+  --ws-negative: var(--color-danger);
+  --ws-warning: var(--color-warning);
+  --ws-shadow: var(--shadow-panel);
+}

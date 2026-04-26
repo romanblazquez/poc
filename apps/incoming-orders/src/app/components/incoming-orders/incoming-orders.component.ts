@@ -17,7 +17,7 @@ import type { FundAllocation, IncomingOrder } from '@fdc3-poc/shared-domain';
   templateUrl: './incoming-orders.component.html',
 })
 export class IncomingOrdersComponent implements OnInit, OnDestroy {
-  @Input() theme: ThemeName = 'quartz-dark';
+  @Input() theme: ThemeName = 'dark-financial';
 
   fundId: string | null = null;
   selectedOrderId: string | null = null;
@@ -28,7 +28,10 @@ export class IncomingOrdersComponent implements OnInit, OnDestroy {
     {
       field: 'side',
       width: 90,
-      cellStyle: ({ value }) => ({ color: value === 'Buy' ? '#087443' : '#b42318', fontWeight: 800 }),
+      cellStyle: ({ value, node }) => ({
+        color: node?.isSelected() ? 'var(--ws-selection-text)' : value === 'Buy' ? '#087443' : '#b42318',
+        fontWeight: 800,
+      }),
     },
     {
       field: 'quantity',

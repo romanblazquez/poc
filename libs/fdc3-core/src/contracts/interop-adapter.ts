@@ -1,6 +1,7 @@
 import type { Fdc3Context } from '../types/context.js';
 import type { IntentResolution } from '../types/intent.js';
 import type { UserChannel } from '../types/channel.js';
+import type { ThemeName } from '../types/context.js';
 
 /**
  * Unsubscribe function returned by listener registration.
@@ -97,6 +98,9 @@ export interface Fdc3DesktopAgent {
   ): Unsubscribe;
   completeIntent(requestId: string, result?: Fdc3Context): Promise<void>;
   closeWindow(): Promise<boolean>;
+  getTheme(): Promise<ThemeName>;
+  setTheme(theme: ThemeName): Promise<ThemeName>;
+  onThemeChanged(handler: (theme: ThemeName) => void): Unsubscribe;
   joinUserChannel(channelId: string): Promise<void>;
   leaveCurrentChannel(): Promise<void>;
   getCurrentChannel(): Promise<UserChannel | null>;

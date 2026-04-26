@@ -8,8 +8,8 @@ export interface ThemeConfig {
 }
 
 export const THEMES: Record<ThemeName, ThemeConfig> = {
-  'quartz-dark':   { label: 'Quartz Dark',   agGrid: 'ag-theme-quartz-dark',  dockview: 'dockview-theme-dark',  dataTheme: 'dark' },
-  'quartz-light':  { label: 'Quartz Light',  agGrid: 'ag-theme-quartz',       dockview: 'dockview-theme-light', dataTheme: 'light' },
-  'alpine-dark':   { label: 'Alpine Dark',   agGrid: 'ag-theme-alpine-dark',  dockview: 'dockview-theme-dark',  dataTheme: 'dark' },
-  'material-dark': { label: 'Material Dark', agGrid: 'ag-theme-material',     dockview: 'dockview-theme-dark',  dataTheme: 'dark' },
+  'dark-financial':  { label: 'Dark Financial',  agGrid: 'ag-theme-quartz-dark', dockview: 'dockview-theme-dark',  dataTheme: 'dark-financial' },
+  'light-financial': { label: 'Light Financial', agGrid: 'ag-theme-quartz',      dockview: 'dockview-theme-light', dataTheme: 'light-financial' },
+  'high-contrast':   { label: 'High Contrast',   agGrid: 'ag-theme-quartz-dark', dockview: 'dockview-theme-dark',  dataTheme: 'high-contrast' },
+  'luxury-neutral':  { label: 'Luxury Neutral',  agGrid: 'ag-theme-quartz',      dockview: 'dockview-theme-light', dataTheme: 'luxury-neutral' },
 };

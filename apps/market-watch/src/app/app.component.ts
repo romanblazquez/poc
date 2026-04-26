@@ -1,6 +1,6 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, NgZone } from '@angular/core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
-import type { ThemeContext, ThemeName } from '@fdc3-poc/fdc3-core';
+import type { ThemeName } from '@fdc3-poc/fdc3-core';
 import { MarketWatchComponent } from './components/market-watch/market-watch.component';
 
 @Component({
@@ -10,15 +10,27 @@ import { MarketWatchComponent } from './components/market-watch/market-watch.com
   template: `<app-market-watch [theme]="theme"></app-market-watch>`,
 })
 export class AppComponent implements OnInit, OnDestroy {
-  theme: ThemeName = 'quartz-dark';
+  theme: ThemeName = 'dark-financial';
   private unsubTheme?: () => void;
+
+  constructor(private zone: NgZone, private cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
     this.applyTheme(this.theme);
     if (window.fdc3) {
-      this.unsubTheme = window.fdc3.addContextListener<ThemeContext>('com.demo.theme', (ctx) => {
-        this.theme = ctx.theme;
-        this.applyTheme(ctx.theme);
+      void window.fdc3.getTheme().then((theme) => {
+        this.zone.run(() => {
+          this.theme = theme;
+          this.applyTheme(theme);
+          this.cdr.markForCheck();
+        });
+      });
+      this.unsubTheme = window.fdc3.onThemeChanged((theme) => {
+        this.zone.run(() => {
+          this.theme = theme;
+          this.applyTheme(theme);
+          this.cdr.markForCheck();
+        });
       });
     }
   }

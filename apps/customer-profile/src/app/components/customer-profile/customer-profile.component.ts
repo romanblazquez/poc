@@ -19,7 +19,7 @@ import type { Customer, Account, Transaction } from '@fdc3-poc/shared-domain';
   templateUrl: './customer-profile.component.html',
 })
 export class CustomerProfileComponent implements OnInit, OnDestroy {
-  @Input() theme: ThemeName = 'quartz-dark';
+  @Input() theme: ThemeName = 'dark-financial';
 
   customer: Customer | null = null;
   accounts: Account[] = [];

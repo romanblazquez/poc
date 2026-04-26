@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
+import '../../../../libs/shared-ui/src/styles/theme-tokens.css';
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },

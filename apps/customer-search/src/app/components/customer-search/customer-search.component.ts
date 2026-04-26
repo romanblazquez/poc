@@ -26,7 +26,7 @@ const SEGMENT_COLORS: Record<string, string> = {
   templateUrl: './customer-search.component.html',
 })
 export class CustomerSearchComponent {
-  @Input() theme: ThemeName = 'quartz-dark';
+  @Input() theme: ThemeName = 'dark-financial';
 
   query = '';
   lastBroadcast: string | null = null;

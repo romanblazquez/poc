@@ -5,7 +5,7 @@ import { WorkspaceToolbar } from './components/WorkspaceToolbar.js';
 import { DockviewWorkspace } from './components/DockviewWorkspace.js';
 import type { DetachedWorkspacePayload } from './components/DockviewWorkspace.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
-import type { ThemeContext, UserChannel } from '@fdc3-poc/fdc3-core';
+import type { UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { ThemeName } from '@fdc3-poc/fdc3-core';
 
@@ -25,6 +25,9 @@ declare global {
       getWorkspaceWindowPayload(workspaceWindowId: string): Promise<DetachedWorkspacePayload | null>;
       updateWorkspaceWindowPayload(payload: DetachedWorkspacePayload): Promise<boolean>;
       recallWorkspaceWindow(workspaceWindowId: string): Promise<boolean>;
+      getTheme(): Promise<ThemeName>;
+      setTheme(theme: ThemeName): Promise<ThemeName>;
+      onThemeChanged(handler: (theme: ThemeName) => void): () => void;
       onWorkspaceWindowClosed(handler: (payload: DetachedWorkspacePayload) => void): () => void;
       addContextListener<T>(type: string | null, handler: (context: T) => void): () => void;
       onChannelChanged(handler: (ch: UserChannel | null) => void): () => void;
@@ -75,14 +78,14 @@ const DEFAULT_WORKSPACE_TABS: WorkspaceTab[] = [
 ];
 
 const DEFAULT_WORKSPACE_STATES: Record<string, WorkspaceState> = {
-  'trading-flow': { channelId: 'channel-5', theme: 'quartz-dark', layout: null },
-  'market-view': { channelId: null, theme: 'quartz-dark', layout: null },
+  'trading-flow': { channelId: 'channel-5', theme: 'dark-financial', layout: null },
+  'market-view': { channelId: null, theme: 'dark-financial', layout: null },
 };
 
 function validTheme(t: unknown): ThemeName {
   return (t != null && Object.prototype.hasOwnProperty.call(THEMES, t as string))
     ? (t as ThemeName)
-    : 'quartz-dark';
+    : 'dark-financial';
 }
 
 function uniquePanelIds(panelIds: string[]): string[] {
@@ -126,7 +129,7 @@ function readWorkspaceStore(): {
       for (const tab of tabs) {
         const rawState = parsed.states?.[tab.id];
         states[tab.id] = {
-          ...(DEFAULT_WORKSPACE_STATES[tab.id] ?? { channelId: null, theme: 'quartz-dark' as ThemeName, layout: null }),
+          ...(DEFAULT_WORKSPACE_STATES[tab.id] ?? { channelId: null, theme: 'dark-financial' as ThemeName, layout: null }),
           ...rawState,
           theme: validTheme(rawState?.theme),
         };
@@ -174,6 +177,7 @@ export function App() {
   const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceTab[]>(initialWorkspaceStore.tabs);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(initialWorkspaceStore.activeWorkspaceId);
   const [workspaceStates, setWorkspaceStates] = useState<Record<string, WorkspaceState>>(initialWorkspaceStore.states);
+  const [globalTheme, setGlobalTheme] = useState<ThemeMode>('dark-financial');
   const [openPanelIds, setOpenPanelIds] = useState<string[]>(
     initialWorkspaceStore.tabs.find((tab) => tab.id === initialWorkspaceStore.activeWorkspaceId)?.panelIds
     ?? initialWorkspaceStore.tabs[0]?.panelIds
@@ -184,9 +188,9 @@ export function App() {
 
   const activeWorkspaceTab = workspaceTabs.find((tab) => tab.id === activeWorkspaceId) ?? workspaceTabs[0];
   const activeWorkspaceState = workspaceStates[activeWorkspaceTab.id]
-    ?? { channelId: null, theme: 'quartz-dark' as ThemeName, layout: null };
+    ?? { channelId: null, theme: globalTheme, layout: null };
   const activeDetachedWorkspace = detachedWorkspaces[activeWorkspaceTab.id];
-  const theme = activeWorkspaceState.theme;
+  const theme = globalTheme;
   const detachedWorkspaceId = new URLSearchParams(window.location.search).get('detachedWorkspaceId');
 
   useEffect(() => {
@@ -211,12 +215,41 @@ export function App() {
     void window.fdc3.getAppList().then(setApps);
     void window.fdc3.getPreloadPath().then(setPreloadPath);
     void window.fdc3.getCurrentChannel().then(setCurrentChannel);
+    void window.fdc3.getTheme().then((nextTheme) => {
+      setGlobalTheme(nextTheme);
+      document.documentElement.dataset.theme = THEMES[nextTheme].dataTheme;
+      window.localStorage.setItem('fdc3.desktop.theme', nextTheme);
+    });
     const unsub = window.fdc3.onChannelChanged(setCurrentChannel);
-    return unsub;
+    const unsubTheme = window.fdc3.onThemeChanged((nextTheme) => {
+      setGlobalTheme(nextTheme);
+      document.documentElement.dataset.theme = THEMES[nextTheme].dataTheme;
+      window.localStorage.setItem('fdc3.desktop.theme', nextTheme);
+      setWorkspaceStates((prev) => {
+        const next: Record<string, WorkspaceState> = {};
+        for (const [workspaceId, state] of Object.entries(prev)) {
+          next[workspaceId] = { ...state, theme: nextTheme };
+        }
+        return next;
+      });
+      setDetachedWorkspaces((prev) => {
+        const next: Partial<Record<string, DetachedWorkspacePayload>> = {};
+        for (const [workspaceId, payload] of Object.entries(prev)) {
+          if (!payload) continue;
+          next[workspaceId] = { ...payload, theme: nextTheme };
+        }
+        return next;
+      });
+    });
+    return () => {
+      unsub();
+      unsubTheme();
+    };
   }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = THEMES[theme].dataTheme;
+    window.localStorage.setItem('fdc3.desktop.theme', theme);
   }, [theme]);
 
   useEffect(() => {
@@ -252,40 +285,35 @@ export function App() {
   }, [activeWorkspaceTab.id, workspaceStates, workspaceTabs]);
 
   const handleThemeChange = useCallback(async (nextTheme: ThemeMode) => {
-    const detached = detachedWorkspaces[activeWorkspaceId];
-    setWorkspaceStates((prev) => ({
-      ...prev,
-      [activeWorkspaceId]: {
-        ...prev[activeWorkspaceId],
-        theme: nextTheme,
-      },
-    }));
-    if (detached) {
-      const nextPayload = { ...detached, theme: nextTheme };
-      setDetachedWorkspaces((prev) => ({
-        ...prev,
-        [activeWorkspaceId]: nextPayload,
-      }));
-      void window.fdc3.updateWorkspaceWindowPayload(nextPayload);
-    }
-    document.documentElement.dataset.theme = THEMES[nextTheme].dataTheme;
+    const appliedTheme = await window.fdc3.setTheme(nextTheme);
+    setGlobalTheme(appliedTheme);
+    setWorkspaceStates((prev) => {
+      const next: Record<string, WorkspaceState> = {};
+      for (const [workspaceId, state] of Object.entries(prev)) {
+        next[workspaceId] = { ...state, theme: appliedTheme };
+      }
+      return next;
+    });
+
+    setDetachedWorkspaces((prev) => {
+      const next: Partial<Record<string, DetachedWorkspacePayload>> = {};
+      for (const [workspaceId, payload] of Object.entries(prev)) {
+        if (!payload) continue;
+        const nextPayload = { ...payload, theme: appliedTheme };
+        next[workspaceId] = nextPayload;
+        void window.fdc3.updateWorkspaceWindowPayload(nextPayload);
+      }
+      return next;
+    });
+
     if (window.fdc3) {
       await window.fdc3.broadcast({
         type: 'com.demo.theme',
-        name: THEMES[nextTheme].label,
-        theme: nextTheme,
+        name: THEMES[appliedTheme].label,
+        theme: appliedTheme,
       });
     }
-  }, [activeWorkspaceId, detachedWorkspaces]);
-
-  useEffect(() => {
-    if (!window.fdc3) return;
-    void window.fdc3.broadcast({
-      type: 'com.demo.theme',
-      name: THEMES[theme].label,
-      theme,
-    });
-  }, [activeWorkspaceId, theme]);
+  }, []);
 
   const handleChannelChange = useCallback((channel: UserChannel | null) => {
     setCurrentChannel(channel);
@@ -678,15 +706,25 @@ function DetachedWorkspaceShell({
 
   useEffect(() => {
     if (!window.fdc3) return;
-    return window.fdc3.addContextListener<ThemeContext>('com.demo.theme', (ctx) => {
+    void window.fdc3.getTheme().then((theme) => {
       setPayload((current) => {
-        if (!current || current.theme === ctx.theme) return current;
-        const next = { ...current, theme: ctx.theme };
-        document.documentElement.dataset.theme = THEMES[ctx.theme].dataTheme;
+        if (!current || current.theme === theme) return current;
+        const next = { ...current, theme };
+        document.documentElement.dataset.theme = THEMES[theme].dataTheme;
         void window.fdc3.updateWorkspaceWindowPayload(next);
         return next;
       });
     });
+    const unsubTheme = window.fdc3.onThemeChanged((theme) => {
+      setPayload((current) => {
+        if (!current || current.theme === theme) return current;
+        const next = { ...current, theme };
+        document.documentElement.dataset.theme = THEMES[theme].dataTheme;
+        void window.fdc3.updateWorkspaceWindowPayload(next);
+        return next;
+      });
+    });
+    return unsubTheme;
   }, []);
 
   const handleDetachedLayoutChange = useCallback((layout: unknown) => {

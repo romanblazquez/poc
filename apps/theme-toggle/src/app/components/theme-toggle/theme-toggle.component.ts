@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { SelectModule } from 'primeng/select';
 import { TagModule } from 'primeng/tag';
 import { THEMES } from '@fdc3-poc/fdc3-core';
-import type { ThemeContext, ThemeName } from '@fdc3-poc/fdc3-core';
+import type { ThemeName } from '@fdc3-poc/fdc3-core';
 
 @Component({
   selector: 'app-theme-toggle',
@@ -14,13 +14,13 @@ import type { ThemeContext, ThemeName } from '@fdc3-poc/fdc3-core';
   templateUrl: './theme-toggle.component.html',
 })
 export class ThemeToggleComponent implements OnInit, OnDestroy {
-  theme: ThemeName = 'quartz-dark';
+  theme: ThemeName = 'dark-financial';
   status = 'Ready';
 
   readonly themes = THEMES;
   readonly themeKeys = Object.keys(THEMES) as ThemeName[];
 
-  private unsub?: () => void;
+  private unsubTheme?: () => void;
 
   constructor(private cdr: ChangeDetectorRef) {}
 
@@ -28,22 +28,28 @@ export class ThemeToggleComponent implements OnInit, OnDestroy {
     document.documentElement.dataset['theme'] = THEMES[this.theme].dataTheme;
 
     if (!window.fdc3) return;
-    this.unsub = window.fdc3.addContextListener<ThemeContext>('com.demo.theme', (ctx) => {
-      this.theme = ctx.theme;
-      document.documentElement.dataset['theme'] = THEMES[ctx.theme].dataTheme;
-      this.status = `Received ${ctx.theme}`;
+    void window.fdc3.getTheme().then((theme) => {
+      this.theme = theme;
+      document.documentElement.dataset['theme'] = THEMES[theme].dataTheme;
+      this.status = `Loaded ${theme}`;
+      this.cdr.markForCheck();
+    });
+    this.unsubTheme = window.fdc3.onThemeChanged((theme) => {
+      this.theme = theme;
+      document.documentElement.dataset['theme'] = THEMES[theme].dataTheme;
+      this.status = `Received ${theme}`;
       this.cdr.markForCheck();
     });
   }
 
   ngOnDestroy(): void {
-    this.unsub?.();
+    this.unsubTheme?.();
   }
 
   async onThemeChange(next: ThemeName): Promise<void> {
     this.theme = next;
     document.documentElement.dataset['theme'] = THEMES[next].dataTheme;
-    this.status = 'Broadcasting...';
+    this.status = 'Applying theme...';
     this.cdr.markForCheck();
 
     if (!window.fdc3) {
@@ -51,12 +57,8 @@ export class ThemeToggleComponent implements OnInit, OnDestroy {
       this.cdr.markForCheck();
       return;
     }
-    await window.fdc3.broadcast({
-      type: 'com.demo.theme',
-      name: THEMES[next].label,
-      theme: next,
-    } satisfies ThemeContext);
-    this.status = `Broadcast ${next}`;
+    await window.fdc3.setTheme(next);
+    this.status = `Applied ${next}`;
     this.cdr.markForCheck();
   }
 }

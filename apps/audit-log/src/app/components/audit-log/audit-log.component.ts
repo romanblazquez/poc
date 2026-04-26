@@ -22,7 +22,7 @@ function severityColor(severity: string): string {
   templateUrl: './audit-log.component.html',
 })
 export class AuditLogComponent implements OnInit, OnDestroy {
-  @Input() theme: ThemeName = 'quartz-dark';
+  @Input() theme: ThemeName = 'dark-financial';
 
   fundId: string | null = null;
   lastOrderId: string | null = null;

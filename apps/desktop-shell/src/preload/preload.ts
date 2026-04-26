@@ -19,7 +19,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
-import type { Fdc3Context, IntentInvocationMetadata, IntentResolution, UserChannel } from '@fdc3-poc/fdc3-core';
+import type { Fdc3Context, IntentInvocationMetadata, IntentResolution, UserChannel, ThemeName } from '@fdc3-poc/fdc3-core';
 
 // ─── Handler registries (live in preload isolate, not renderer) ────────────
 
@@ -41,6 +41,7 @@ const contextHandlers = new Map<string, Set<ContextHandler>>();
 const intentHandlers = new Map<string, Set<IntentHandler>>();
 const channelChangeHandlers = new Set<ChannelHandler>();
 const workspaceWindowClosedHandlers = new Set<(payload: DetachedWorkspacePayload) => void>();
+const themeChangeHandlers = new Set<(theme: ThemeName) => void>();
 
 // ─── Inbound IPC listeners (main → preload) ───────────────────────────────
 
@@ -84,6 +85,12 @@ ipcRenderer.on(IpcEvents.WORKSPACE_WINDOW_CLOSED, (_event, payload: DetachedWork
   }
 });
 
+ipcRenderer.on(IpcEvents.THEME_CHANGED, (_event, theme: ThemeName) => {
+  for (const handler of themeChangeHandlers) {
+    handler(theme);
+  }
+});
+
 // ─── window.fdc3 surface ──────────────────────────────────────────────────
 
 contextBridge.exposeInMainWorld('fdc3', {
@@ -109,6 +116,20 @@ contextBridge.exposeInMainWorld('fdc3', {
       void ipcRenderer.invoke(IpcEvents.ADD_CONTEXT_LISTENER, key);
     }
     contextHandlers.get(key)!.add(handler);
+
+    if (key === 'com.demo.theme') {
+      void ipcRenderer.invoke(IpcEvents.GET_THEME).then((theme) => {
+        try {
+          handler({
+            type: 'com.demo.theme',
+            name: `Theme: ${String(theme)}`,
+            theme,
+          } as Fdc3Context);
+        } catch (e) {
+          console.error('[fdc3 preload] Theme bootstrap handler threw:', e);
+        }
+      });
+    }
 
     return () => {
       const set = contextHandlers.get(key);
@@ -180,6 +201,22 @@ contextBridge.exposeInMainWorld('fdc3', {
   /** Close the current Electron app window or embedded app surface. */
   closeWindow(): Promise<boolean> {
     return ipcRenderer.invoke(IpcEvents.CLOSE_CURRENT_WINDOW) as Promise<boolean>;
+  },
+
+  /** Get current global desktop theme. */
+  getTheme(): Promise<ThemeName> {
+    return ipcRenderer.invoke(IpcEvents.GET_THEME) as Promise<ThemeName>;
+  },
+
+  /** Set global desktop theme and propagate to all windows. */
+  setTheme(theme: ThemeName): Promise<ThemeName> {
+    return ipcRenderer.invoke(IpcEvents.SET_THEME, theme) as Promise<ThemeName>;
+  },
+
+  /** Subscribe to global theme changes pushed by main process. */
+  onThemeChanged(handler: (theme: ThemeName) => void): () => void {
+    themeChangeHandlers.add(handler);
+    return () => themeChangeHandlers.delete(handler);
   },
 
   // ─── Shell-specific extras (used by the launcher renderer) ───────────────

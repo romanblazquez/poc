@@ -16,7 +16,7 @@ import type { FundAllocation } from '@fdc3-poc/shared-domain';
   templateUrl: './funds-allocations.component.html',
 })
 export class FundsAllocationsComponent implements OnInit, OnDestroy {
-  @Input() theme: ThemeName = 'quartz-dark';
+  @Input() theme: ThemeName = 'dark-financial';
 
   selectedFundId: string | null = null;
   readonly rowData = FUND_ALLOCATIONS;
@@ -59,8 +59,8 @@ export class FundsAllocationsComponent implements OnInit, OnDestroy {
       width: 100,
       type: 'rightAligned',
       valueFormatter: ({ value }) => `${Number(value) > 0 ? '+' : ''}${Number(value).toFixed(1)}%`,
-      cellStyle: ({ value }) => ({
-        color: Number(value) >= 0 ? '#0f8a4b' : '#b42318',
+      cellStyle: ({ value, node }) => ({
+        color: node?.isSelected() ? 'var(--ws-selection-text)' : Number(value) >= 0 ? '#0f8a4b' : '#b42318',
         fontWeight: 700,
       }),
     },
