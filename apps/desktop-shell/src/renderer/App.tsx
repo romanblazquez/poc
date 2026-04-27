@@ -7,7 +7,7 @@ import type { DetachedWorkspacePayload } from './components/DockviewWorkspace.js
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
 import type { UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
-import type { ThemeName } from '@fdc3-poc/fdc3-core';
+import type { FlowPolicy, ThemeName } from '@fdc3-poc/fdc3-core';
 
 // window.fdc3 is injected by the preload script
 declare global {
@@ -32,6 +32,7 @@ declare global {
       addContextListener<T>(type: string | null, handler: (context: T) => void): () => void;
       onChannelChanged(handler: (ch: UserChannel | null) => void): () => void;
       broadcast(context: unknown): Promise<void>;
+      setFlowPolicy(policy: FlowPolicy): Promise<void>;
     };
   }
 }

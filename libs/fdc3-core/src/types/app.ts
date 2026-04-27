@@ -12,6 +12,26 @@ export interface AppIdentifier {
  * Full app descriptor from the App Directory.
  * Follows the FDC3 AppD spec loosely, extended with layout and dev hints.
  */
+/**
+ * Routing policy derived from the Interop Flow designer.
+ * Sent from the renderer to the main process whenever the flow changes.
+ * The main process uses this to filter context broadcasts and intent deliveries.
+ */
+export interface FlowPolicy {
+  /** When false, the policy is inactive and all traffic flows freely. */
+  enabled: boolean;
+  /**
+   * Keys of the form "sourceAppId:contextType:targetAppId".
+   * If a key is present the corresponding context broadcast is BLOCKED.
+   */
+  disabledContextRoutes: string[];
+  /**
+   * Keys of the form "sourceAppId:intentName:targetAppId".
+   * If a key is present the corresponding intent delivery is BLOCKED.
+   */
+  disabledIntentRoutes: string[];
+}
+
 export interface AppDefinition {
   /** Unique, stable identifier */
   appId: string;

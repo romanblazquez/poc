@@ -19,7 +19,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
-import type { Fdc3Context, IntentInvocationMetadata, IntentResolution, UserChannel, ThemeName } from '@fdc3-poc/fdc3-core';
+import type { Fdc3Context, FlowPolicy, IntentInvocationMetadata, IntentResolution, UserChannel, ThemeName } from '@fdc3-poc/fdc3-core';
 
 // ─── Handler registries (live in preload isolate, not renderer) ────────────
 
@@ -269,5 +269,13 @@ contextBridge.exposeInMainWorld('fdc3', {
   onChannelChanged(handler: ChannelHandler): () => void {
     channelChangeHandlers.add(handler);
     return () => channelChangeHandlers.delete(handler);
+  },
+
+  /**
+   * Push the current interop flow routing policy to the main process.
+   * Main uses this to enforce which app pairs may exchange a given context/intent.
+   */
+  setFlowPolicy(policy: FlowPolicy): Promise<void> {
+    return ipcRenderer.invoke(IpcEvents.SET_FLOW_POLICY, policy) as Promise<void>;
   },
 });

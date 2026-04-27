@@ -158,6 +158,10 @@ export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme
 
   const handleClosePanel = useCallback(() => setSelectedEdgeId(null), []);
 
+  const handleDeleteConnector = useCallback((connectorId: string) => {
+    commitFlow({ ...flowRef.current, connectors: flowRef.current.connectors.filter((c) => c.id !== connectorId) });
+  }, [commitFlow]);
+
   const selectedConnector = selectedEdgeId ? flow.connectors.find((c) => c.id === selectedEdgeId) : null;
   const selectedValidation = selectedConnector ? validationMap.get(selectedConnector.id) : null;
 
@@ -224,6 +228,7 @@ export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme
             validation={selectedValidation}
             flow={flow}
             onUpdate={updateConnector}
+            onDelete={handleDeleteConnector}
             onClose={handleClosePanel}
           />
         )}

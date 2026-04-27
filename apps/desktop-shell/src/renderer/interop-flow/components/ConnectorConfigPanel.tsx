@@ -7,6 +7,7 @@ interface ConnectorConfigPanelProps {
   validation: ConnectorValidation | undefined;
   flow: InteropFlowDefinition;
   onUpdate: (connectorId: string, updater: (c: InteropConnector) => InteropConnector) => void;
+  onDelete: (connectorId: string) => void;
   onClose: () => void;
 }
 
@@ -15,6 +16,7 @@ export function ConnectorConfigPanel({
   validation,
   flow,
   onUpdate,
+  onDelete,
   onClose,
 }: ConnectorConfigPanelProps) {
   const sourceNode = flow.nodes.find((n) => n.appId === connector.sourceAppId);
@@ -63,9 +65,10 @@ export function ConnectorConfigPanel({
 
   const handleDelete = useCallback(() => {
     if (confirm('Delete this connector?')) {
+      onDelete(connector.id);
       onClose();
     }
-  }, [onClose]);
+  }, [connector.id, onDelete, onClose]);
 
   return (
     <div
@@ -91,7 +94,10 @@ export function ConnectorConfigPanel({
           borderBottom: '1px solid var(--interop-border)',
         }}
       >
-        <strong style={{ fontSize: 12, color: 'var(--interop-text-strong)' }}>Connector Config</strong>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <strong style={{ fontSize: 12, color: 'var(--interop-text-strong)' }}>Connector Config</strong>
+          <span style={{ fontSize: 9, color: 'var(--interop-text-muted)' }}>Changes save automatically</span>
+        </div>
         <button
           onClick={onClose}
           style={{

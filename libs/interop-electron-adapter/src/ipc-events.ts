@@ -32,6 +32,7 @@ export const IpcEvents = {
   CLOSE_CURRENT_WINDOW: 'fdc3:closeCurrentWindow',
   GET_THEME: 'fdc3:getTheme',
   SET_THEME: 'fdc3:setTheme',
+  SET_FLOW_POLICY: 'fdc3:setFlowPolicy',
 
   // ─── Main → Renderer (webContents.send) ──────────────────────────────────
   CONTEXT_UPDATE: 'fdc3:contextUpdate',
