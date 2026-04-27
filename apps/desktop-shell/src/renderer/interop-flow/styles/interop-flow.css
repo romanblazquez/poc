@@ -1,14 +1,97 @@
 /* Interop Flow Designer Styles */
 
+.interop-flow-shell {
+  --interop-bg: var(--shell-bg);
+  --interop-panel: var(--shell-panel);
+  --interop-panel-2: var(--shell-panel-2);
+  --interop-border: var(--shell-border);
+  --interop-text: var(--shell-text);
+  --interop-text-strong: var(--shell-text);
+  --interop-text-muted: var(--shell-muted);
+  --interop-accent: var(--shell-accent);
+  --interop-accent-border: var(--shell-accent-border);
+  --interop-accent-contrast: #07111e;
+  --interop-context: color-mix(in srgb, var(--shell-accent) 78%, #7fe4ff);
+  --interop-intent: color-mix(in srgb, var(--shell-accent) 42%, #d986ff);
+  --interop-grid-line: color-mix(in srgb, var(--shell-border) 46%, transparent);
+  --interop-success: var(--shell-positive);
+  --interop-danger: var(--shell-negative);
+  --interop-warning: #f3a33b;
+  --interop-minimap-bg: color-mix(in srgb, var(--shell-panel) 88%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--shell-bg) 92%, var(--shell-panel)) 0%, var(--shell-bg) 100%);
+  color: var(--interop-text);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+}
+
+.interop-flow-shell[data-theme='light-financial'],
+.interop-flow-shell[data-theme='luxury-neutral'] {
+  --interop-accent-contrast: #f7fbff;
+}
+
+.interop-flow-empty-state {
+  align-items: center;
+  color: var(--interop-text);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: center;
+  padding: 32px;
+  text-align: center;
+}
+
+.interop-flow-empty-state h3 {
+  font-size: 22px;
+  font-weight: 900;
+  margin: 0;
+}
+
+.interop-flow-empty-state p {
+  color: var(--interop-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 460px;
+}
+
+.interop-flow-empty-badge {
+  align-items: center;
+  background: color-mix(in srgb, var(--interop-accent) 18%, transparent);
+  border: 1px solid var(--interop-accent-border);
+  border-radius: 12px;
+  color: var(--interop-accent);
+  display: inline-flex;
+  font-size: 20px;
+  font-weight: 900;
+  height: 56px;
+  justify-content: center;
+  width: 56px;
+}
+
+.interop-flow-validation-bar {
+  background: color-mix(in srgb, var(--interop-danger) 12%, var(--interop-panel));
+  border-top: 1px solid color-mix(in srgb, var(--interop-danger) 40%, var(--interop-border));
+  color: var(--interop-danger);
+  flex-shrink: 0;
+  font-size: 12px;
+  max-height: 90px;
+  overflow-y: auto;
+  padding: 10px 16px;
+}
+
 .interop-app-node {
-  background: linear-gradient(135deg, #1a1a30 0%, #0f0f20 100%);
-  border: 1px solid #2a3a60;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--interop-panel-2) 96%, white 4%) 0%, var(--interop-panel) 100%);
+  border: 1px solid var(--interop-border);
   border-radius: 8px;
   padding: 12px;
   min-width: 160px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
   font-size: 11px;
-  color: #a0a0d0;
+  color: var(--interop-text);
 }
 
 .interop-app-node-title {
@@ -17,7 +100,7 @@
   gap: 8px;
   margin-bottom: 10px;
   font-weight: 600;
-  color: #e0e0ff;
+  color: var(--interop-text-strong);
   font-size: 12px;
 }
 
@@ -27,25 +110,25 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  background: linear-gradient(135deg, #4080e8, #9040e8);
+  background: linear-gradient(135deg, var(--interop-accent), color-mix(in srgb, var(--interop-intent) 76%, var(--interop-accent)));
   border-radius: 6px;
   font-size: 10px;
   font-weight: 700;
-  color: #fff;
+  color: var(--interop-accent-contrast);
 }
 
 .interop-app-node-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  border-top: 1px solid #1e1e3e;
+  border-top: 1px solid var(--interop-border);
   padding-top: 8px;
 }
 
 .interop-port-heading {
   font-size: 9px;
   font-weight: 700;
-  color: #606080;
+  color: var(--interop-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 6px;
@@ -61,7 +144,7 @@
   gap: 6px;
   margin-bottom: 4px;
   font-size: 10px;
-  color: #a0a0d0;
+  color: var(--interop-text);
   position: relative;
   height: 20px;
 }
@@ -78,8 +161,8 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #4080e8;
-  border: 2px solid #0a0a18;
+  background: var(--interop-accent);
+  border: 2px solid var(--interop-bg);
   cursor: grab;
   transition: all 0.2s;
 }
@@ -87,48 +170,48 @@
 .interop-handle:hover {
   width: 16px;
   height: 16px;
-  background: #60a0ff;
-  box-shadow: 0 0 8px rgba(96, 160, 255, 0.6);
+  background: color-mix(in srgb, var(--interop-accent) 86%, white 14%);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--interop-accent) 48%, transparent);
 }
 
 .interop-handle-context {
-  background: #60c0ff;
+  background: var(--interop-context);
 }
 
 .interop-handle-context:hover {
-  background: #80d0ff;
+  background: color-mix(in srgb, var(--interop-context) 84%, white 16%);
 }
 
 .interop-handle-intent {
-  background: #c060ff;
+  background: var(--interop-intent);
 }
 
 .interop-handle-intent:hover {
-  background: #d080ff;
+  background: color-mix(in srgb, var(--interop-intent) 82%, white 18%);
 }
 
 .interop-handle.connecting {
-  background: #ffb040;
-  box-shadow: 0 0 12px rgba(255, 176, 64, 0.8);
+  background: var(--interop-warning);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--interop-warning) 60%, transparent);
 }
 
 /* Edge labels */
 .interop-edge-label {
-  background: rgba(10, 10, 24, 0.95);
-  border: 1px solid #2a2a50;
+  background: color-mix(in srgb, var(--interop-panel) 94%, transparent);
+  border: 1px solid var(--interop-border);
   border-radius: 4px;
   padding: 3px 6px;
   font-size: 9px;
   font-weight: 600;
-  color: #a0a0d0;
+  color: var(--interop-text);
   pointer-events: none;
   white-space: nowrap;
 }
 
 .interop-edge-label-invalid {
-  border-color: #ff6060;
-  color: #ff9090;
-  background: rgba(255, 96, 96, 0.1);
+  border-color: var(--interop-danger);
+  color: var(--interop-danger);
+  background: color-mix(in srgb, var(--interop-danger) 10%, transparent);
 }
 
 /* React Flow overrides */
@@ -151,8 +234,8 @@
 }
 
 .react-flow__node.selected .interop-app-node {
-  border-color: #4080e8;
-  box-shadow: 0 4px 24px rgba(64, 128, 232, 0.3);
+  border-color: var(--interop-accent);
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--interop-accent) 24%, transparent);
 }
 
 .react-flow__edge.selected {
@@ -160,22 +243,22 @@
 }
 
 /* Background panel */
-.react-flow__background {
-  background: linear-gradient(135deg, #0a0a18 0%, #0f0f20 100%);
+.interop-flow-shell .react-flow__background {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--interop-bg) 94%, var(--interop-panel)) 0%, var(--interop-bg) 100%);
 }
 
 /* Controls styling */
-.react-flow__controls {
-  background: #0a0a18;
-  border: 1px solid #1e1e3e;
+.interop-flow-shell .react-flow__controls {
+  background: var(--interop-panel);
+  border: 1px solid var(--interop-border);
   border-radius: 8px;
   padding: 8px;
 }
 
-.react-flow__controls button {
-  background: #1a1a30;
-  border: 1px solid #2a2a50;
-  color: #a0a0d0;
+.interop-flow-shell .react-flow__controls button {
+  background: var(--interop-panel-2);
+  border: 1px solid var(--interop-border);
+  color: var(--interop-text);
   cursor: pointer;
   width: 32px;
   height: 32px;
@@ -187,20 +270,20 @@
   transition: all 0.2s;
 }
 
-.react-flow__controls button:hover {
-  background: #2a2a40;
-  border-color: #4080e8;
-  color: #4080e8;
+.interop-flow-shell .react-flow__controls button:hover {
+  background: color-mix(in srgb, var(--interop-panel-2) 82%, var(--interop-accent) 18%);
+  border-color: var(--interop-accent);
+  color: var(--interop-accent);
 }
 
 /* MiniMap styling */
-.react-flow__minimap {
-  background: rgba(10, 10, 24, 0.8);
-  border: 1px solid #1e1e3e;
+.interop-flow-shell .react-flow__minimap {
+  background: var(--interop-minimap-bg);
+  border: 1px solid var(--interop-border);
   border-radius: 6px;
 }
 
-.react-flow__minimap-mask {
-  fill: rgba(64, 128, 232, 0.1);
-  stroke: #4080e8;
+.interop-flow-shell .react-flow__minimap-mask {
+  fill: color-mix(in srgb, var(--interop-accent) 12%, transparent);
+  stroke: var(--interop-accent);
 }

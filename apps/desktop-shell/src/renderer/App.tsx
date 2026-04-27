@@ -193,6 +193,8 @@ export function App() {
     ?? { channelId: null, theme: globalTheme, layout: null };
   const activeDetachedWorkspace = detachedWorkspaces[activeWorkspaceTab.id];
   const theme = globalTheme;
+  const activeWorkspaceApps = apps.filter((app) => activeWorkspaceTab.panelIds.includes(app.appId));
+  const interopWorkspaceAppIds = activeWorkspaceApps.map((app) => app.appId);
   const detachedWorkspaceId = new URLSearchParams(window.location.search).get('detachedWorkspaceId');
 
   useEffect(() => {
@@ -574,52 +576,68 @@ export function App() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px 0', flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {workspaceTabs.map((workspace) => (
-            <WorkspaceTabButton
-              key={workspace.id}
-              active={activeWorkspaceTab.id === workspace.id}
-              onClick={() => setActiveWorkspaceId(workspace.id)}
-              onDoubleClick={() => handleWorkspaceRenameStart(workspace.id, workspace.name)}
-              onClose={workspaceTabs.length > 1 ? () => handleCloseWorkspace(workspace.id) : undefined}
-              editing={editingWorkspaceId === workspace.id}
-              editingValue={editingWorkspaceName}
-              onEditingChange={setEditingWorkspaceName}
-              onEditingCommit={() => commitWorkspaceRename(workspace.id)}
-              onEditingCancel={cancelWorkspaceRename}
+        {activeMode !== 'launcher' ? (
+          <div style={{ display: 'flex', gap: 4 }}>
+            {workspaceTabs.map((workspace) => (
+              <WorkspaceTabButton
+                key={workspace.id}
+                active={activeWorkspaceTab.id === workspace.id}
+                onClick={() => setActiveWorkspaceId(workspace.id)}
+                onDoubleClick={() => handleWorkspaceRenameStart(workspace.id, workspace.name)}
+                onClose={workspaceTabs.length > 1 ? () => handleCloseWorkspace(workspace.id) : undefined}
+                editing={editingWorkspaceId === workspace.id}
+                editingValue={editingWorkspaceName}
+                onEditingChange={setEditingWorkspaceName}
+                onEditingCommit={() => commitWorkspaceRename(workspace.id)}
+                onEditingCancel={cancelWorkspaceRename}
+              >
+                {workspace.name}
+              </WorkspaceTabButton>
+            ))}
+            <button
+              onClick={handleAddWorkspace}
+              title="Add workspace"
+              style={{
+                background: 'var(--shell-panel-2)',
+                border: '1px solid var(--shell-border)',
+                borderRadius: '6px 6px 0 0',
+                color: 'var(--shell-text)',
+                cursor: 'pointer',
+                fontSize: 14,
+                fontWeight: 900,
+                height: 28,
+                lineHeight: '24px',
+                padding: '0 10px',
+              }}
             >
-              {workspace.name}
-            </WorkspaceTabButton>
-          ))}
-          <button
-            onClick={handleAddWorkspace}
-            title="Add workspace"
-            style={{
-              background: 'var(--shell-panel-2)',
-              border: '1px solid var(--shell-border)',
-              borderRadius: '6px 6px 0 0',
-              color: 'var(--shell-text)',
-              cursor: 'pointer',
-              fontSize: 14,
-              fontWeight: 900,
-              height: 28,
-              lineHeight: '24px',
-              padding: '0 10px',
-            }}
-          >
-            +
-          </button>
-        </div>
+              +
+            </button>
+          </div>
+        ) : (
+          <div />
+        )}
         <div style={{ flex: 1 }} />
-        <TabButton active={activeMode === 'workspace'} onClick={() => setActiveMode('workspace')}>
-          Workspace
-        </TabButton>
-        <TabButton active={activeMode === 'interop-flow'} onClick={() => setActiveMode('interop-flow')}>
-          Interop Flow
-        </TabButton>
-        <TabButton active={activeMode === 'launcher'} onClick={() => setActiveMode('launcher')}>
-          App Launcher
-        </TabButton>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            background: 'var(--shell-panel)',
+            border: '1px solid var(--shell-border)',
+            borderRadius: 8,
+            padding: 3,
+            gap: 3,
+          }}
+        >
+          <TabButton active={activeMode === 'workspace'} grouped onClick={() => setActiveMode('workspace')}>
+            Workspace
+          </TabButton>
+          <TabButton active={activeMode === 'interop-flow'} grouped onClick={() => setActiveMode('interop-flow')}>
+            Interop Flow
+          </TabButton>
+          <TabButton active={activeMode === 'launcher'} grouped onClick={() => setActiveMode('launcher')}>
+            App Launcher
+          </TabButton>
+        </div>
       </div>
 
       <div style={{ flex: 1, minHeight: 0, padding: '10px 12px 12px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -654,9 +672,11 @@ export function App() {
           )
         ) : activeMode === 'interop-flow' ? (
           <InteropFlowDesigner
-            apps={apps}
+            apps={activeWorkspaceApps}
             workspaceTabId={activeWorkspaceTab.id}
-            appIds={apps.map((a) => a.appId)}
+            workspaceName={activeWorkspaceTab.name}
+            theme={theme}
+            appIds={interopWorkspaceAppIds}
           />
         ) : (
           <div style={{ flex: 1, overflow: 'auto' }}>
@@ -980,10 +1000,12 @@ function WorkspaceTabButton({
 
 function TabButton({
   active,
+  grouped = false,
   onClick,
   children,
 }: {
   active: boolean;
+  grouped?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -993,7 +1015,7 @@ function TabButton({
       style={{
         background: active ? 'var(--shell-accent-soft)' : 'var(--shell-panel-2)',
         border: `1px solid ${active ? 'var(--shell-accent-border)' : 'var(--shell-border)'}`,
-        borderRadius: 5,
+        borderRadius: grouped ? 6 : 6,
         color: active ? 'var(--shell-accent-text)' : 'var(--shell-muted)',
         cursor: 'pointer',
         fontSize: 11,

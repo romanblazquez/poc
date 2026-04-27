@@ -28,6 +28,8 @@ import '../styles/interop-flow.css';
 interface InteropFlowDesignerProps {
   apps: AppEntry[];
   workspaceTabId: string;
+  workspaceName: string;
+  theme: string;
   appIds: string[];
   onFlowChange?: (flow: InteropFlowDefinition) => void;
 }
@@ -35,7 +37,7 @@ interface InteropFlowDesignerProps {
 const nodeTypes = { app: AppNode };
 const edgeTypes = { connector: ConnectorEdge };
 
-export function InteropFlowDesigner({ apps, workspaceTabId, appIds, onFlowChange }: InteropFlowDesignerProps) {
+export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme, appIds, onFlowChange }: InteropFlowDesignerProps) {
   const { flow, setFlow, commitFlow, autoWireFunds, updateConnector } = useInteropFlow(workspaceTabId, apps, appIds);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -174,9 +176,26 @@ export function InteropFlowDesigner({ apps, workspaceTabId, appIds, onFlowChange
     onFlowChange?.(flow);
   }, [flow, onFlowChange]);
 
+  if (appIds.length === 0) {
+    return (
+      <div className="interop-flow-shell" data-theme={theme}>
+        <div className="interop-flow-empty-state">
+          <div className="interop-flow-empty-badge">IF</div>
+          <h3>Empty Workspace</h3>
+          <p>
+            {workspaceName} has no apps yet, so there is no interop graph to configure.
+            Add apps in Workspace mode and the flow canvas will react automatically.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
+    <div className="interop-flow-shell" data-theme={theme}>
       <FlowToolbar
+        workspaceName={workspaceName}
+        appCount={appIds.length}
         canAutoWire={appIds.includes('incoming-orders') && appIds.includes('funds-allocations')}
         onAutoWire={autoWireFunds}
         flowEnabled={flow.enabled}
@@ -199,16 +218,16 @@ export function InteropFlowDesigner({ apps, workspaceTabId, appIds, onFlowChange
           edgeTypes={edgeTypes}
           fitView
         >
-          <Background />
+          <Background color="var(--interop-grid-line)" gap={20} size={1} />
           <Controls />
           <MiniMap
             position="bottom-right"
             width={140}
             height={100}
             style={{
-              backgroundColor: 'rgba(10, 10, 24, 0.8)',
-              border: '1px solid #1e1e3e',
-              borderRadius: 6,
+              backgroundColor: 'var(--interop-minimap-bg)',
+              border: '1px solid var(--interop-border)',
+              borderRadius: 8,
             }}
           />
         </ReactFlow>
@@ -226,18 +245,7 @@ export function InteropFlowDesigner({ apps, workspaceTabId, appIds, onFlowChange
 
       {/* Validation summary */}
       {validations.some((v) => !v.valid) && (
-        <div
-          style={{
-            background: '#1a0a0a',
-            borderTop: '1px solid #3a1a1a',
-            padding: '10px 16px',
-            fontSize: 12,
-            color: '#ff9090',
-            maxHeight: 80,
-            overflowY: 'auto',
-            flexShrink: 0,
-          }}
-        >
+        <div className="interop-flow-validation-bar">
           <strong>⚠ {validations.filter((v) => !v.valid).length} invalid connector(s):</strong>
           <ul style={{ margin: '6px 0 0 20px', listStyle: 'none', padding: 0 }}>
             {validations

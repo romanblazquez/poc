@@ -1,6 +1,8 @@
 import React from 'react';
 
 interface FlowToolbarProps {
+  workspaceName: string;
+  appCount: number;
   canAutoWire: boolean;
   onAutoWire: () => void;
   flowEnabled: boolean;
@@ -10,6 +12,8 @@ interface FlowToolbarProps {
 }
 
 export function FlowToolbar({
+  workspaceName,
+  appCount,
   canAutoWire,
   onAutoWire,
   flowEnabled,
@@ -24,23 +28,30 @@ export function FlowToolbar({
         alignItems: 'center',
         gap: 12,
         padding: '12px 16px',
-        background: '#0a0a18',
-        borderBottom: '1px solid #1e1e3e',
+        background: 'var(--interop-panel)',
+        borderBottom: '1px solid var(--interop-border)',
         flexShrink: 0,
       }}
     >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+        <div style={{ color: 'var(--interop-text-strong)', fontSize: 12, fontWeight: 800 }}>{workspaceName}</div>
+        <div style={{ color: 'var(--interop-text-muted)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+          {appCount} app{appCount === 1 ? '' : 's'} in this workspace
+        </div>
+      </div>
+
       <button
         onClick={onAutoWire}
         disabled={!canAutoWire}
         title="Generate recommended Funds workflow (Incoming Orders → Funds Allocations → Audit Log + Theme to all)"
         style={{
           padding: '6px 12px',
-          background: canAutoWire ? '#4080e8' : '#2a2a40',
-          border: 'none',
-          borderRadius: 4,
-          color: canAutoWire ? '#fff' : '#808080',
+          background: canAutoWire ? 'var(--interop-accent)' : 'var(--interop-panel-2)',
+          border: `1px solid ${canAutoWire ? 'var(--interop-accent-border)' : 'var(--interop-border)'}`,
+          borderRadius: 6,
+          color: canAutoWire ? 'var(--interop-accent-contrast)' : 'var(--interop-text-muted)',
           fontSize: 12,
-          fontWeight: 600,
+          fontWeight: 700,
           cursor: canAutoWire ? 'pointer' : 'not-allowed',
           transition: 'background 0.2s',
         }}
@@ -54,12 +65,12 @@ export function FlowToolbar({
           alignItems: 'center',
           gap: 6,
           padding: '4px 8px',
-          background: '#1a1a30',
-          borderRadius: 4,
-          border: '1px solid #2a2a50',
+          background: 'var(--interop-panel-2)',
+          borderRadius: 6,
+          border: '1px solid var(--interop-border)',
         }}
       >
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, color: '#a0a0d0' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: 'var(--interop-text)' }}>
           <input
             type="checkbox"
             checked={flowEnabled}
@@ -78,12 +89,12 @@ export function FlowToolbar({
           alignItems: 'center',
           gap: 16,
           fontSize: 11,
-          color: '#808090',
+          color: 'var(--interop-text-muted)',
         }}
       >
-        <span>Connectors: <strong style={{ color: '#a0a0d0' }}>{connectorCount}</strong></span>
+        <span>Connectors: <strong style={{ color: 'var(--interop-text-strong)' }}>{connectorCount}</strong></span>
         {validationCount > 0 && (
-          <span style={{ color: '#ff8080' }}>
+          <span style={{ color: 'var(--interop-danger)' }}>
             Invalid: <strong>{validationCount}</strong>
           </span>
         )}

@@ -28,7 +28,7 @@ export function ConnectorEdge({
         path={edgePath}
         markerEnd={markerEnd}
         style={{
-          stroke: valid ? edgeColor(mode) : '#ef4444',
+          stroke: valid ? edgeColor(mode) : 'var(--interop-danger)',
           strokeDasharray: mode.includes('intent') ? '5 4' : undefined,
           strokeWidth: 1.6,
           opacity: data?.enabled === false ? 0.35 : 0.9,
@@ -47,8 +47,8 @@ export function ConnectorEdge({
 }
 
 function edgeColor(mode: string): string {
-  if (mode === 'theme') return '#94a3b8';
-  if (mode === 'audit') return '#f59e0b';
-  if (mode.includes('intent')) return '#a78bfa';
-  return '#60a5fa';
+  if (mode === 'theme') return 'var(--interop-text-muted)';
+  if (mode === 'audit') return 'var(--interop-warning)';
+  if (mode.includes('intent')) return 'var(--interop-intent)';
+  return 'var(--interop-context)';
 }

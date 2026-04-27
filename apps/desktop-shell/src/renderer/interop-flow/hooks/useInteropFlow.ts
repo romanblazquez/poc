@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppEntry } from '../../App.js';
 import { createRecommendedFundsFlow, mergeFlowWithWorkspaceApps } from '../engine/connector-resolver.js';
 import { loadInteropFlow, saveInteropFlow } from '../engine/flow-persistence.js';
@@ -12,6 +12,10 @@ export function useInteropFlow(workspaceTabId: string, apps: AppEntry[], appIds:
   }, [apps, appIds, workspaceTabId]);
   const [flow, setFlow] = useState<InteropFlowDefinition>(initial);
   const validations = useMemo(() => validateFlow(flow), [flow]);
+
+  useEffect(() => {
+    setFlow(initial);
+  }, [initial]);
 
   const commitFlow = useCallback((next: InteropFlowDefinition) => {
     setFlow(next);
