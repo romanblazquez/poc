@@ -38,4 +38,11 @@ export interface AppDefinition {
   icon?: string;
   /** Category for launcher grouping */
   category?: string;
+  /** FDC3 capability declarations (broadcasts, listensTo, raisesIntents, handlesIntents) */
+  capabilities?: {
+    broadcasts?: string[];
+    listensTo?: string[];
+    raisesIntents?: string[];
+    handlesIntents?: string[];
+  };
 }

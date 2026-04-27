@@ -8,16 +8,18 @@ import {
   useEdgesState,
   type Node,
   type Edge,
+  type NodeChange,
+  type EdgeChange,
   type Connection,
-  type OnEdgesChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { AppEntry } from '../../App.js';
 import { validateConnector, validateFlow } from '../engine/flow-validator.js';
 import { createInteropNodes } from '../engine/connector-resolver.js';
 import { parsePort } from '../model/connector-types.js';
+import { contextLabel, intentLabel } from '../model/fdc3-schema.js';
 import type { InteropConnector, InteropFlowDefinition } from '../model/interop-flow-types.js';
-import { contextInPort, contextOutPort, intentInPort, intentOutPort } from '../model/connector-types.js';
+import { contextOutPort, intentInPort, intentOutPort } from '../model/connector-types.js';
 import { AppNode } from './AppNode.js';
 import { ConnectorEdge } from './ConnectorEdge.js';
 import { FlowToolbar } from './FlowToolbar.js';
@@ -38,143 +40,128 @@ const nodeTypes = { app: AppNode };
 const edgeTypes = { connector: ConnectorEdge };
 
 export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme, appIds, onFlowChange }: InteropFlowDesignerProps) {
-  const { flow, setFlow, commitFlow, autoWireFunds, updateConnector } = useInteropFlow(workspaceTabId, apps, appIds);
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const { flow, commitFlow, autoWireFlow, updateConnector } = useInteropFlow(workspaceTabId, apps, appIds);
+  const [nodes, setNodes, onNodesChangeInternal] = useNodesState([]);
+  const [edges, setEdges, onEdgesChangeInternal] = useEdgesState([]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const validations = useMemo(() => validateFlow(flow), [flow]);
   const validationMap = useMemo(() => new Map(validations.map((v) => [v.connectorId, v])), [validations]);
-
-  // Track node app IDs — only re-sync React Flow nodes when the set of apps changes, not on position updates.
-  // Position updates during drag are owned by React Flow; we persist them on drag-stop only.
-  const nodeAppIds = useMemo(() => flow.nodes.map((n) => n.appId).join(','), [flow.nodes]);
   const flowRef = useRef(flow);
   flowRef.current = flow;
 
+  // Sync nodes from flow model only when the set of apps changes (not on position updates from drag).
+  const lastNodeIdsRef = useRef('');
   useEffect(() => {
-    const flowNodes = flowRef.current.nodes.map((node) => ({
-      id: node.appId,
-      data: node,
-      position: node.position,
-      type: 'app',
-      draggable: true,
-      connectable: true,
-    }));
-    setNodes(flowNodes);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodeAppIds, setNodes]);
+    const ids = flow.nodes.map((n) => n.appId).join(',');
+    if (ids === lastNodeIdsRef.current) return;
+    lastNodeIdsRef.current = ids;
+    setNodes(
+      flow.nodes.map((node) => ({
+        id: node.appId,
+        data: node,
+        position: node.position,
+        type: 'app' as const,
+        draggable: true,
+        connectable: true,
+      })),
+    );
+  }, [flow.nodes, setNodes]);
 
-  // Convert flow connectors to React Flow edges
+  // Sync edges whenever flow.connectors changes by reference.
+  // Node position updates (drag) call commitFlow with the SAME connectors reference,
+  // so this effect correctly does NOT fire during drag.
   useEffect(() => {
-    const flowEdges = flow.connectors.map((connector) => {
-      const validation = validationMap.get(connector.id);
-      return {
-        id: connector.id,
-        source: connector.sourceAppId,
-        target: connector.targetAppId,
-        sourceHandle: connector.sourcePortId,
-        targetHandle: connector.targetPortId,
-        type: 'connector',
-        data: {
-          ...connector,
-          valid: validation?.valid ?? false,
-          label: connector.contextType ?? connector.intentName ?? connector.mode,
-        },
-        animated: connector.enabled,
-        deletable: true,
-      };
-    });
-    setEdges(flowEdges);
+    setEdges(
+      flow.connectors.map((connector) => {
+        const validation = validationMap.get(connector.id);
+        return {
+          id: connector.id,
+          source: connector.sourceAppId,
+          target: connector.targetAppId,
+          sourceHandle: connector.sourcePortId,
+          targetHandle: connector.targetPortId,
+          type: 'connector',
+          data: { ...connector, valid: validation?.valid ?? false, label: connectorDisplayLabel(connector) },
+          animated: connector.enabled,
+          deletable: true,
+        };
+      }),
+    );
   }, [flow.connectors, validationMap, setEdges]);
 
-  // Persist final node position when drag ends
-  const handleNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
+  // Let React Flow own all node changes for smooth drag; only persist final position back to model.
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    onNodesChangeInternal(changes);
+    const dragEnds = changes.filter((c) => c.type === 'position' && (c as { dragging?: boolean }).dragging === false);
+    if (dragEnds.length === 0) return;
     const current = flowRef.current;
-    const updatedNodes = current.nodes.map((n) =>
-      n.appId === node.id ? { ...n, position: node.position } : n
-    );
+    const updatedNodes = current.nodes.map((n) => {
+      const change = dragEnds.find((c) => c.id === n.appId && c.type === 'position') as { position?: { x: number; y: number } } | undefined;
+      return change?.position ? { ...n, position: change.position } : n;
+    });
     commitFlow({ ...current, nodes: updatedNodes });
-  }, [commitFlow]);
+  }, [onNodesChangeInternal, commitFlow]);
 
-  // Handle edge connection (user drags port to port)
+  // Let React Flow own edge selection; only persist removals back to model.
+  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+    onEdgesChangeInternal(changes);
+    const removes = changes.filter((c) => c.type === 'remove');
+    if (removes.length === 0) return;
+    const ids = new Set(removes.map((c) => c.id));
+    commitFlow({ ...flowRef.current, connectors: flowRef.current.connectors.filter((c) => !ids.has(c.id)) });
+  }, [onEdgesChangeInternal, commitFlow]);
+
+  // Handle manual edge connection (drag port to port)
   const handleConnect = useCallback((connection: Connection) => {
-    if (!connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) {
-      return;
-    }
-
+    if (!connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) return;
     const sourcePort = parsePort(connection.sourceHandle);
     const targetPort = parsePort(connection.targetHandle);
+    if (!sourcePort || !targetPort) return;
 
-    if (!sourcePort || !targetPort) {
-      return;
-    }
-
-    // Determine mode based on port types
     let mode: InteropConnector['mode'] = 'context';
     let contextType: string | undefined;
     let intentName: string | undefined;
 
     if (sourcePort.kind === 'context-out' && targetPort.kind === 'context-in') {
-      mode = 'context';
-      contextType = sourcePort.value;
+      mode = 'context'; contextType = sourcePort.value;
     } else if (sourcePort.kind === 'intent-out' && targetPort.kind === 'intent-in') {
-      mode = 'intent';
-      intentName = sourcePort.value;
+      mode = 'intent'; intentName = sourcePort.value;
     } else if (sourcePort.kind === 'context-out' && targetPort.kind === 'intent-in') {
-      mode = 'context-to-intent';
-      contextType = sourcePort.value;
-      intentName = targetPort.value;
+      mode = 'context-to-intent'; contextType = sourcePort.value; intentName = targetPort.value;
     } else {
-      return; // Invalid connection
+      return;
     }
 
-    // Create new connector
     const newConnector: InteropConnector = {
       id: `connector-${Date.now()}-${Math.random().toString(36).substring(7)}`,
       sourceAppId: connection.source,
       targetAppId: connection.target,
       sourcePortId: connection.sourceHandle,
       targetPortId: connection.targetHandle,
-      mode,
-      contextType,
-      intentName,
-      enabled: true,
+      mode, contextType, intentName, enabled: true,
     };
 
-    // Validate before adding
-    const validation = validateConnector(newConnector, flow.nodes);
-    if (!validation.valid) {
-      console.warn(`Invalid connector: ${validation.message}`);
-    }
+    const validation = validateConnector(newConnector, flowRef.current.nodes);
+    if (!validation.valid) console.warn(`Invalid connector: ${validation.message}`);
+    commitFlow({ ...flowRef.current, connectors: [...flowRef.current.connectors, newConnector] });
+  }, [commitFlow]);
 
-    commitFlow({ ...flow, connectors: [...flow.connectors, newConnector] });
-  }, [flow, commitFlow]);
-
-  // Handle edge deletion
   const handleEdgesDelete = useCallback((edgesToDelete: Edge[]) => {
-    const connectorIdsToDelete = new Set(edgesToDelete.map((e) => e.id));
-    commitFlow({
-      ...flow,
-      connectors: flow.connectors.filter((c) => !connectorIdsToDelete.has(c.id)),
-    });
-  }, [flow, commitFlow]);
+    const ids = new Set(edgesToDelete.map((e) => e.id));
+    commitFlow({ ...flowRef.current, connectors: flowRef.current.connectors.filter((c) => !ids.has(c.id)) });
+  }, [commitFlow]);
 
-  // Handle edge click to open config panel
   const handleEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
     event.stopPropagation();
     setSelectedEdgeId(edge.id);
   }, []);
 
-  const handleClosePanel = useCallback(() => {
-    setSelectedEdgeId(null);
-  }, []);
+  const handleClosePanel = useCallback(() => setSelectedEdgeId(null), []);
 
   const selectedConnector = selectedEdgeId ? flow.connectors.find((c) => c.id === selectedEdgeId) : null;
   const selectedValidation = selectedConnector ? validationMap.get(selectedConnector.id) : null;
 
-  useEffect(() => {
-    onFlowChange?.(flow);
-  }, [flow, onFlowChange]);
+  useEffect(() => { onFlowChange?.(flow); }, [flow, onFlowChange]);
 
   if (appIds.length === 0) {
     return (
@@ -196,8 +183,8 @@ export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme
       <FlowToolbar
         workspaceName={workspaceName}
         appCount={appIds.length}
-        canAutoWire={appIds.includes('incoming-orders') && appIds.includes('funds-allocations')}
-        onAutoWire={autoWireFunds}
+        canAutoWire={appIds.length > 1}
+        onAutoWire={autoWireFlow}
         flowEnabled={flow.enabled}
         onToggleFlowEnabled={(enabled) => commitFlow({ ...flow, enabled })}
         connectorCount={flow.connectors.length}
@@ -213,7 +200,6 @@ export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme
           onConnect={handleConnect}
           onEdgesDelete={handleEdgesDelete}
           onEdgeClick={handleEdgeClick}
-          onNodeDragStop={handleNodeDragStop}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
@@ -258,4 +244,20 @@ export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme
       )}
     </div>
   );
+}
+
+function connectorDisplayLabel(connector: InteropConnector): string {
+  if (connector.mode === 'context-to-intent' && connector.contextType && connector.intentName) {
+    return `${contextLabel(connector.contextType)} -> ${intentLabel(connector.intentName)}`;
+  }
+  if (connector.mode === 'intent' && connector.intentName) {
+    return intentLabel(connector.intentName);
+  }
+  if (connector.contextType) {
+    return contextLabel(connector.contextType);
+  }
+  if (connector.intentName) {
+    return intentLabel(connector.intentName);
+  }
+  return connector.mode;
 }

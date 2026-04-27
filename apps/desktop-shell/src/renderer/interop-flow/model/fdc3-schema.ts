@@ -18,13 +18,16 @@ export const FDC3_CONTEXT_SCHEMAS: Fdc3ContextSchema[] = [
   { type: 'com.demo.order', label: 'Order', requiredFields: ['type', 'orderId'], optionalFields: ['fundId', 'client', 'side', 'quantity'] },
   { type: 'com.demo.fund', label: 'Fund', requiredFields: ['type', 'fundId'], optionalFields: ['name', 'isin'] },
   { type: 'com.demo.theme', label: 'Theme', requiredFields: ['type', 'theme'], optionalFields: ['name'] },
+  { type: 'fdc3.portfolio', label: 'Portfolio', requiredFields: ['type', 'id'], optionalFields: ['name', 'positions'] },
   { type: 'com.demo.paymentRequest', label: 'Payment Request', requiredFields: ['type', 'amount', 'currency'], optionalFields: ['contactId', 'reference'] },
 ];
 
 export const FDC3_INTENT_SCHEMAS: Fdc3IntentSchema[] = [
   { name: 'ViewOrder', label: 'View Order', acceptsContextTypes: ['com.demo.order'] },
   { name: 'ViewFund', label: 'View Fund', acceptsContextTypes: ['com.demo.fund'] },
+  { name: 'ViewContact', label: 'View Contact', acceptsContextTypes: ['fdc3.contact'] },
   { name: 'ViewPortfolio', label: 'View Portfolio', acceptsContextTypes: ['fdc3.contact', 'fdc3.portfolio'] },
+  { name: 'ViewInstrument', label: 'View Instrument', acceptsContextTypes: ['fdc3.instrument'] },
   { name: 'StartPayment', label: 'Start Payment', acceptsContextTypes: ['com.demo.paymentRequest'] },
   { name: 'OpenAudit', label: 'Open Audit', acceptsContextTypes: ['com.demo.order', 'com.demo.fund'] },
   { name: 'ApplyTheme', label: 'Apply Theme', acceptsContextTypes: ['com.demo.theme'] },

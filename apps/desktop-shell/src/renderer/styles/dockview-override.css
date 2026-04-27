@@ -178,7 +178,8 @@
   opacity: 0.5;
 }
 
-/* Detached workspace mode: hide tab strip completely. */
-.detached-workspace .tabs-and-actions-container {
+/* Detached workspace mode: hide tab strip only when there is a single panel.
+   If the dock contains more than one tab, the strip is kept visible. */
+.detached-workspace .tabs-and-actions-container:has(.tabs-container > .tab:only-child) {
   display: none !important;
 }

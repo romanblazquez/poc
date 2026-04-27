@@ -197,15 +197,21 @@
 
 /* Edge labels */
 .interop-edge-label {
+  align-items: center;
   background: color-mix(in srgb, var(--interop-panel) 94%, transparent);
   border: 1px solid var(--interop-border);
-  border-radius: 4px;
-  padding: 3px 6px;
+  border-radius: 999px;
+  display: inline-flex;
   font-size: 9px;
   font-weight: 600;
+  justify-content: center;
+  line-height: 1;
+  max-width: 160px;
+  padding: 4px 8px;
   color: var(--interop-text);
   pointer-events: none;
   white-space: nowrap;
+  width: max-content;
 }
 
 .interop-edge-label-invalid {

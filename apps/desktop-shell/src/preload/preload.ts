@@ -222,8 +222,8 @@ contextBridge.exposeInMainWorld('fdc3', {
   // ─── Shell-specific extras (used by the launcher renderer) ───────────────
 
   /** Get the list of registered applications from the app directory. */
-  getAppList(): Promise<Array<{ appId: string; title: string; description?: string; icon?: string; category?: string; url: string; devPort: number }>> {
-    return ipcRenderer.invoke(IpcEvents.GET_APP_LIST) as Promise<Array<{ appId: string; title: string; description?: string; icon?: string; category?: string; url: string; devPort: number }>>;
+  getAppList(): Promise<Array<{ appId: string; title: string; description?: string; icon?: string; category?: string; url: string; devPort: number; capabilities?: { broadcasts?: string[]; listensTo?: string[]; raisesIntents?: string[]; handlesIntents?: string[] }; listensForContexts?: string[]; intents?: Array<{ intent: string; contextTypes: string[] | null; appId: string; displayName?: string }> }>> {
+    return ipcRenderer.invoke(IpcEvents.GET_APP_LIST) as Promise<Array<{ appId: string; title: string; description?: string; icon?: string; category?: string; url: string; devPort: number; capabilities?: { broadcasts?: string[]; listensTo?: string[]; raisesIntents?: string[]; handlesIntents?: string[] }; listensForContexts?: string[]; intents?: Array<{ intent: string; contextTypes: string[] | null; appId: string; displayName?: string }> }>>;
   },
 
   /** Get the preload path used by embedded app webviews. */

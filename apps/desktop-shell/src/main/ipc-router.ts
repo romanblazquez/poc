@@ -275,6 +275,9 @@ export class IpcRouter {
         category: a.category,
         url: a.url,
         devPort: a.devPort,
+        capabilities: a.capabilities,
+        listensForContexts: a.listensForContexts,
+        intents: a.intents,
       }));
     });
   }

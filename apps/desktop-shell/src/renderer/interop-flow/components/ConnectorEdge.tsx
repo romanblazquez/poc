@@ -37,7 +37,12 @@ export function ConnectorEdge({
       <EdgeLabelRenderer>
         <div
           className={`interop-edge-label ${valid ? '' : 'interop-edge-label-invalid'}`}
-          style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+          style={{
+            left: 0,
+            position: 'absolute',
+            top: 0,
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+          }}
         >
           {String(data?.label ?? mode)}
         </div>

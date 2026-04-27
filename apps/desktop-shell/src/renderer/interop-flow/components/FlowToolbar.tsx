@@ -43,7 +43,7 @@ export function FlowToolbar({
       <button
         onClick={onAutoWire}
         disabled={!canAutoWire}
-        title="Generate recommended Funds workflow (Incoming Orders → Funds Allocations → Audit Log + Theme to all)"
+        title="Generate compatible FDC3 connectors automatically from app context and intent capabilities"
         style={{
           padding: '6px 12px',
           background: canAutoWire ? 'var(--interop-accent)' : 'var(--interop-panel-2)',
@@ -56,7 +56,7 @@ export function FlowToolbar({
           transition: 'background 0.2s',
         }}
       >
-        Auto-wire Funds
+        Auto-wire FDC3
       </button>
 
       <div

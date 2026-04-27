@@ -36,6 +36,13 @@ declare global {
   }
 }
 
+export interface AppCapabilityConfig {
+  broadcasts?: string[];
+  listensTo?: string[];
+  raisesIntents?: string[];
+  handlesIntents?: string[];
+}
+
 export interface AppEntry {
   appId: string;
   title: string;
@@ -44,6 +51,9 @@ export interface AppEntry {
   category?: string;
   url: string;
   devPort: number;
+  capabilities?: AppCapabilityConfig;
+  listensForContexts?: string[];
+  intents?: Array<{ intent: string; contextTypes: string[]; appId?: string; displayName?: string }>;
 }
 
 type ThemeMode = ThemeName;

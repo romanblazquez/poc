@@ -1,20 +1,7 @@
-import type { AppEntry } from '../../App.js';
+import type { AppCapabilityConfig, AppEntry } from '../../App.js';
 import { contextInPort, contextOutPort, intentInPort, intentOutPort } from '../model/connector-types.js';
 import { FDC3_CONTEXT_SCHEMAS, FDC3_INTENT_SCHEMAS } from '../model/fdc3-schema.js';
 import type { InteropAppNode, InteropConnector, InteropFlowDefinition } from '../model/interop-flow-types.js';
-
-interface AppCapabilityConfig {
-  broadcasts?: string[];
-  listensTo?: string[];
-  raisesIntents?: string[];
-  handlesIntents?: string[];
-}
-
-type CapabilityAwareApp = AppEntry & {
-  capabilities?: AppCapabilityConfig;
-  listensForContexts?: string[];
-  intents?: Array<{ intent: string; contextTypes: string[] }>;
-};
 
 const DEFAULT_POSITIONS: Record<string, { x: number; y: number }> = {
   'incoming-orders': { x: 80, y: 120 },
@@ -23,6 +10,9 @@ const DEFAULT_POSITIONS: Record<string, { x: number; y: number }> = {
   'theme-toggle': { x: 410, y: 390 },
   'customer-profile': { x: 80, y: 390 },
   'payment-action': { x: 740, y: 390 },
+  'customer-search': { x: 80, y: 80 },
+  'portfolio-view': { x: 740, y: 80 },
+  'market-watch': { x: 80, y: 370 },
 };
 
 const FALLBACK_CAPABILITIES: Record<string, Required<AppCapabilityConfig>> = {
@@ -65,7 +55,7 @@ const FALLBACK_CAPABILITIES: Record<string, Required<AppCapabilityConfig>> = {
 };
 
 export function createInteropNodes(apps: AppEntry[], appIds: string[]): InteropAppNode[] {
-  const appById = new Map(apps.map((app) => [app.appId, app as CapabilityAwareApp]));
+  const appById = new Map(apps.map((app) => [app.appId, app]));
   return appIds
     .map((appId, index) => {
       const app = appById.get(appId);
@@ -84,18 +74,9 @@ export function createInteropNodes(apps: AppEntry[], appIds: string[]): InteropA
     .filter((node): node is InteropAppNode => Boolean(node));
 }
 
-export function createRecommendedFundsFlow(apps: AppEntry[], appIds: string[]): InteropFlowDefinition {
+export function createAutoWiredFlow(apps: AppEntry[], appIds: string[]): InteropFlowDefinition {
   const nodes = createInteropNodes(apps, appIds);
-  const connectors: InteropConnector[] = [
-    contextConnector('incoming-orders', 'funds-allocations', 'com.demo.order'),
-    contextConnector('incoming-orders', 'funds-allocations', 'com.demo.fund'),
-    contextConnector('funds-allocations', 'audit-log', 'com.demo.fund'),
-    intentConnector('funds-allocations', 'audit-log', 'ViewFund', 'com.demo.fund'),
-    contextConnector('theme-toggle', 'incoming-orders', 'com.demo.theme', 'theme'),
-    contextConnector('theme-toggle', 'funds-allocations', 'com.demo.theme', 'theme'),
-    contextConnector('theme-toggle', 'audit-log', 'com.demo.theme', 'theme'),
-    intentConnector('customer-profile', 'payment-action', 'StartPayment', 'com.demo.paymentRequest'),
-  ].filter((connector) => nodes.some((node) => node.appId === connector.sourceAppId) && nodes.some((node) => node.appId === connector.targetAppId));
+  const connectors = buildAutoConnectors(nodes);
 
   return { nodes, connectors, enabled: true };
 }
@@ -112,24 +93,84 @@ export function mergeFlowWithWorkspaceApps(flow: InteropFlowDefinition | undefin
   };
 }
 
-function resolveCapabilities(app: CapabilityAwareApp): InteropAppNode['capabilities'] {
-  const fallback = FALLBACK_CAPABILITIES[app.appId] ?? {
-    broadcasts: [],
-    listensTo: app.listensForContexts ?? [],
-    raisesIntents: [],
-    handlesIntents: app.intents?.map((intent) => intent.intent) ?? [],
-  };
-  const configured = app.capabilities ?? {};
-  const broadcasts = configured.broadcasts ?? fallback.broadcasts;
-  const listensTo = configured.listensTo ?? app.listensForContexts ?? fallback.listensTo;
-  const raisesIntents = configured.raisesIntents ?? fallback.raisesIntents;
-  const handlesIntents = configured.handlesIntents ?? app.intents?.map((intent) => intent.intent) ?? fallback.handlesIntents;
+function resolveCapabilities(app: AppEntry): InteropAppNode['capabilities'] {
+  const fallback = FALLBACK_CAPABILITIES[app.appId];
+  const configured = app.capabilities;
+
+  // Merge all sources so no declaration is silently dropped.
+  // Priority: app-directory capabilities → listensForContexts/intents metadata → hardcoded fallback.
+  const broadcasts = unique([
+    ...(configured?.broadcasts ?? fallback?.broadcasts ?? []),
+  ]);
+  const listensTo = unique([
+    ...(configured?.listensTo ?? fallback?.listensTo ?? []),
+    ...(app.listensForContexts ?? []),
+  ]);
+  const raisesIntents = unique([
+    ...(configured?.raisesIntents ?? fallback?.raisesIntents ?? []),
+  ]);
+  const handlesIntents = unique([
+    ...(configured?.handlesIntents ?? fallback?.handlesIntents ?? []),
+    ...(app.intents?.map((i) => i.intent) ?? []),
+  ]);
+
   return {
     broadcasts: schemasForContexts(broadcasts),
     listensTo: schemasForContexts(listensTo),
     raisesIntents: schemasForIntents(raisesIntents),
     handlesIntents: schemasForIntents(handlesIntents),
   };
+}
+
+function unique(arr: string[]): string[] {
+  return [...new Set(arr)];
+}
+
+function buildAutoConnectors(nodes: InteropAppNode[]): InteropConnector[] {
+  const connectors: InteropConnector[] = [];
+  const seenIds = new Set<string>();
+
+  for (const source of nodes) {
+    for (const target of nodes) {
+      if (source.appId === target.appId) continue;
+
+      for (const broadcast of source.capabilities.broadcasts) {
+        if (target.capabilities.listensTo.some((schema) => schema.type === broadcast.type)) {
+          pushConnector(connectors, seenIds, contextConnector(source.appId, target.appId, broadcast.type, connectorModeForContext(broadcast.type)));
+        }
+
+        for (const handledIntent of target.capabilities.handlesIntents) {
+          if (handledIntent.acceptsContextTypes.includes(broadcast.type)) {
+            pushConnector(
+              connectors,
+              seenIds,
+              contextToIntentConnector(source.appId, target.appId, broadcast.type, handledIntent.name),
+            );
+          }
+        }
+      }
+
+      for (const raisedIntent of source.capabilities.raisesIntents) {
+        if (target.capabilities.handlesIntents.some((schema) => schema.name === raisedIntent.name)) {
+          const preferredContext = raisedIntent.acceptsContextTypes[0];
+          pushConnector(connectors, seenIds, intentConnector(source.appId, target.appId, raisedIntent.name, preferredContext));
+        }
+      }
+    }
+  }
+
+  return connectors;
+}
+
+function pushConnector(connectors: InteropConnector[], seenIds: Set<string>, connector: InteropConnector): void {
+  if (seenIds.has(connector.id)) return;
+  seenIds.add(connector.id);
+  connectors.push(connector);
+}
+
+function connectorModeForContext(contextType: string): InteropConnector['mode'] {
+  if (contextType === 'com.demo.theme') return 'theme';
+  return 'context';
 }
 
 function schemasForContexts(types: string[]) {
@@ -156,7 +197,7 @@ function contextConnector(
   mode: InteropConnector['mode'] = 'context',
 ): InteropConnector {
   return {
-    id: `${sourceAppId}:${contextType}->${targetAppId}`,
+    id: `${mode}:${sourceAppId}:${contextType}->${targetAppId}`,
     sourceAppId,
     targetAppId,
     sourcePortId: contextOutPort(contextType),
@@ -168,9 +209,9 @@ function contextConnector(
   };
 }
 
-function intentConnector(sourceAppId: string, targetAppId: string, intentName: string, contextType: string): InteropConnector {
+function intentConnector(sourceAppId: string, targetAppId: string, intentName: string, contextType?: string): InteropConnector {
   return {
-    id: `${sourceAppId}:${intentName}->${targetAppId}`,
+    id: `intent:${sourceAppId}:${intentName}->${targetAppId}`,
     sourceAppId,
     targetAppId,
     sourcePortId: intentOutPort(intentName),
@@ -178,6 +219,21 @@ function intentConnector(sourceAppId: string, targetAppId: string, intentName: s
     mode: 'intent',
     intentName,
     contextType,
+    enabled: true,
+    transform: { type: 'identity' },
+  };
+}
+
+function contextToIntentConnector(sourceAppId: string, targetAppId: string, contextType: string, intentName: string): InteropConnector {
+  return {
+    id: `context-to-intent:${sourceAppId}:${contextType}->${targetAppId}:${intentName}`,
+    sourceAppId,
+    targetAppId,
+    sourcePortId: contextOutPort(contextType),
+    targetPortId: intentInPort(intentName),
+    mode: 'context-to-intent',
+    contextType,
+    intentName,
     enabled: true,
     transform: { type: 'identity' },
   };
