@@ -745,6 +745,7 @@ function DetachedWorkspaceShell({
 }) {
   const [payload, setPayload] = useState<DetachedWorkspacePayload | null>(null);
   const [currentChannel, setCurrentChannel] = useState<UserChannel | null>(null);
+  const [labelsVisible, setLabelsVisible] = useState(true);
 
   useEffect(() => {
     if (!window.fdc3) return;
@@ -822,12 +823,28 @@ function DetachedWorkspaceShell({
         borderBottom: '1px solid var(--shell-border)',
         display: 'flex',
         flexShrink: 0,
+        gap: 6,
         height: 34,
-        justifyContent: 'space-between',
-        padding: '0 12px',
+        padding: '0 8px',
       }}>
-        <div style={{ color: 'var(--shell-text)', fontSize: 12, fontWeight: 900 }}>{payload.name}</div>
-        <div style={{ color: 'var(--shell-muted)', fontSize: 11, fontWeight: 800 }}>Floating workspace window</div>
+        <button
+          onClick={() => void window.fdc3.recallWorkspaceWindow(workspaceId)}
+          title="Pull back to main shell"
+          style={detachedShellButtonStyle}
+        >
+          ← Pull Back
+        </button>
+        <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--shell-border)', margin: '6px 2px' }} />
+        <span style={{ color: 'var(--shell-text)', fontSize: 12, fontWeight: 900, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {payload.name}
+        </span>
+        <button
+          onClick={() => setLabelsVisible((v) => !v)}
+          title={labelsVisible ? 'Hide tab labels' : 'Show tab labels'}
+          style={{ ...detachedShellButtonStyle, background: labelsVisible ? 'var(--shell-accent-soft)' : 'var(--shell-panel-2)', color: labelsVisible ? 'var(--shell-accent-text)' : 'var(--shell-muted)' }}
+        >
+          {labelsVisible ? '▤ Labels' : '▥ Labels'}
+        </button>
       </div>
       <DockviewWorkspace
         apps={apps}
@@ -839,10 +856,25 @@ function DetachedWorkspaceShell({
         workspaceName={payload.name}
         theme={payload.theme}
         detached
+        labelsVisible={labelsVisible}
       />
     </div>
   );
 }
+
+const detachedShellButtonStyle: React.CSSProperties = {
+  background: 'var(--shell-panel-2)',
+  border: '1px solid var(--shell-border)',
+  borderRadius: 5,
+  color: 'var(--shell-text)',
+  cursor: 'pointer',
+  flexShrink: 0,
+  fontSize: 11,
+  fontWeight: 800,
+  height: 22,
+  padding: '0 9px',
+  textTransform: 'uppercase',
+};
 
 function DetachedWorkspacePlaceholder({
   workspaceName,

@@ -41,6 +41,7 @@ interface DockviewWorkspaceProps {
   theme: ThemeMode;
   detached?: boolean;
   displays?: DisplayInfo[];
+  labelsVisible?: boolean;
 }
 
 export interface DetachedWorkspacePayload {
@@ -212,6 +213,7 @@ export function DockviewWorkspace({
   theme,
   detached = false,
   displays = [],
+  labelsVisible = true,
 }: DockviewWorkspaceProps) {
   const channelId = currentChannel?.id ?? null;
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -421,7 +423,12 @@ export function DockviewWorkspace({
   const closedApps = apps.filter((app) => !openPanelIds.has(app.appId));
 
   return (
-    <div ref={rootRef} className={detached ? 'detached-workspace' : undefined} style={rootStyle}>
+    <div
+      ref={rootRef}
+      className={detached ? 'detached-workspace' : undefined}
+      style={rootStyle}
+      {...(!labelsVisible ? { 'data-hide-labels': '' } : {})}
+    >
       {!detached && (
         <div style={toolbarStyle}>
           <button onClick={resetLayout} style={secondaryButtonStyle}>

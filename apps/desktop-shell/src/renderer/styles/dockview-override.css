@@ -183,3 +183,9 @@
 .detached-workspace .tabs-and-actions-container:has(.tabs-container > .tab:only-child) {
   display: none !important;
 }
+
+/* Labels-hidden mode: collapse tab label text, keep close button and tab chrome. */
+[data-hide-labels] .dv-tab-label,
+[data-hide-labels] .dockview-tab-label {
+  display: none !important;
+}
