@@ -76,6 +76,7 @@ const WebviewContext = createContext<WebviewContextValue>({
 });
 
 function resolveEmbeddedAppUrl(app: AppEntry): string {
+  if (app.devPort === 0) return app.url;
   if (window.location.protocol.startsWith('http')) {
     return `http://localhost:${app.devPort}`;
   }

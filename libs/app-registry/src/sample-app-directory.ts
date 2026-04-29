@@ -93,4 +93,15 @@ export const SAMPLE_APP_DIRECTORY: AppDefinition[] = [
       },
     ],
   },
+  {
+    appId: 'cloud-sample',
+    title: 'Cloud App',
+    description: 'Sample cloud-hosted app loaded directly from a remote URL — demonstrates embedding external web content.',
+    url: 'https://example.com',
+    devPort: 0,
+    icon: '☁',
+    category: 'Cloud',
+    initialLayout: { x: 200, y: 200, width: 1100, height: 760 },
+    listensForContexts: [],
+  },
 ];

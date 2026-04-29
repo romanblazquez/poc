@@ -86,14 +86,14 @@ const apps = [
   { name: 'THEME',     port: 4014, args: ['nx', 'serve', 'theme-toggle',       '--port=4014', '--no-open'] },
 ];
 
-for (const app of apps) {
+for (const app of apps.filter((a) => a.port > 0)) {
   spawnProc(app.name, 'npx', app.args, CYAN);
 }
 
 // ─── 2. Wait for all Angular dev servers ─────────────────────────────────────
 
 log('DEV', 'Waiting for Angular dev servers to be ready…', YELLOW);
-await Promise.all(apps.map((a) => waitForPort(a.port, a.name)));
+await Promise.all(apps.filter((a) => a.port > 0).map((a) => waitForPort(a.port, a.name)));
 
 // ─── 3. Launch Electron via electron-vite ────────────────────────────────────
 
