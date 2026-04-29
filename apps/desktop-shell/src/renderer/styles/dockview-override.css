@@ -178,32 +178,9 @@
   opacity: 0.5;
 }
 
-/* Detached workspace mode: hide tab strip only when there is a single panel.
-   If the dock contains more than one tab, the strip is kept visible. */
-.detached-workspace .tabs-and-actions-container:has(.tabs-container > .tab:only-child) {
+/* Detached workspace mode: hide tab strip when there is only a single panel.
+   Edit-layout mode overrides this so all headers are visible for drag/rearrange. */
+.detached-workspace:not([data-edit-layout]) .tabs-and-actions-container:has(.tabs-container > .tab:only-child) {
   display: none !important;
-}
-
-/* Edit-layout mode: force all tab headers visible so panels can be dragged/rearranged. */
-.detached-workspace[data-edit-layout] .tabs-and-actions-container {
-  display: flex !important;
-}
-
-/* Edit-layout mode: ensure label text and close actions are visible on every tab. */
-.detached-workspace[data-edit-layout] .tab .dv-default-tab-content {
-  overflow: visible !important;
-  visibility: visible !important;
-  max-width: unset !important;
-  white-space: nowrap;
-  color: var(--shell-text);
-}
-
-.detached-workspace[data-edit-layout] .tab.active-tab .dv-default-tab-content {
-  color: var(--shell-accent-text);
-}
-
-/* Force the close/action button visible on inactive tabs too in edit mode. */
-.detached-workspace[data-edit-layout] .tab .dv-default-tab-action {
-  visibility: visible !important;
 }
 
