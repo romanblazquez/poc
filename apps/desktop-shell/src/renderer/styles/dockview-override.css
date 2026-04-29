@@ -184,8 +184,8 @@
   display: none !important;
 }
 
-/* Labels-hidden mode: collapse tab label text, keep close button and tab chrome. */
-[data-hide-labels] .dv-tab-label,
-[data-hide-labels] .dockview-tab-label {
-  display: none !important;
+/* Edit-layout mode: force all tab headers visible so panels can be dragged/rearranged. */
+.detached-workspace[data-edit-layout] .tabs-and-actions-container {
+  display: flex !important;
 }
+

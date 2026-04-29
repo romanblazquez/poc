@@ -745,7 +745,7 @@ function DetachedWorkspaceShell({
 }) {
   const [payload, setPayload] = useState<DetachedWorkspacePayload | null>(null);
   const [currentChannel, setCurrentChannel] = useState<UserChannel | null>(null);
-  const [labelsVisible, setLabelsVisible] = useState(true);
+  const [editLayout, setEditLayout] = useState(false);
 
   useEffect(() => {
     if (!window.fdc3) return;
@@ -839,11 +839,11 @@ function DetachedWorkspaceShell({
           {payload.name}
         </span>
         <button
-          onClick={() => setLabelsVisible((v) => !v)}
-          title={labelsVisible ? 'Hide tab labels' : 'Show tab labels'}
-          style={{ ...detachedShellButtonStyle, background: labelsVisible ? 'var(--shell-accent-soft)' : 'var(--shell-panel-2)', color: labelsVisible ? 'var(--shell-accent-text)' : 'var(--shell-muted)' }}
+          onClick={() => setEditLayout((v) => !v)}
+          title={editLayout ? 'Lock layout — hide panel headers' : 'Edit layout — show panel headers to drag and rearrange panels'}
+          style={{ ...detachedShellButtonStyle, background: editLayout ? 'var(--shell-accent-soft)' : 'var(--shell-panel-2)', color: editLayout ? 'var(--shell-accent-text)' : 'var(--shell-muted)' }}
         >
-          {labelsVisible ? '▤ Labels' : '▥ Labels'}
+          {editLayout ? '✓ Done' : '✎ Edit Layout'}
         </button>
       </div>
       <DockviewWorkspace
@@ -856,7 +856,7 @@ function DetachedWorkspaceShell({
         workspaceName={payload.name}
         theme={payload.theme}
         detached
-        labelsVisible={labelsVisible}
+        headersVisible={editLayout}
       />
     </div>
   );
