@@ -189,10 +189,8 @@
   display: flex !important;
 }
 
-/* Edit-layout mode: ensure the panel label text inside each tab is readable.
-   .dv-default-tab-content is Dockview's inner label element. */
+/* Edit-layout mode: ensure label text and close actions are visible on every tab. */
 .detached-workspace[data-edit-layout] .tab .dv-default-tab-content {
-  display: block !important;
   overflow: visible !important;
   visibility: visible !important;
   max-width: unset !important;
@@ -202,5 +200,10 @@
 
 .detached-workspace[data-edit-layout] .tab.active-tab .dv-default-tab-content {
   color: var(--shell-accent-text);
+}
+
+/* Force the close/action button visible on inactive tabs too in edit mode. */
+.detached-workspace[data-edit-layout] .tab .dv-default-tab-action {
+  visibility: visible !important;
 }
 
