@@ -189,3 +189,18 @@
   display: flex !important;
 }
 
+/* Edit-layout mode: ensure the panel label text inside each tab is readable.
+   .dv-default-tab-content is Dockview's inner label element. */
+.detached-workspace[data-edit-layout] .tab .dv-default-tab-content {
+  display: block !important;
+  overflow: visible !important;
+  visibility: visible !important;
+  max-width: unset !important;
+  white-space: nowrap;
+  color: var(--shell-text);
+}
+
+.detached-workspace[data-edit-layout] .tab.active-tab .dv-default-tab-content {
+  color: var(--shell-accent-text);
+}
+
