@@ -3,7 +3,7 @@ import { AppLauncher } from './components/AppLauncher.js';
 import { ChannelBar } from './components/ChannelBar.js';
 import { WorkspaceToolbar } from './components/WorkspaceToolbar.js';
 import { DockviewWorkspace } from './components/DockviewWorkspace.js';
-import type { DetachedWorkspacePayload } from './components/DockviewWorkspace.js';
+import type { DetachedWorkspacePayload, DisplayInfo } from './components/DockviewWorkspace.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
 import type { UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
@@ -33,6 +33,7 @@ declare global {
       onChannelChanged(handler: (ch: UserChannel | null) => void): () => void;
       broadcast(context: unknown): Promise<void>;
       setFlowPolicy(policy: FlowPolicy): Promise<void>;
+      getDisplays(): Promise<DisplayInfo[]>;
     };
   }
 }
@@ -198,6 +199,7 @@ export function App() {
   );
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
   const [detachedWorkspaces, setDetachedWorkspaces] = useState<Partial<Record<string, DetachedWorkspacePayload>>>({});
+  const [displays, setDisplays] = useState<DisplayInfo[]>([]);
 
   const activeWorkspaceTab = workspaceTabs.find((tab) => tab.id === activeWorkspaceId) ?? workspaceTabs[0];
   const activeWorkspaceState = workspaceStates[activeWorkspaceTab.id]
@@ -230,6 +232,7 @@ export function App() {
     void window.fdc3.getAppList().then(setApps);
     void window.fdc3.getPreloadPath().then(setPreloadPath);
     void window.fdc3.getCurrentChannel().then(setCurrentChannel);
+    void window.fdc3.getDisplays().then(setDisplays);
     void window.fdc3.getTheme().then((nextTheme) => {
       setGlobalTheme(nextTheme);
       document.documentElement.dataset.theme = THEMES[nextTheme].dataTheme;
@@ -672,6 +675,7 @@ export function App() {
               onDetachWorkspace={handleDetachWorkspace}
               workspaceName={activeWorkspaceTab.name}
               theme={theme}
+              displays={displays}
             />
           ) : (
             <div style={{

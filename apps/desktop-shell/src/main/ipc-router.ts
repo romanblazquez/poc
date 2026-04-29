@@ -1,4 +1,4 @@
-import { ipcMain, webContents } from 'electron';
+import { ipcMain, webContents, screen } from 'electron';
 import { randomUUID } from 'crypto';
 import type { Fdc3Context, FlowPolicy, IntentResolution, ThemeContext, ThemeName } from '@fdc3-poc/fdc3-core';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
@@ -78,6 +78,7 @@ export class IpcRouter {
     this.handleUpdateWorkspaceWindowPayload();
     this.handleRecallWorkspaceWindow();
     this.handleCloseCurrentWindow();
+    this.handleGetDisplays();
   }
 
   // ─── Context broadcasting ─────────────────────────────────────────────────
@@ -397,6 +398,20 @@ export class IpcRouter {
   private handleRecallWorkspaceWindow(): void {
     ipcMain.handle(IpcEvents.RECALL_WORKSPACE_WINDOW, (_event, workspaceWindowId: string) => {
       return this.windowManager.recallWorkspaceWindow(workspaceWindowId);
+    });
+  }
+
+  private handleGetDisplays(): void {
+    ipcMain.handle(IpcEvents.GET_DISPLAYS, () => {
+      const displays = screen.getAllDisplays();
+      const primary = screen.getPrimaryDisplay();
+      return displays.map((d) => ({
+        id: d.id,
+        isPrimary: d.id === primary.id,
+        bounds: d.bounds,
+        workArea: d.workArea,
+        scaleFactor: d.scaleFactor,
+      }));
     });
   }
 

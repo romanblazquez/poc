@@ -44,6 +44,8 @@ export interface DetachedWorkspacePayload {
   channelId: string | null;
   theme: string;
   sourceWorkspaceId?: string;
+  targetX?: number;
+  targetY?: number;
 }
 
 const SNAP_THRESHOLD = 18;
@@ -134,7 +136,12 @@ export class WindowManager {
     });
 
     win.loadURL(appendQuery(getShellUrl(), `detachedWorkspaceId=${encodeURIComponent(payload.id)}`)).catch(console.error);
-    win.once('ready-to-show', () => win.show());
+    win.once('ready-to-show', () => {
+      if (payload.targetX !== undefined && payload.targetY !== undefined) {
+        win.setPosition(payload.targetX, payload.targetY);
+      }
+      win.show();
+    });
     this.register(win, `workspace:${payload.id}`);
     win.on('closed', () => this.returnDetachedWorkspace(payload.id));
     return win;

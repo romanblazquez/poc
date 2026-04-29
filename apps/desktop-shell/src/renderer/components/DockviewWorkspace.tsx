@@ -40,6 +40,7 @@ interface DockviewWorkspaceProps {
   workspaceName?: string;
   theme: ThemeMode;
   detached?: boolean;
+  displays?: DisplayInfo[];
 }
 
 export interface DetachedWorkspacePayload {
@@ -50,6 +51,16 @@ export interface DetachedWorkspacePayload {
   channelId: string | null;
   theme: ThemeMode;
   sourceWorkspaceId?: string;
+  targetX?: number;
+  targetY?: number;
+}
+
+export interface DisplayInfo {
+  id: number;
+  isPrimary: boolean;
+  bounds: { x: number; y: number; width: number; height: number };
+  workArea: { x: number; y: number; width: number; height: number };
+  scaleFactor: number;
 }
 
 interface AppPanelParams {
@@ -200,6 +211,7 @@ export function DockviewWorkspace({
   workspaceName,
   theme,
   detached = false,
+  displays = [],
 }: DockviewWorkspaceProps) {
   const channelId = currentChannel?.id ?? null;
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -385,7 +397,7 @@ export function DockviewWorkspace({
     setShowAddMenu(false);
   }, [channelId, preloadPath, syncDetachedTabTooltips, theme]);
 
-  const detachWorkspace = useCallback(async () => {
+  const detachToDisplay = useCallback(async (display?: DisplayInfo) => {
     if (!onDetachWorkspace) return;
     const api = dockApiRef.current;
     const ids = Array.from(openPanelIds);
@@ -398,6 +410,8 @@ export function DockviewWorkspace({
       layout: api.toJSON(),
       channelId,
       theme,
+      targetX: display ? display.workArea.x + 40 : undefined,
+      targetY: display ? display.workArea.y + 40 : undefined,
     };
     await onDetachWorkspace(payload);
     api.clear();
@@ -414,9 +428,25 @@ export function DockviewWorkspace({
             Reset Layout
           </button>
           {onDetachWorkspace && openPanelIds.size > 0 && (
-            <button onClick={() => void detachWorkspace()} style={detachButtonStyle} title="Detach this workspace as one window">
-              Detach Workspace
-            </button>
+            displays.length > 1 ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ color: 'var(--shell-muted)', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Detach to:</span>
+                {displays.map((d, i) => (
+                  <button
+                    key={d.id}
+                    onClick={() => void detachToDisplay(d)}
+                    title={`${d.bounds.width}×${d.bounds.height}  ·  ${d.isPrimary ? 'Primary display' : `Display ${i + 1}`}`}
+                    style={d.isPrimary ? detachButtonStyle : detachSecondaryButtonStyle}
+                  >
+                    {d.isPrimary ? '▣' : '▢'} {d.isPrimary ? 'Primary' : `Display ${i + 1}`}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <button onClick={() => void detachToDisplay()} style={detachButtonStyle} title="Detach this workspace as one window">
+                Detach Workspace
+              </button>
+            )
           )}
           <div style={{ position: 'relative' }}>
             <button onClick={() => setShowAddMenu((value) => !value)} style={primaryButtonStyle}>
@@ -512,6 +542,19 @@ const detachButtonStyle: CSSProperties = {
   border: '1px solid var(--shell-accent-border)',
   borderRadius: 6,
   color: 'var(--shell-accent-text)',
+  cursor: 'pointer',
+  fontSize: 11,
+  fontWeight: 800,
+  height: 24,
+  padding: '0 10px',
+  textTransform: 'uppercase',
+};
+
+const detachSecondaryButtonStyle: CSSProperties = {
+  background: 'var(--shell-panel-2)',
+  border: '1px solid var(--shell-border)',
+  borderRadius: 6,
+  color: 'var(--shell-text)',
   cursor: 'pointer',
   fontSize: 11,
   fontWeight: 800,

@@ -35,6 +35,16 @@ interface DetachedWorkspacePayload {
   channelId: string | null;
   theme: string;
   sourceWorkspaceId?: string;
+  targetX?: number;
+  targetY?: number;
+}
+
+interface DisplayInfo {
+  id: number;
+  isPrimary: boolean;
+  bounds: { x: number; y: number; width: number; height: number };
+  workArea: { x: number; y: number; width: number; height: number };
+  scaleFactor: number;
 }
 
 const contextHandlers = new Map<string, Set<ContextHandler>>();
@@ -277,5 +287,10 @@ contextBridge.exposeInMainWorld('fdc3', {
    */
   setFlowPolicy(policy: FlowPolicy): Promise<void> {
     return ipcRenderer.invoke(IpcEvents.SET_FLOW_POLICY, policy) as Promise<void>;
+  },
+
+  /** Get all connected displays with bounds and primary flag. */
+  getDisplays(): Promise<DisplayInfo[]> {
+    return ipcRenderer.invoke(IpcEvents.GET_DISPLAYS) as Promise<DisplayInfo[]>;
   },
 });
