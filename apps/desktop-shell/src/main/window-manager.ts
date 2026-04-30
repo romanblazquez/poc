@@ -1,6 +1,7 @@
 import { BrowserWindow, webContents } from 'electron';
 import type { Rectangle } from 'electron';
 import path from 'path';
+import { pathToFileURL } from 'url';
 import type { AppDefinition } from '@fdc3-poc/fdc3-core';
 import type { WindowState } from '@fdc3-poc/workspace-engine';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
@@ -24,7 +25,7 @@ function getShellUrl(): string {
   if (isDev) {
     return 'http://localhost:5173'; // electron-vite renderer dev server
   }
-  return `file://${path.join(__dirname, '../renderer/index.html')}`;
+  return pathToFileURL(path.join(__dirname, '../renderer/index.html')).href;
 }
 
 function appendQuery(url: string, query: string): string {
