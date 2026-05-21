@@ -1,2 +1,0 @@
-export { NxReactRspackPlugin } from './src/plugins/nx-react-rspack-plugin/nx-react-rspack-plugin';
-//# sourceMappingURL=react-plugin.d.ts.map

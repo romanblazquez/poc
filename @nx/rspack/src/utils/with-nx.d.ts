@@ -1,9 +1,0 @@
-import { NxAppRspackPluginOptions } from '../plugins/utils/models';
-import { NxComposableRspackPlugin } from './config';
-export type WithNxOptions = Partial<NxAppRspackPluginOptions>;
-/**
- * @param {WithNxOptions} pluginOptions
- * @returns {NxComposableRspackPlugin}
- */
-export declare function withNx(pluginOptions?: WithNxOptions): NxComposableRspackPlugin;
-//# sourceMappingURL=with-nx.d.ts.map

@@ -1,0 +1,27 @@
+{
+  "name": "news",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/news/src",
+  "targets": {
+    "serve": {
+      "executor": "@nx/angular:dev-server",
+      "options": {
+        "buildTarget": "news:build",
+        "port": 4009,
+        "open": false
+      }
+    },
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "apps/news/dist",
+        "index": "apps/news/src/index.html",
+        "browser": "apps/news/src/main.ts",
+        "tsConfig": "apps/news/tsconfig.app.json",
+        "styles": ["apps/news/src/styles.scss"],
+        "assets": []
+      }
+    }
+  }
+}

@@ -1,0 +1,126 @@
+<div class="workstation-app">
+  <div class="ws-header">
+    <div class="ws-title">
+      <span class="ws-title-mark">RQ</span>
+      <span class="ws-title-text">RFQ Quote</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <p-tag *ngIf="session" [value]="session.rfqId" severity="info"></p-tag>
+      <p-tag *ngIf="banner" [value]="banner" severity="warn"></p-tag>
+    </div>
+  </div>
+
+  <div class="ws-content" style="gap:10px">
+
+    <!-- Form card -->
+    <div class="ws-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:14px">
+        <div>
+          <div style="font-size:11px;color:var(--ws-muted);text-transform:uppercase;letter-spacing:.06em">Instrument</div>
+          <div style="font-size:18px;font-weight:850">{{ instrumentName || 'Select an instrument' }}</div>
+          <div style="font-size:12px;color:var(--ws-muted)">
+            <span *ngIf="ticker">{{ ticker }}</span>
+            <span *ngIf="isin"> · ISIN {{ isin }}</span>
+            <span *ngIf="!ticker">Broadcast an fdc3.instrument to pre-fill.</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
+        <div>
+          <div class="ws-label">Side</div>
+          <p-selectButton [options]="sides" [(ngModel)]="side" optionLabel="label" optionValue="value"
+                          [allowEmpty]="false"></p-selectButton>
+        </div>
+        <div>
+          <div class="ws-label">Currency</div>
+          <input pInputText type="text" [(ngModel)]="currency" style="width:100%;margin-top:4px" />
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <div class="ws-label">Quantity</div>
+        <input pInputText type="number" [(ngModel)]="quantity" style="width:100%;margin-top:4px" min="0" />
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button *ngFor="let q of quickQty" pButton type="button" [label]="q.toString()" size="small" [outlined]="true"
+                  (click)="setQuickQty(q)"></button>
+        </div>
+      </div>
+
+      <button pButton type="button"
+              [label]="session ? 'RFQ in progress…' : 'Request quotes from venues'"
+              severity="success"
+              [disabled]="!canRequest"
+              style="width:100%;font-weight:800"
+              (click)="requestQuotes()"></button>
+    </div>
+
+    <!-- Quotes table -->
+    <div *ngIf="quotes.length" class="ws-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-weight:800">Venue Quotes</div>
+        <button pButton type="button" label="Reject All" severity="danger" [outlined]="true" size="small"
+                (click)="rejectAll()" [disabled]="!session"></button>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div *ngFor="let q of quotes; trackBy: trackByVenue"
+             class="rfq-row"
+             [class.rfq-row-best]="isBestQuote(q)"
+             style="display:grid;grid-template-columns:130px 110px 110px 1fr 100px;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:var(--ws-panel-2,rgba(255,255,255,.04));border:1px solid var(--ws-border)">
+          <span style="font-weight:700">{{ q.venue }}</span>
+
+          <span *ngIf="q.status === 'Pending'" style="color:var(--ws-muted);font-style:italic">awaiting…</span>
+          <span *ngIf="q.status !== 'Pending'" style="font-size:16px;font-weight:900;font-variant-numeric:tabular-nums">
+            {{ q.price | number:'1.2-2' }}
+          </span>
+
+          <span *ngIf="q.status !== 'Pending'" style="font-variant-numeric:tabular-nums;color:var(--ws-muted)">
+            {{ q.quotedQty | number }}
+          </span>
+          <span *ngIf="q.status === 'Pending'"></span>
+
+          <div *ngIf="q.status === 'Live'" style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1;height:6px;background:var(--ws-border);border-radius:3px;overflow:hidden">
+              <div [style.width.%]="countdownPct(q)"
+                   [style.background-color]="isBestQuote(q) ? 'var(--ws-positive)' : 'var(--ws-accent, #4080e8)'"
+                   style="height:100%;transition:width 0.3s linear"></div>
+            </div>
+            <span style="font-size:11px;color:var(--ws-muted);min-width:32px;text-align:right">{{ countdownSec(q) }}s</span>
+          </div>
+          <div *ngIf="q.status !== 'Live'">
+            <p-tag [value]="q.status" [severity]="quoteSeverity(q)"></p-tag>
+            <span *ngIf="q.rejectionReason" style="font-size:11px;color:var(--ws-muted);margin-left:6px">{{ q.rejectionReason }}</span>
+          </div>
+
+          <button pButton type="button" label="Accept" severity="success"
+                  size="small"
+                  [disabled]="q.status !== 'Live'"
+                  (click)="accept(q)"></button>
+        </div>
+      </div>
+
+      <div *ngIf="bestQuote" style="margin-top:10px;font-size:11px;color:var(--ws-muted)">
+        Best quote: <strong>{{ bestQuote.venue }}</strong> @ {{ bestQuote.price | number:'1.2-2' }}
+        ({{ bestQuote.quotedQty | number }}{{ bestQuote.quotedQty < (session?.quantity ?? 0) ? ' partial' : '' }})
+      </div>
+    </div>
+
+    <!-- Recent history -->
+    <div *ngIf="history.length" class="ws-card" style="padding:8px 12px">
+      <div style="font-weight:800;font-size:12px;margin-bottom:6px">Recent RFQs</div>
+      <div style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+        <div *ngFor="let h of history; trackBy: trackByHist"
+             style="display:grid;grid-template-columns:90px 120px 60px 60px 1fr 100px;gap:8px;align-items:center">
+          <span style="color:var(--ws-muted);font-variant-numeric:tabular-nums">{{ h.ts | date:'HH:mm:ss' }}</span>
+          <span style="font-weight:700">{{ h.rfqId }}</span>
+          <span [style.color]="h.side === 'Buy' ? 'var(--ws-positive)' : 'var(--ws-negative)'" style="font-weight:800">{{ h.side }}</span>
+          <span>{{ h.ticker }}</span>
+          <span style="color:var(--ws-muted)">{{ h.venue ? h.venue + ' @ ' + (h.price | number:'1.2-2') : '—' }}</span>
+          <p-tag [value]="h.outcome"
+                 [severity]="h.outcome === 'Filled' ? 'success' : h.outcome === 'Rejected' ? 'danger' : 'warn'"></p-tag>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

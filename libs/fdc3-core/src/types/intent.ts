@@ -1,4 +1,6 @@
 import type { Fdc3Context } from './context.js';
+import type { AppMetadata } from './app.js';
+import type { Channel } from './channel.js';
 
 /**
  * An intent declaration — what the intent is named and what context types it accepts.
@@ -15,6 +17,23 @@ export interface IntentDefinition {
 }
 
 /**
+ * FDC3 2.0 `IntentMetadata` — describes one intent for discovery / resolver UI.
+ */
+export interface IntentMetadata {
+  name: string;
+  displayName?: string;
+}
+
+/**
+ * FDC3 2.0 `AppIntent` — one intent and the list of apps that handle it.
+ * Returned by `findIntent` / `findIntentsByContext`.
+ */
+export interface AppIntent {
+  intent: IntentMetadata;
+  apps: AppMetadata[];
+}
+
+/**
  * Result returned after an intent is raised and resolved.
  */
 export interface IntentResolution {
@@ -22,8 +41,12 @@ export interface IntentResolution {
   source: { appId: string };
   /** The raised intent name */
   intent: string;
-  /** Optional return context from the handler */
-  result?: Fdc3Context;
+  /**
+   * Optional return value from the handler. The preload unwraps any
+   * PrivateChannel marker it sees into a real Channel client before resolving
+   * the raiseIntent promise — so callers may receive a context or a channel.
+   */
+  result?: Fdc3Context | Channel;
 }
 
 /**
@@ -36,6 +59,44 @@ export class IntentResolutionError extends Error {
   ) {
     super(`No handler found for intent "${intent}"`);
     this.name = 'IntentResolutionError';
+  }
+}
+
+/**
+ * FDC3 2.0 standard error codes returned by `findIntent` / `raiseIntent`.
+ * See https://fdc3.finos.org/docs/api/ref/Errors
+ */
+export const ResolveError = {
+  NoAppsFound: 'NoAppsFound',
+  ResolverUnavailable: 'ResolverUnavailable',
+  UserCancelled: 'UserCancelledResolution',
+  ResolverTimeout: 'ResolverTimeout',
+  IntentDeliveryFailed: 'IntentDeliveryFailed',
+  TargetAppUnavailable: 'TargetAppUnavailable',
+  TargetInstanceUnavailable: 'TargetInstanceUnavailable',
+} as const;
+export type ResolveErrorCode = (typeof ResolveError)[keyof typeof ResolveError];
+
+/**
+ * Raised when `findIntent` / `findIntentsByContext` matches no apps.
+ * Uses the FDC3 standard `NoAppsFound` error code as its message so
+ * spec-aware callers can `catch (e) { if (e.message === ResolveError.NoAppsFound) … }`.
+ */
+export class NoAppsFoundError extends Error {
+  constructor() {
+    super(ResolveError.NoAppsFound);
+    this.name = 'NoAppsFoundError';
+  }
+}
+
+/**
+ * Raised when the user cancels the resolver dialog instead of picking a handler.
+ * Uses the FDC3 standard `UserCancelledResolution` error code.
+ */
+export class UserCancelledResolutionError extends Error {
+  constructor() {
+    super(ResolveError.UserCancelled);
+    this.name = 'UserCancelledResolutionError';
   }
 }
 

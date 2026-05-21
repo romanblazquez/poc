@@ -1,6 +1,0 @@
-import { type Schema } from '../schema';
-import { type ExecutorContext, type ProjectConfiguration } from '@nx/devkit';
-export declare function startRemotes(remotes: string[], workspaceProjects: Record<string, ProjectConfiguration>, options: Pick<Schema, 'devRemotes' | 'verbose'>, context: ExecutorContext): Promise<AsyncIterable<{
-    success: boolean;
-}>[]>;
-//# sourceMappingURL=start-dev-remotes.d.ts.map

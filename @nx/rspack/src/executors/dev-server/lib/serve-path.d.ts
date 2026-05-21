@@ -1,4 +1,0 @@
-import type { RspackExecutorSchema } from '../../rspack/schema';
-export declare function buildServePath(browserOptions: RspackExecutorSchema): string;
-export declare function _findDefaultServePath(baseHref?: string, deployUrl?: string): string | null;
-//# sourceMappingURL=serve-path.d.ts.map

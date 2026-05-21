@@ -1,3 +1,0 @@
-import { RspackExecutorSchema } from '../../../executors/rspack/schema';
-export declare function normalizePathOptions(projectRoot: string, options: Partial<RspackExecutorSchema>): Partial<RspackExecutorSchema>;
-//# sourceMappingURL=normalize-path-options.d.ts.map

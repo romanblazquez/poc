@@ -1,5 +1,0 @@
-import type { Tree } from '@nx/devkit';
-import type { Schema } from './schema';
-export declare function scamToStandalone(tree: Tree, { component, project: projectName, skipFormat }: Schema): Promise<void>;
-export default scamToStandalone;
-//# sourceMappingURL=scam-to-standalone.d.ts.map

@@ -1,3 +1,0 @@
-import type { Tree } from '@nx/devkit';
-export declare function transformCjsConfigFile(tree: Tree, configPath: string): void;
-//# sourceMappingURL=transform-cjs.d.ts.map

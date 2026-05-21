@@ -1,0 +1,122 @@
+<div class="workstation-app" [attr.data-side]="form.side">
+  <div class="ws-header">
+    <div class="ws-title">
+      <span class="ws-title-mark">OT</span>
+      <span class="ws-title-text">Order Ticket</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <p-tag *ngIf="form.ticker" [value]="form.ticker" severity="info"></p-tag>
+      <p-tag *ngIf="streamingOrderId" [value]="'Live ' + streamingOrderId" severity="success"></p-tag>
+      <p-tag *ngIf="intentBanner" [value]="intentBanner" severity="warn"></p-tag>
+    </div>
+  </div>
+
+  <div class="ws-content">
+    <div class="ws-card">
+
+      <!-- Instrument header -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:14px">
+        <div>
+          <div style="font-size:11px;color:var(--ws-muted);text-transform:uppercase;letter-spacing:.06em">Instrument</div>
+          <div style="font-size:20px;font-weight:850">{{ form.instrumentName || 'Select an instrument' }}</div>
+          <div style="font-size:12px;color:var(--ws-muted)">
+            <span *ngIf="form.ticker">{{ form.ticker }}</span>
+            <span *ngIf="form.isin"> · ISIN {{ form.isin }}</span>
+            <span *ngIf="!form.ticker">Broadcast an fdc3.instrument or raise CreateOrder to pre-fill.</span>
+          </div>
+        </div>
+        <div *ngIf="referencePrice" style="text-align:right">
+          <div style="font-size:11px;color:var(--ws-muted)">Last</div>
+          <div style="font-size:18px;font-weight:900">{{ referencePrice | number:'1.2-2' }} {{ form.currency }}</div>
+          <button pButton type="button" label="Use Last" size="small" [text]="true" (click)="applyReferencePrice()"
+                  *ngIf="form.orderType === 'Limit'"></button>
+        </div>
+      </div>
+
+      <!-- Side + Order type -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <div class="ws-label">Side</div>
+          <p-selectButton [options]="sides" [(ngModel)]="form.side" optionLabel="label" optionValue="value"
+                          [allowEmpty]="false" styleClass="side-buttons" [attr.data-side]="form.side"></p-selectButton>
+        </div>
+        <div>
+          <div class="ws-label">Order Type</div>
+          <p-selectButton [options]="orderTypes" [(ngModel)]="form.orderType" optionLabel="label" optionValue="value"
+                          [allowEmpty]="false"></p-selectButton>
+        </div>
+      </div>
+
+      <!-- Quantity -->
+      <div style="margin-bottom:12px">
+        <div class="ws-label">Quantity</div>
+        <input pInputText type="number" [(ngModel)]="form.quantity" style="width:100%;margin-top:4px" min="0" />
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button *ngFor="let q of quickQty" pButton type="button" [label]="q.toString()" size="small" [outlined]="true"
+                  (click)="setQuickQty(q)"></button>
+        </div>
+      </div>
+
+      <!-- Limit price -->
+      <div *ngIf="form.orderType === 'Limit'" style="margin-bottom:12px">
+        <div class="ws-label">Limit Price ({{ form.currency }})</div>
+        <input pInputText type="number" [(ngModel)]="form.limitPrice" style="width:100%;margin-top:4px" step="0.01" min="0" />
+      </div>
+
+      <!-- TIF / Venue / Account -->
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px">
+        <div>
+          <div class="ws-label">TIF</div>
+          <p-select [options]="tifs" [(ngModel)]="form.tif" optionLabel="label" optionValue="value"
+                    appendTo="body" styleClass="w-full"></p-select>
+        </div>
+        <div>
+          <div class="ws-label">Venue</div>
+          <p-select [options]="venues" [(ngModel)]="form.venue" optionLabel="label" optionValue="value"
+                    appendTo="body" styleClass="w-full"></p-select>
+        </div>
+        <div>
+          <div class="ws-label">Account</div>
+          <p-select [options]="accounts" [(ngModel)]="form.account" optionLabel="label" optionValue="value"
+                    appendTo="body" styleClass="w-full"></p-select>
+        </div>
+      </div>
+
+      <!-- Notional preview + Submit -->
+      <div class="ws-card" style="box-shadow:none;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--ws-muted);font-weight:800">Estimated Notional</span>
+        <span style="font-size:20px;font-weight:900">{{ form.currency }} {{ notional | number:'1.2-2' }}</span>
+      </div>
+
+      <div style="display:flex;gap:10px">
+        <button pButton type="button"
+                [label]="(form.side === 'Buy' ? 'Buy ' : 'Sell ') + (form.quantity || 0) + ' ' + (form.ticker || '—')"
+                [severity]="form.side === 'Buy' ? 'success' : 'danger'"
+                [disabled]="!canSubmit"
+                style="flex:1;font-weight:800"
+                (click)="submit()"></button>
+        <button pButton type="button" label="Reset" [outlined]="true" (click)="resetTicket()"></button>
+      </div>
+    </div>
+
+    <!-- Status feed -->
+    <div class="ws-card" *ngIf="statusFeed.length">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-weight:800">Order Status Feed</div>
+        <span *ngIf="streamingOrderId" style="font-size:11px;color:var(--ws-muted)">{{ streamingOrderId }}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div *ngFor="let row of statusFeed; trackBy: trackByStatus"
+             style="display:grid;grid-template-columns:90px 110px 1fr 100px;gap:8px;font-size:12px;align-items:center">
+          <span style="color:var(--ws-muted)">{{ row.ts | date:'HH:mm:ss' }}</span>
+          <p-tag [value]="row.status"
+                 [severity]="row.status === 'Filled' ? 'success' : row.status === 'Rejected' || row.status === 'Cancelled' ? 'danger' : row.status === 'PartiallyFilled' ? 'warn' : 'info'"></p-tag>
+          <span>{{ row.message || '—' }}</span>
+          <span *ngIf="row.filledQty != null" style="text-align:right;font-variant-numeric:tabular-nums">
+            {{ row.filledQty | number }}<span *ngIf="row.avgPrice"> @ {{ row.avgPrice | number:'1.2-2' }}</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -19,7 +19,8 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
-import type { Fdc3Context, FlowPolicy, IntentInvocationMetadata, IntentResolution, UserChannel, ThemeName } from '@fdc3-poc/fdc3-core';
+import type { AppIntent, Channel, ChannelDisplayMetadata, ChannelListener, Fdc3Context, FlowPolicy, ImplementationMetadata, IntentInvocationMetadata, IntentResolution, PrivateChannel, PrivateChannelEventListener, PrivateChannelMarker, UserChannel, ThemeName } from '@fdc3-poc/fdc3-core';
+import { isPrivateChannelMarker } from '@fdc3-poc/fdc3-core';
 
 // ─── Handler registries (live in preload isolate, not renderer) ────────────
 
@@ -50,6 +51,29 @@ interface DisplayInfo {
 const contextHandlers = new Map<string, Set<ContextHandler>>();
 const intentHandlers = new Map<string, Set<IntentHandler>>();
 const channelChangeHandlers = new Set<ChannelHandler>();
+/** channelId → (contextType | '*') → Set<handler> — for App Channel listeners. */
+const appChannelHandlers = new Map<string, Map<string, Set<ContextHandler>>>();
+/** channelId → (contextType | '*') → Set<handler> — for Private Channel context listeners. */
+const privateChannelHandlers = new Map<string, Map<string, Set<ContextHandler>>>();
+
+type PrivateChannelLifecycleHandler = (contextType: string | null) => void;
+type PrivateChannelDisconnectHandler = () => void;
+
+interface PrivateChannelLifecycleMaps {
+  added: Set<PrivateChannelLifecycleHandler>;
+  removed: Set<PrivateChannelLifecycleHandler>;
+  disconnected: Set<PrivateChannelDisconnectHandler>;
+}
+const privateChannelLifecycle = new Map<string, PrivateChannelLifecycleMaps>();
+
+function ensurePrivateChannelLifecycle(channelId: string): PrivateChannelLifecycleMaps {
+  let map = privateChannelLifecycle.get(channelId);
+  if (!map) {
+    map = { added: new Set(), removed: new Set(), disconnected: new Set() };
+    privateChannelLifecycle.set(channelId, map);
+  }
+  return map;
+}
 const workspaceWindowClosedHandlers = new Set<(payload: DetachedWorkspacePayload) => void>();
 const themeChangeHandlers = new Set<(theme: ThemeName) => void>();
 
@@ -100,6 +124,147 @@ ipcRenderer.on(IpcEvents.THEME_CHANGED, (_event, theme: ThemeName) => {
     handler(theme);
   }
 });
+
+ipcRenderer.on(
+  IpcEvents.APP_CHANNEL_CONTEXT,
+  (_event, { channelId, context }: { channelId: string; context: Fdc3Context }) => {
+    const channelMap = appChannelHandlers.get(channelId);
+    if (!channelMap) return;
+    const typed = channelMap.get(context.type);
+    const wild = channelMap.get('*');
+    for (const handler of [...(typed ?? []), ...(wild ?? [])]) {
+      try {
+        handler(context);
+      } catch (e) {
+        console.error('[fdc3 preload] App channel handler threw:', e);
+      }
+    }
+  },
+);
+
+ipcRenderer.on(
+  IpcEvents.PRIVATE_CHANNEL_CONTEXT,
+  (_event, { channelId, context }: { channelId: string; context: Fdc3Context }) => {
+    const channelMap = privateChannelHandlers.get(channelId);
+    if (!channelMap) return;
+    const typed = channelMap.get(context.type);
+    const wild = channelMap.get('*');
+    for (const handler of [...(typed ?? []), ...(wild ?? [])]) {
+      try {
+        handler(context);
+      } catch (e) {
+        console.error('[fdc3 preload] Private channel handler threw:', e);
+      }
+    }
+  },
+);
+
+ipcRenderer.on(
+  IpcEvents.PRIVATE_CHANNEL_LISTENER_ADDED,
+  (_event, { channelId, contextType }: { channelId: string; contextType: string | null }) => {
+    const ev = privateChannelLifecycle.get(channelId);
+    if (!ev) return;
+    for (const h of ev.added) {
+      try { h(contextType); } catch (e) { console.error(e); }
+    }
+  },
+);
+
+ipcRenderer.on(
+  IpcEvents.PRIVATE_CHANNEL_LISTENER_REMOVED,
+  (_event, { channelId, contextType }: { channelId: string; contextType: string | null }) => {
+    const ev = privateChannelLifecycle.get(channelId);
+    if (!ev) return;
+    for (const h of ev.removed) {
+      try { h(contextType); } catch (e) { console.error(e); }
+    }
+  },
+);
+
+ipcRenderer.on(
+  IpcEvents.PRIVATE_CHANNEL_DISCONNECTED,
+  (_event, { channelId }: { channelId: string }) => {
+    const ev = privateChannelLifecycle.get(channelId);
+    if (!ev) return;
+    for (const h of ev.disconnected) {
+      try { h(); } catch (e) { console.error(e); }
+    }
+    // After disconnect both sides drop their handler maps for this channel.
+    privateChannelHandlers.delete(channelId);
+    privateChannelLifecycle.delete(channelId);
+  },
+);
+
+/** Build a client-side PrivateChannel that proxies to the main-process store. */
+function buildPrivateChannel(channelId: string): PrivateChannel {
+  return {
+    id: channelId,
+    type: 'private',
+    broadcast(context: Fdc3Context): Promise<void> {
+      return ipcRenderer.invoke(IpcEvents.PRIVATE_CHANNEL_BROADCAST, { channelId, context }) as Promise<void>;
+    },
+    getCurrentContext(contextType?: string): Promise<Fdc3Context | null> {
+      return ipcRenderer.invoke(IpcEvents.PRIVATE_CHANNEL_GET_CURRENT_CONTEXT, { channelId, contextType }) as Promise<Fdc3Context | null>;
+    },
+    async addContextListener<T extends Fdc3Context>(
+      contextType: string | null,
+      handler: (context: T) => void,
+    ): Promise<ChannelListener> {
+      const key = contextType ?? '*';
+      const channelMap = privateChannelHandlers.get(channelId) ?? new Map<string, Set<ContextHandler>>();
+      const set = channelMap.get(key) ?? new Set<ContextHandler>();
+      const wrapped: ContextHandler = (ctx) => handler(ctx as T);
+      set.add(wrapped);
+      channelMap.set(key, set);
+      privateChannelHandlers.set(channelId, channelMap);
+
+      const cached = (await ipcRenderer.invoke(IpcEvents.PRIVATE_CHANNEL_ADD_LISTENER, {
+        channelId,
+        contextType,
+      })) as Fdc3Context[];
+      for (const ctx of cached) {
+        try { handler(ctx as T); } catch (e) { console.error('[fdc3 preload] Private channel cached-context handler threw:', e); }
+      }
+
+      return {
+        unsubscribe: (): void => {
+          const localSet = privateChannelHandlers.get(channelId)?.get(key);
+          localSet?.delete(wrapped);
+          if (localSet?.size === 0) {
+            privateChannelHandlers.get(channelId)?.delete(key);
+            void ipcRenderer.invoke(IpcEvents.PRIVATE_CHANNEL_REMOVE_LISTENER, { channelId, contextType });
+          }
+        },
+      };
+    },
+    onAddContextListener(handler: PrivateChannelLifecycleHandler): PrivateChannelEventListener {
+      const ev = ensurePrivateChannelLifecycle(channelId);
+      ev.added.add(handler);
+      return { unsubscribe: () => ev.added.delete(handler) };
+    },
+    onUnsubscribe(handler: PrivateChannelLifecycleHandler): PrivateChannelEventListener {
+      const ev = ensurePrivateChannelLifecycle(channelId);
+      ev.removed.add(handler);
+      return { unsubscribe: () => ev.removed.delete(handler) };
+    },
+    onDisconnect(handler: PrivateChannelDisconnectHandler): PrivateChannelEventListener {
+      const ev = ensurePrivateChannelLifecycle(channelId);
+      ev.disconnected.add(handler);
+      return { unsubscribe: () => ev.disconnected.delete(handler) };
+    },
+    disconnect(): Promise<void> {
+      return ipcRenderer.invoke(IpcEvents.PRIVATE_CHANNEL_DISCONNECT, channelId) as Promise<void>;
+    },
+  };
+}
+
+/** Replace a private-channel marker inside an intent result with a wrapped PrivateChannel. */
+async function unwrapIntentResult(result: unknown): Promise<unknown> {
+  if (!isPrivateChannelMarker(result)) return result;
+  const channelId = (result as PrivateChannelMarker).__fdc3PrivateChannelId;
+  await ipcRenderer.invoke(IpcEvents.PRIVATE_CHANNEL_CONNECT, channelId);
+  return buildPrivateChannel(channelId);
+}
 
 // ─── window.fdc3 surface ──────────────────────────────────────────────────
 
@@ -153,14 +318,36 @@ contextBridge.exposeInMainWorld('fdc3', {
 
   /**
    * Raise a named intent, routing to the appropriate handler app.
+   * If the handler returns a PrivateChannel via `completeIntent`, the result
+   * field is automatically wrapped into a usable PrivateChannel client.
    */
-  raiseIntent(intent: string, context?: Fdc3Context): Promise<IntentResolution> {
-    return ipcRenderer.invoke(IpcEvents.RAISE_INTENT, { intent, context }) as Promise<IntentResolution>;
+  async raiseIntent(intent: string, context?: Fdc3Context): Promise<IntentResolution> {
+    const resolution = (await ipcRenderer.invoke(IpcEvents.RAISE_INTENT, { intent, context })) as IntentResolution;
+    if (resolution && resolution.result !== undefined) {
+      const unwrapped = await unwrapIntentResult(resolution.result);
+      return { ...resolution, result: unwrapped as IntentResolution['result'] };
+    }
+    return resolution;
   },
 
-  /** Complete a pending intent invocation with an optional result context. */
-  completeIntent(requestId: string, result?: Fdc3Context): Promise<void> {
-    return ipcRenderer.invoke(IpcEvents.COMPLETE_INTENT, { requestId, result }) as Promise<void>;
+  /**
+   * Complete a pending intent invocation with an optional result. Pass either
+   * a context object or a PrivateChannel returned by `createPrivateChannel()`.
+   * PrivateChannels are serialised over IPC as a marker and re-wrapped on the
+   * raiser side.
+   */
+  completeIntent(requestId: string, result?: Fdc3Context | PrivateChannel | PrivateChannelMarker): Promise<void> {
+    let payload: Fdc3Context | PrivateChannelMarker | undefined;
+    if (result === undefined) {
+      payload = undefined;
+    } else if ((result as PrivateChannel).type === 'private' && typeof (result as { id?: string }).id === 'string') {
+      payload = { __fdc3PrivateChannelId: (result as PrivateChannel).id };
+    } else if (isPrivateChannelMarker(result)) {
+      payload = result;
+    } else {
+      payload = result as Fdc3Context;
+    }
+    return ipcRenderer.invoke(IpcEvents.COMPLETE_INTENT, { requestId, result: payload }) as Promise<void>;
   },
 
   /**
@@ -206,6 +393,106 @@ contextBridge.exposeInMainWorld('fdc3', {
   /** Open (or focus) an app by its appId. */
   open(app: { appId: string }, context?: Fdc3Context): Promise<void> {
     return ipcRenderer.invoke(IpcEvents.OPEN_APP, { appId: app.appId, context }) as Promise<void>;
+  },
+
+  /**
+   * FDC3 2.0 — implementation metadata about this desktop agent and the calling app.
+   * Use this to feature-detect optional capabilities or display the agent version.
+   */
+  getInfo(): Promise<ImplementationMetadata> {
+    return ipcRenderer.invoke(IpcEvents.GET_INFO) as Promise<ImplementationMetadata>;
+  },
+
+  /**
+   * FDC3 2.0 — `findIntent(intent, context?, resultType?)`.
+   * Resolves to one `AppIntent` listing every app in the directory that handles
+   * the intent (filtered by context type when context is passed). Rejects with
+   * the FDC3 standard `NoAppsFound` error code when nothing matches.
+   */
+  findIntent(intent: string, context?: Fdc3Context, resultType?: string): Promise<AppIntent> {
+    return ipcRenderer.invoke(IpcEvents.FIND_INTENT, { intent, context, resultType }) as Promise<AppIntent>;
+  },
+
+  /**
+   * FDC3 2.0 — `findIntentsByContext(context, resultType?)`.
+   * Resolves to the list of intents that accept the given context type, each
+   * paired with its handler apps. Returns `[]` if nothing matches.
+   */
+  findIntentsByContext(context: Fdc3Context, resultType?: string): Promise<AppIntent[]> {
+    return ipcRenderer.invoke(IpcEvents.FIND_INTENTS_BY_CONTEXT, { context, resultType }) as Promise<AppIntent[]>;
+  },
+
+  /**
+   * FDC3 2.0 — `createPrivateChannel()`. Returns a brand-new PrivateChannel
+   * the caller can pass to `completeIntent` so the intent raiser receives a
+   * channel reference and can stream follow-up updates.
+   */
+  async createPrivateChannel(): Promise<PrivateChannel> {
+    const marker = (await ipcRenderer.invoke(IpcEvents.CREATE_PRIVATE_CHANNEL)) as PrivateChannelMarker;
+    return buildPrivateChannel(marker.__fdc3PrivateChannelId);
+  },
+
+  /**
+   * FDC3 2.0 — `getOrCreateChannel(channelId)`. Returns a Channel object whose
+   * `broadcast` / `getCurrentContext` / `addContextListener` operate on a private
+   * App Channel namespace (distinct from user channels). Listeners receive the
+   * last-value cache on first subscribe.
+   */
+  async getOrCreateChannel(channelId: string): Promise<Channel> {
+    const meta = (await ipcRenderer.invoke(IpcEvents.GET_OR_CREATE_APP_CHANNEL, channelId)) as {
+      id: string;
+      type: 'app';
+      displayMetadata?: ChannelDisplayMetadata;
+    };
+    return {
+      id: meta.id,
+      type: meta.type,
+      displayMetadata: meta.displayMetadata,
+      broadcast(context: Fdc3Context): Promise<void> {
+        return ipcRenderer.invoke(IpcEvents.APP_CHANNEL_BROADCAST, { channelId: meta.id, context }) as Promise<void>;
+      },
+      getCurrentContext(contextType?: string): Promise<Fdc3Context | null> {
+        return ipcRenderer.invoke(IpcEvents.APP_CHANNEL_GET_CURRENT_CONTEXT, { channelId: meta.id, contextType }) as Promise<Fdc3Context | null>;
+      },
+      async addContextListener<T extends Fdc3Context>(
+        contextType: string | null,
+        handler: (context: T) => void,
+      ): Promise<ChannelListener> {
+        const key = contextType ?? '*';
+        const channelMap = appChannelHandlers.get(meta.id) ?? new Map<string, Set<ContextHandler>>();
+        const set = channelMap.get(key) ?? new Set<ContextHandler>();
+        const wrapped: ContextHandler = (ctx) => handler(ctx as T);
+        set.add(wrapped);
+        channelMap.set(key, set);
+        appChannelHandlers.set(meta.id, channelMap);
+
+        const cached = (await ipcRenderer.invoke(IpcEvents.APP_CHANNEL_ADD_LISTENER, {
+          channelId: meta.id,
+          contextType,
+        })) as Fdc3Context[];
+        for (const ctx of cached) {
+          try {
+            handler(ctx as T);
+          } catch (e) {
+            console.error('[fdc3 preload] App channel cached-context handler threw:', e);
+          }
+        }
+
+        return {
+          unsubscribe: (): void => {
+            const localSet = appChannelHandlers.get(meta.id)?.get(key);
+            localSet?.delete(wrapped);
+            if (localSet?.size === 0) {
+              appChannelHandlers.get(meta.id)?.delete(key);
+              void ipcRenderer.invoke(IpcEvents.APP_CHANNEL_REMOVE_LISTENER, {
+                channelId: meta.id,
+                contextType,
+              });
+            }
+          },
+        };
+      },
+    };
   },
 
   /** Close the current Electron app window or embedded app surface. */
@@ -293,4 +580,34 @@ contextBridge.exposeInMainWorld('fdc3', {
   getDisplays(): Promise<DisplayInfo[]> {
     return ipcRenderer.invoke(IpcEvents.GET_DISPLAYS) as Promise<DisplayInfo[]>;
   },
+
+  // ─── Intent resolver modal — internal, used only by intent-resolver.html ───
+
+  __intentResolverGetPayload(): Promise<unknown> {
+    return ipcRenderer.invoke(IpcEvents.INTENT_RESOLVER_GET_PAYLOAD);
+  },
+  __intentResolverPick(appId: string, instanceId?: number): Promise<void> {
+    return ipcRenderer.invoke(IpcEvents.INTENT_RESOLVER_PICK, { appId, instanceId }) as Promise<void>;
+  },
+  __intentResolverCancel(): Promise<void> {
+    return ipcRenderer.invoke(IpcEvents.INTENT_RESOLVER_CANCEL) as Promise<void>;
+  },
 });
+
+// ─── FDC3 2.0 fdc3Ready ────────────────────────────────────────────────────
+// Apps following the spec do:
+//   if (window.fdc3) { use it } else { window.addEventListener('fdc3Ready', …) }
+// Our contextBridge exposes window.fdc3 synchronously before any renderer script
+// runs, so window.fdc3 is always present — but we still fire the event once the
+// DOM is ready, so spec-compliant apps and the @finos/fdc3 helper work without
+// modification.
+if (typeof window !== 'undefined') {
+  const fire = (): void => {
+    window.dispatchEvent(new Event('fdc3Ready'));
+  };
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', fire, { once: true });
+  } else {
+    queueMicrotask(fire);
+  }
+}

@@ -1,7 +1,8 @@
 import type { Fdc3Context } from '../types/context.js';
-import type { IntentResolution } from '../types/intent.js';
-import type { UserChannel } from '../types/channel.js';
+import type { AppIntent, IntentResolution } from '../types/intent.js';
+import type { Channel, PrivateChannel, UserChannel } from '../types/channel.js';
 import type { ThemeName } from '../types/context.js';
+import type { ImplementationMetadata } from '../types/app.js';
 
 /**
  * Unsubscribe function returned by listener registration.
@@ -96,7 +97,7 @@ export interface Fdc3DesktopAgent {
     intent: string,
     handler: (context?: Fdc3Context, metadata?: IntentInvocationMetadata) => Promise<void> | void,
   ): Unsubscribe;
-  completeIntent(requestId: string, result?: Fdc3Context): Promise<void>;
+  completeIntent(requestId: string, result?: Fdc3Context | PrivateChannel): Promise<void>;
   closeWindow(): Promise<boolean>;
   getTheme(): Promise<ThemeName>;
   setTheme(theme: ThemeName): Promise<ThemeName>;
@@ -106,4 +107,29 @@ export interface Fdc3DesktopAgent {
   getCurrentChannel(): Promise<UserChannel | null>;
   getUserChannels(): Promise<UserChannel[]>;
   open(app: { appId: string }, context?: Fdc3Context): Promise<void>;
+  /**
+   * Returns the desktop agent's implementation metadata (FDC3 2.0).
+   * Apps use this to verify the FDC3 version, provider, and their own identity.
+   */
+  getInfo(): Promise<ImplementationMetadata>;
+  /**
+   * FDC3 2.0 — find apps that handle a named intent (optionally for a given context type).
+   * Rejects with `NoAppsFound` if no app matches.
+   */
+  findIntent(intent: string, context?: Fdc3Context, resultType?: string): Promise<AppIntent>;
+  /**
+   * FDC3 2.0 — find all intents that accept a given context (optionally filtered by resultType).
+   * Returns an empty array when nothing matches.
+   */
+  findIntentsByContext(context: Fdc3Context, resultType?: string): Promise<AppIntent[]>;
+  /**
+   * FDC3 2.0 — get or create an App Channel by id. App channels are separate from
+   * user channels and have no "membership"; anyone with the id can broadcast/listen.
+   */
+  getOrCreateChannel(channelId: string): Promise<Channel>;
+  /**
+   * FDC3 2.0 — create a new PrivateChannel for streaming intent results.
+   * Typically called by an intent handler before `completeIntent(requestId, channel)`.
+   */
+  createPrivateChannel(): Promise<PrivateChannel>;
 }

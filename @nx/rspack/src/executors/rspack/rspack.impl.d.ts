@@ -1,7 +1,0 @@
-import { ExecutorContext } from '@nx/devkit';
-import { RspackExecutorSchema } from './schema';
-export default function runExecutor(options: RspackExecutorSchema, context: ExecutorContext): AsyncGenerator<{
-    success: boolean;
-    outfile?: string;
-}, void, any>;
-//# sourceMappingURL=rspack.impl.d.ts.map

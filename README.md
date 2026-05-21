@@ -1,6 +1,9 @@
 # FDC3 Desktop POC
 
-> **Enterprise desktop interoperability shell** built on Electron + FDC3-compatible APIs.  
+> **Enterprise desktop interoperability shell** built on Electron + FDC3-compatible APIs,
+> with an Angular 21 app fleet, AG Grid blotters, Dockview workspaces, and a runtime-swappable
+> adapter layer (Electron / Browser / io.Connect).
+>
 > Demonstrates the core concepts of Interop.io / Harmonix / io.Connect Desktop without vendor lock-in.
 
 ---
@@ -9,12 +12,16 @@
 
 | Capability | Implementation |
 |------------|---------------|
-| Multi-app desktop | 5 React apps in separate Electron `BrowserWindow`s |
+| Multi-app desktop | 10 Angular apps, hosted either as detached Electron `BrowserWindow`s or as Dockview panels |
 | Context broadcasting | `window.fdc3.broadcast()` → IPC → channel-filtered delivery |
-| User channels | 6 coloured channels; only apps on the same channel receive contexts |
-| Intent routing | `raiseIntent('StartPayment')` opens Payment Action and pre-fills it |
-| App directory | `config/app-directory.json` — declarative app registry |
-| Workspace persistence | Save/restore window layout + channel assignments to disk |
+| User channels | 6 colour-coded channels; only apps on the same channel receive contexts |
+| Intent routing | `raiseIntent('StartPayment')` opens Payment Action and pre-fills it; results returned via `completeIntent` |
+| App directory | `config/app-directory.json` — declarative app registry, **validated at load time** |
+| Workspace persistence | Save/restore Dockview layout, channel assignments, detached windows |
+| Multi-monitor | Detach the workspace into any connected display |
+| Theming | 4 themes (`dark-financial`, `light-financial`, `high-contrast`, `luxury-neutral`) broadcast as `com.demo.theme` |
+| Interop Flow designer | React Flow editor for visualising and gating context/intent routes between apps |
+| Cloud apps | Apps with `devPort: 0` are embedded directly from an external URL |
 | Adapter architecture | `InteropAdapter` interface — swap Electron IPC for io.Connect or OpenFin at runtime |
 | Security | `contextIsolation: true`, no `nodeIntegration`, preload-only bridge |
 
@@ -28,10 +35,11 @@ Custom Electron Shell (this POC)          io.Connect / Interop.io
 ✅ FDC3-compatible API                    ✅ FDC3 2.0 certified
 ✅ User channels                          ✅ User channels + channel visualiser
 ✅ Intent routing                         ✅ Intent routing + resolver UI
-✅ App directory (JSON)                   ✅ Remote AppD, live reload, versioning
-✅ Workspace persistence                  ✅ Named workspaces, server-side, shared
-⚠️ Single monitor (Electron native)       ✅ Multi-monitor, tabbed groups
-❌ No resolver UI (first match wins)      ✅ Full intent resolver dialog
+✅ App directory (JSON, validated)        ✅ Remote AppD, live reload, versioning
+✅ Workspace persistence + Dockview        ✅ Named workspaces, server-side, shared
+✅ Multi-monitor detach                    ✅ Multi-monitor, tabbed groups
+⚠️  No resolver UI (first match wins)      ✅ Full intent resolver dialog
+⚠️  No PrivateChannel / AppChannel yet     ✅ Full FDC3 2.0 channel model
 ❌ No native/COM app support              ✅ Native, .NET, Java, web
 Free (open source)                        Commercial licence required
 ```
@@ -43,7 +51,7 @@ one-file bootstrap swap. See [`docs/interop-vs-custom-shell.md`](docs/interop-vs
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 20+ (see `.nvmrc`)
 - npm 10+
 
 ---
@@ -59,11 +67,10 @@ npm run dev
 ```
 
 This will:
-1. Start Vite dev servers for all 5 demo apps (ports 4001–4005)
+1. Start Angular dev servers for all 9 local apps (ports 4001–4005, 4011–4014)
 2. Wait for them to be ready
-3. Launch `electron-vite dev` — builds main + preload, starts Electron
-
-The **Shell Launcher** window opens automatically. Open apps from the launcher.
+3. Launch `electron-vite dev` — builds the main + preload processes, starts Electron
+4. The **Shell Launcher** window opens automatically. Open apps from the launcher.
 
 ### Individual commands
 
@@ -84,6 +91,38 @@ npm run typecheck
 npm run lint
 ```
 
+On Windows there are `start.bat` and `start.ps1` helpers that wrap `npm run dev`.
+
+---
+
+## The App Fleet
+
+All apps live in `apps/` as standalone Angular 21 projects. Their interop contracts are
+declared in `config/app-directory.json` and **validated at shell startup** — a bad
+`url`/`devPort` combination fails fast in development with an actionable error.
+
+| App | Port | Role | Broadcasts | Listens | Intents |
+|---|---|---|---|---|---|
+| `customer-search` | 4001 | CRM — pick a customer | `fdc3.contact` | — | — |
+| `customer-profile` | 4002 | CRM — full profile + KYC | `fdc3.contact`, `com.demo.paymentRequest` | `fdc3.contact` | raises `StartPayment`, handles `ViewContact` |
+| `portfolio-view` | 4003 | Investments — positions + P&L | `fdc3.portfolio`, `fdc3.instrument` | `fdc3.contact`, `fdc3.portfolio` | handles `ViewPortfolio` |
+| `market-watch` | 4004 | Markets — live ticks | `fdc3.instrument` | `fdc3.instrument` | handles `ViewInstrument` |
+| `payment-action` | 4005 | Payments — authorise an instruction | — | `com.demo.paymentRequest` | handles `StartPayment` (returns `PaymentResult`) |
+| `funds-allocations` | 4011 | Buy-side — fund weight / drift / risk | `com.demo.fund` | `com.demo.order`, `com.demo.fund` | handles `ViewFund` |
+| `incoming-orders` | 4012 | Buy-side — fund order blotter | `com.demo.order`, `com.demo.fund` | `com.demo.fund` | — |
+| `audit-log` | 4013 | Buy-side — fund/order audit trail | — | `com.demo.order`, `com.demo.fund` | handles `OpenAudit`, `ViewFund` |
+| `theme-toggle` | 4014 | Workspace — broadcasts theme | `com.demo.theme` | `com.demo.theme` | handles `ApplyTheme` |
+| `cloud-sample` | — | Demo — externally-hosted URL via `devPort: 0` | — | — | — |
+
+### App directory convention
+
+- `devPort > 0` ⇒ this is a local Angular app. **Dev** loads `http://localhost:<devPort>`,
+  **production** loads the `url` (a `file://…` path under the app's `dist/browser/`).
+- `devPort === 0` ⇒ this is a cloud app. The `url` is loaded as-is in every environment.
+
+The validator in `libs/app-registry` enforces this and refuses to load misconfigurations
+(missing port, mismatched protocol, duplicate ports, etc.).
+
 ---
 
 ## Repository Structure
@@ -91,54 +130,60 @@ npm run lint
 ```
 fdc3-desktop-poc/
 ├─ apps/
-│  ├─ desktop-shell/       Electron app (main + preload + shell UI)
-│  ├─ customer-search/     React app — FDC3 broadcaster
-│  ├─ customer-profile/    React app — context receiver + intent raiser
-│  ├─ portfolio-view/      React app — context receiver + instrument broadcaster
-│  ├─ market-watch/        React app — instrument context receiver
-│  └─ payment-action/      React app — StartPayment intent handler
+│  ├─ desktop-shell/         Electron app — main, preload, renderer (Dockview workspace + Interop Flow)
+│  ├─ customer-search/       Angular app — broadcasts fdc3.contact
+│  ├─ customer-profile/      Angular app — contact receiver + StartPayment raiser
+│  ├─ portfolio-view/        Angular app — contact/portfolio receiver + instrument broadcaster
+│  ├─ market-watch/          Angular app — instrument receiver + live ticks
+│  ├─ payment-action/        Angular app — StartPayment intent handler
+│  ├─ funds-allocations/     Angular app — fund weights / drift (AG Grid)
+│  ├─ incoming-orders/       Angular app — order blotter (AG Grid)
+│  ├─ audit-log/             Angular app — audit trail (AG Grid)
+│  └─ theme-toggle/          Angular app — broadcasts theme
 │
 ├─ libs/
-│  ├─ fdc3-core/            Types + InteropAdapter contract (no runtime deps)
-│  ├─ interop-electron-adapter/  IPC event constants + adapter docs
-│  ├─ interop-browser-adapter/   BroadcastChannel-based (browser-only mode)
-│  ├─ interop-ioconnect-adapter/ io.Connect adapter stub (future)
-│  ├─ app-registry/         AppRegistry + sample directory
-│  ├─ channel-engine/       ChannelManager (last-value cache)
-│  ├─ intent-engine/        IntentRegistry + IntentResolver
-│  ├─ workspace-engine/     LayoutStore (JSON persistence)
-│  ├─ shared-domain/        Mock financial data (customers, portfolios, etc.)
-│  └─ shared-ui/            ChannelPicker, AppHeader, StatusBadge components
+│  ├─ fdc3-core/                  Types + InteropAdapter contract (no runtime deps)
+│  ├─ interop-electron-adapter/   IPC event constants + adapter docs
+│  ├─ interop-browser-adapter/    BroadcastChannel-based (browser-only mode)
+│  ├─ interop-ioconnect-adapter/  io.Connect adapter stub (future)
+│  ├─ app-registry/               AppRegistry + sample directory + app-directory.json validator
+│  ├─ channel-engine/             ChannelManager (last-value cache, user channels)
+│  ├─ intent-engine/              IntentRegistry + IntentResolver
+│  ├─ workspace-engine/           LayoutStore (JSON persistence)
+│  ├─ shared-domain/              Mock financial data (customers, portfolios, funds, orders, audit)
+│  └─ shared-ui/                  ChannelPicker, AppHeader, StatusBadge components
 │
 ├─ config/
-│  ├─ app-directory.json    App registry — edit to add new apps
-│  ├─ channels.json         Channel definitions
-│  └─ workspace.default.json Default layout
+│  ├─ app-directory.json          App registry — edit to add new apps (validated at load)
+│  ├─ channels.json               Channel definitions
+│  └─ workspace.default.json      Default Dockview layout
 │
 ├─ docs/
-│  ├─ architecture.md       Full architecture diagram + data flow
-│  ├─ fdc3-model.md         FDC3 concepts explained
+│  ├─ architecture.md             Full architecture diagram + data flow
+│  ├─ fdc3-model.md               FDC3 concepts explained
 │  ├─ interop-vs-custom-shell.md  Comparison with io.Connect
-│  └─ demo-script.md        Client-facing 15-minute walkthrough
+│  └─ demo-script.md              Client-facing 15-minute walkthrough
 │
-└─ tools/scripts/dev.mjs    Dev orchestration script
+└─ tools/scripts/dev.mjs          Dev orchestration script
 ```
 
 ---
 
 ## Demo Script (Quick Version)
 
-1. `npm run dev` → Electron opens
-2. In the Shell, click **Customer Search**, **Customer Profile**, **Portfolio View** to open them
-3. Join all three apps to the **Green** channel via the channel picker in each app header
-4. In Customer Search, click **Maria Garcia**
-5. Watch Customer Profile and Portfolio View update instantly
-6. In Customer Profile, click **💳 Start Payment**
-7. Payment Action opens, pre-filled — click **✓ Approve**
-8. In Portfolio View, click **AAPL** → open Market Watch → AAPL highlights
-9. In Shell, click **💾 Save Workspace** → quit → relaunch → layout restores
+1. `npm run dev` → Electron opens with the Shell launcher.
+2. Open **Customer Search**, **Customer Profile**, and **Portfolio View**.
+3. Join all three to the **Green** channel via the channel picker in each app header.
+4. In Customer Search, click **Maria Garcia**.
+5. Watch Customer Profile and Portfolio View update instantly.
+6. In Customer Profile, click **💳 Start Payment**.
+7. Payment Action opens, pre-filled — click **✓ Approve**. The result is returned to Customer Profile via `completeIntent`.
+8. In Portfolio View, click **AAPL** → open Market Watch → AAPL highlights.
+9. Open **Funds Allocations**, click a fund row → **Incoming Orders** filters to that fund → **Audit Log** shows related events.
+10. Toggle theme via **Theme Toggle** — every participating app re-themes in unison.
+11. In the Shell, click **💾 Save Workspace** → quit → relaunch → layout, channels, and detached windows all restore.
 
-Full script with narration: [`docs/demo-script.md`](docs/demo-script.md)
+Full script with narration: [`docs/demo-script.md`](docs/demo-script.md).
 
 ---
 
@@ -146,13 +191,15 @@ Full script with narration: [`docs/demo-script.md`](docs/demo-script.md)
 
 ```
 ┌──────────────────────────────────────────────────┐
-│          Application Layer (window.fdc3)         │
-│  CustomerSearch  CustomerProfile  PortfolioView  │
-│  MarketWatch     PaymentAction                   │
+│              Application Layer                    │
+│              (Angular 21, window.fdc3)            │
+│  CustomerSearch  CustomerProfile  PortfolioView   │
+│  MarketWatch     PaymentAction    Funds/Orders…   │
+│  ThemeToggle     CloudSample      AuditLog        │
 └────────────────────┬─────────────────────────────┘
                      │  InteropAdapter interface
 ┌────────────────────▼─────────────────────────────┐
-│       Adapter Layer (runtime-swappable)          │
+│        Adapter Layer (runtime-swappable)         │
 │  ElectronAdapter  BrowserAdapter  IoConnectAdapter│
 └────────────────────┬─────────────────────────────┘
                      │  Electron IPC (in this POC)
@@ -160,6 +207,15 @@ Full script with narration: [`docs/demo-script.md`](docs/demo-script.md)
 │        Electron Main Process                     │
 │  WindowManager  ChannelManager  IntentResolver   │
 │  AppRegistry    WorkspaceManager  IpcRouter      │
+│  ThemeManager   FlowPolicyEnforcer               │
+└──────────────────────────────────────────────────┘
+                     ▲
+                     │
+┌────────────────────┴─────────────────────────────┐
+│  Renderer (desktop-shell)                        │
+│  Dockview workspace · AppLauncher · ChannelBar   │
+│  Interop Flow Designer (React Flow)              │
+│  WorkspaceBuilder + Detached Runtime Windows     │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -176,7 +232,7 @@ Full script with narration: [`docs/demo-script.md`](docs/demo-script.md)
    - Import from `@interopio/desktop` instead of the stub types
    - Implement the `TODO` comments
 
-3. In each app's `src/main.tsx`, replace the preload-provided `window.fdc3` with:
+3. In each app's `src/main.ts`, replace the preload-provided `window.fdc3` with:
    ```typescript
    import GlueDesktop from '@interopio/desktop';
    import { IoConnectInteropAdapter } from '@fdc3-poc/interop-ioconnect-adapter';
@@ -185,28 +241,28 @@ Full script with narration: [`docs/demo-script.md`](docs/demo-script.md)
    const adapter = new IoConnectInteropAdapter(glue);
    (window as any).fdc3 = {
      broadcast: (ctx) => adapter.broadcastContext(ctx),
-     // ... same surface
+     // …same surface, see libs/fdc3-core/src/contracts/interop-adapter.ts
    };
    ```
 
 4. Remove `apps/desktop-shell/` — io.Connect hosts the windows natively.
 
-5. App code (`CustomerSearch.tsx`, etc.) does not change.
+5. App code (`CustomerSearch.tsx` equivalents in Angular) does not change.
 
 See [`docs/interop-vs-custom-shell.md`](docs/interop-vs-custom-shell.md) for the full comparison.
 
 ---
 
-## Next Steps (Turning This into a Real Client Demo)
+## Roadmap
 
-1. **Add real data**: Replace mock data in `libs/shared-domain/` with live API calls
-2. **Add an intent resolver UI**: When multiple apps handle the same intent, show a picker dialog
-3. **io.Connect integration**: Wire `IoConnectInteropAdapter` with a trial licence
-4. **Custom app**: Replace one demo app with a real client-owned application
-5. **Named workspaces**: Extend `WorkspaceManager` with a workspace name picker UI
-6. **Notifications**: Add FDC3-style notifications (not in FDC3 2.0 spec but io.Connect supports it)
-7. **CI/CD**: Add GitHub Actions for type checking + build verification
-8. **Electron packaging**: `npm run dist` produces a `.dmg` / `.exe` for client machines
+Tracked across phases — see `docs/agent-handoff/` and the project notes.
+
+- **Phase 0 — Hygiene (in progress)**: app-directory validator, README refresh, cloud-sample fix.
+- **Phase 1 — FDC3 2.0 lift**: `getInfo`, `findIntents`/`findIntentsByContext`, `PrivateChannel`, `AppChannel`, `fdc3Ready`, intent resolver dialog.
+- **Phase 2 — Trader sample apps**: `order-ticket`, `order-blotter`, `chart`, `news`, `rfq-quote`.
+- **Phase 3 — Polish existing apps**: streaming P&L, sparkline columns, flashing cells, `findIntentsByContext` menus, per-workflow AppChannels, compliance check.
+- **Phase 4 — Shell polish**: workspace persona templates, global hotkeys, symbol palette (Cmd-K), intent resolver UI, notifications centre.
+- **Phase 5 — Sellable**: real io.Connect wiring, recorded demo, GitHub Actions CI, Electron LTS upgrade, signed `.dmg`/`.exe`.
 
 ---
 
@@ -215,9 +271,10 @@ See [`docs/interop-vs-custom-shell.md`](docs/interop-vs-custom-shell.md) for the
 | Layer | Technology |
 |-------|-----------|
 | Desktop shell | Electron 31, electron-vite 2 |
-| App renderer | React 18, Vite 5 |
-| Language | TypeScript 5.5 (strict) |
-| Monorepo | Nx 19 (project graph, task runner) |
-| Interop protocol | FDC3 2.0 (custom implementation) |
-| Persistence | Node.js `fs` (JSON files in userData) |
-| Styling | Inline React styles (no CSS framework dependency) |
+| Shell renderer | React 18 + Vite 5 (Dockview, React Flow, AG Grid React) |
+| App renderer | Angular 21 (standalone components, `OnPush`, PrimeNG 21, AG Grid 35) |
+| Language | TypeScript 5.7 (strict) |
+| Monorepo | Nx 22 (project graph, task runner) |
+| Interop protocol | FDC3 2.0-compatible custom implementation |
+| Persistence | Node.js `fs` (JSON files in `userData`) |
+| Styling | SCSS + PrimeNG theme tokens + per-app CSS variables |

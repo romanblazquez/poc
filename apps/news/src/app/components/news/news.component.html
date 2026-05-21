@@ -1,0 +1,48 @@
+<div class="workstation-app">
+  <div class="ws-header">
+    <div class="ws-title">
+      <span class="ws-title-mark">NW</span>
+      <span class="ws-title-text">News</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <p-selectButton [options]="severities" [(ngModel)]="severityFilter" optionLabel="label" optionValue="value"
+                      [allowEmpty]="false" (onChange)="setSeverityFilter($any($event).value)"></p-selectButton>
+      <p-tag *ngIf="instrumentFilter" [value]="'Filter: ' + instrumentFilter.ticker" severity="warn"
+             style="cursor:pointer" (click)="clearInstrumentFilter()"></p-tag>
+      <p-tag *ngIf="banner" [value]="banner" severity="info"></p-tag>
+    </div>
+  </div>
+
+  <div class="ws-content" style="gap:8px">
+    <div *ngIf="visibleHeadlines.length === 0" class="ws-empty">
+      <div class="ws-empty-icon">NW</div>
+      <div style="font-weight:800">No headlines match</div>
+      <div style="font-size:13px;max-width:340px;line-height:1.5">
+        Clear the filter or wait for new headlines to arrive (one every ~10 seconds).
+      </div>
+    </div>
+
+    <div *ngFor="let h of visibleHeadlines; trackBy: trackByHeadline" class="ws-card"
+         style="padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:11px;color:var(--ws-muted)">
+        <span style="font-variant-numeric:tabular-nums">{{ h.ts | date:'HH:mm:ss' }}</span>
+        <p-tag [value]="h.ticker" severity="info" style="cursor:pointer" (click)="broadcastTicker(h)"></p-tag>
+        <p-tag [value]="h.severity" [severity]="severitySeverity(h.severity)"></p-tag>
+        <span style="margin-left:auto;text-transform:uppercase;letter-spacing:.04em">{{ h.source }}</span>
+      </div>
+      <div style="font-size:14px;font-weight:700;line-height:1.4">{{ h.headline }}</div>
+
+      <div *ngIf="actionsFor(h).length > 0" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+        <button *ngFor="let ai of actionsFor(h); trackBy: trackByIntent"
+                pButton type="button" size="small" [outlined]="true"
+                [label]="ai.intent.displayName ?? ai.intent.name"
+                [loading]="busyHeadlineId === h.id"
+                (click)="raise(h, ai)"></button>
+      </div>
+      <div *ngIf="instrumentFilter?.ticker === h.ticker && actionsFor(h).length === 0"
+           style="font-size:11px;color:var(--ws-muted);font-style:italic;margin-top:2px">
+        No FDC3 intents currently handle <code>fdc3.instrument</code>.
+      </div>
+    </div>
+  </div>
+</div>

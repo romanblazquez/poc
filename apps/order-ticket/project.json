@@ -1,0 +1,27 @@
+{
+  "name": "order-ticket",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/order-ticket/src",
+  "targets": {
+    "serve": {
+      "executor": "@nx/angular:dev-server",
+      "options": {
+        "buildTarget": "order-ticket:build",
+        "port": 4006,
+        "open": false
+      }
+    },
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "apps/order-ticket/dist",
+        "index": "apps/order-ticket/src/index.html",
+        "browser": "apps/order-ticket/src/main.ts",
+        "tsConfig": "apps/order-ticket/tsconfig.app.json",
+        "styles": ["apps/order-ticket/src/styles.scss"],
+        "assets": []
+      }
+    }
+  }
+}

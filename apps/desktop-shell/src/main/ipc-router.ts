@@ -1,15 +1,21 @@
-import { ipcMain, webContents, screen } from 'electron';
+import { app, ipcMain, webContents, screen } from 'electron';
 import { randomUUID } from 'crypto';
-import type { Fdc3Context, FlowPolicy, IntentResolution, ThemeContext, ThemeName } from '@fdc3-poc/fdc3-core';
+import type { AppIntent, Fdc3Context, FlowPolicy, ImplementationMetadata, IntentResolution, PrivateChannelMarker, ThemeContext, ThemeName } from '@fdc3-poc/fdc3-core';
+import { NoAppsFoundError } from '@fdc3-poc/fdc3-core';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
 import type { ChannelManager } from '@fdc3-poc/channel-engine';
+import { AppChannelStore, PrivateChannelStore } from '@fdc3-poc/channel-engine';
+import type { AppChannelMeta, PrivateChannelLifecycleEvent } from '@fdc3-poc/channel-engine';
 import type { IntentRegistry } from '@fdc3-poc/intent-engine';
 import { IntentResolver } from '@fdc3-poc/intent-engine';
+import { AppRegistry } from '@fdc3-poc/app-registry';
+import { IntentResolverWindowManager } from './intent-resolver-window.js';
 import type { WindowManager } from './window-manager.js';
 import type { DetachedWorkspacePayload } from './window-manager.js';
 import type { WorkspaceManager } from './workspace-manager.js';
 import type { ThemeManager } from './theme-manager.js';
 import type { AppDefinition } from '@fdc3-poc/fdc3-core';
+import { BrowserWindow } from 'electron';
 
 /**
  * IpcRouter — the heart of the FDC3 main-process implementation.
@@ -22,6 +28,14 @@ export class IpcRouter {
   private readonly pendingIntentResults = new Map<string, (result?: Fdc3Context) => void>();
   /** Routing policy pushed by the renderer Interop Flow designer. null = unrestricted. */
   private flowPolicy: FlowPolicy | null = null;
+  /** Read-only registry used by FDC3 discovery (findIntent / findIntentsByContext). */
+  private readonly appRegistry: AppRegistry;
+  /** FDC3 App Channels (`getOrCreateChannel`). Separate from user channels. */
+  private readonly appChannels = new AppChannelStore();
+  /** FDC3 PrivateChannels (`createPrivateChannel` + intent-result delivery). */
+  private readonly privateChannels = new PrivateChannelStore();
+  /** Modal resolver windows shown when more than one app handles a raised intent. */
+  private readonly intentResolverWindows = new IntentResolverWindowManager();
 
   /**
    * Resolve an appId for any webContents — BrowserWindow apps (via the registry)
@@ -51,6 +65,7 @@ export class IpcRouter {
     private readonly appDirectory: AppDefinition[],
   ) {
     this.intentResolver = new IntentResolver();
+    this.appRegistry = new AppRegistry(appDirectory);
   }
 
   register(): void {
@@ -79,6 +94,24 @@ export class IpcRouter {
     this.handleRecallWorkspaceWindow();
     this.handleCloseCurrentWindow();
     this.handleGetDisplays();
+    this.handleGetInfo();
+    this.handleFindIntent();
+    this.handleFindIntentsByContext();
+    this.handleGetOrCreateAppChannel();
+    this.handleAppChannelBroadcast();
+    this.handleAppChannelAddListener();
+    this.handleAppChannelRemoveListener();
+    this.handleAppChannelGetCurrentContext();
+    this.handleCreatePrivateChannel();
+    this.handlePrivateChannelConnect();
+    this.handlePrivateChannelBroadcast();
+    this.handlePrivateChannelAddListener();
+    this.handlePrivateChannelRemoveListener();
+    this.handlePrivateChannelGetCurrentContext();
+    this.handlePrivateChannelDisconnect();
+    this.handleIntentResolverGetPayload();
+    this.handleIntentResolverPick();
+    this.handleIntentResolverCancel();
   }
 
   // ─── Context broadcasting ─────────────────────────────────────────────────
@@ -160,12 +193,25 @@ export class IpcRouter {
         const senderAppId = this.getAppIdForWebContents(event.sender.id);
         const expectsCompletion = intent === 'StartPayment';
         const requestId = expectsCompletion ? randomUUID() : undefined;
+        const parentWindow = BrowserWindow.fromWebContents(event.sender) ?? undefined;
 
         const resolution = await this.intentResolver.resolve({
           intent,
           context,
           registry: this.intentRegistry,
           appDirectory: this.appDirectory,
+          chooseHandler: (intentName, ctx, candidates) =>
+            this.intentResolverWindows.show(
+              {
+                intent: intentName,
+                context: ctx,
+                contextType: ctx?.type,
+                contextName: typeof ctx?.name === 'string' ? ctx?.name : undefined,
+                theme: this.themeManager.getTheme(),
+                candidates,
+              },
+              parentWindow,
+            ),
           deliverToWindow: (targetId, intentName, ctx) => {
             if (!this.isIntentRouteAllowed(senderAppId, intentName, targetId)) return;
             this.windowManager.sendTo(targetId, IpcEvents.INTENT_FIRE, {
@@ -415,9 +461,229 @@ export class IpcRouter {
     });
   }
 
+  // ─── Intent resolver modal window ─────────────────────────────────────────
+
+  private handleIntentResolverGetPayload(): void {
+    ipcMain.handle(IpcEvents.INTENT_RESOLVER_GET_PAYLOAD, (event) => {
+      return this.intentResolverWindows.getPayload(event.sender.id);
+    });
+  }
+
+  private handleIntentResolverPick(): void {
+    ipcMain.handle(
+      IpcEvents.INTENT_RESOLVER_PICK,
+      (event, { appId, instanceId }: { appId: string; instanceId?: number }) => {
+        this.intentResolverWindows.pick(event.sender.id, appId, instanceId);
+      },
+    );
+  }
+
+  private handleIntentResolverCancel(): void {
+    ipcMain.handle(IpcEvents.INTENT_RESOLVER_CANCEL, (event) => {
+      this.intentResolverWindows.cancel(event.sender.id);
+    });
+  }
+
+  // ─── Private Channels (FDC3 2.0 createPrivateChannel) ──────────────────────
+
+  private handleCreatePrivateChannel(): void {
+    ipcMain.handle(IpcEvents.CREATE_PRIVATE_CHANNEL, (event): PrivateChannelMarker => {
+      const id = `private:${randomUUID()}`;
+      this.privateChannels.create(id, event.sender.id);
+      return { __fdc3PrivateChannelId: id };
+    });
+  }
+
+  /** Called by a side that just received a private-channel reference (typically the
+   *  intent raiser) to register itself as a participant before broadcasting/listening. */
+  private handlePrivateChannelConnect(): void {
+    ipcMain.handle(IpcEvents.PRIVATE_CHANNEL_CONNECT, (event, channelId: string) => {
+      if (!this.privateChannels.exists(channelId)) return false;
+      this.privateChannels.ensureParticipant(channelId, event.sender.id);
+      return true;
+    });
+  }
+
+  private handlePrivateChannelBroadcast(): void {
+    ipcMain.handle(
+      IpcEvents.PRIVATE_CHANNEL_BROADCAST,
+      (event, { channelId, context }: { channelId: string; context: Fdc3Context }) => {
+        const targets = this.privateChannels.broadcast(channelId, context, event.sender.id);
+        for (const id of targets) {
+          this.windowManager.sendTo(id, IpcEvents.PRIVATE_CHANNEL_CONTEXT, { channelId, context });
+        }
+      },
+    );
+  }
+
+  private handlePrivateChannelAddListener(): void {
+    ipcMain.handle(
+      IpcEvents.PRIVATE_CHANNEL_ADD_LISTENER,
+      (event, { channelId, contextType }: { channelId: string; contextType: string | null }): Fdc3Context[] => {
+        const { cached, lifecycle } = this.privateChannels.addListener(channelId, contextType, event.sender.id);
+        this.fanoutLifecycle(IpcEvents.PRIVATE_CHANNEL_LISTENER_ADDED, lifecycle);
+        return cached;
+      },
+    );
+  }
+
+  private handlePrivateChannelRemoveListener(): void {
+    ipcMain.handle(
+      IpcEvents.PRIVATE_CHANNEL_REMOVE_LISTENER,
+      (event, { channelId, contextType }: { channelId: string; contextType: string | null }) => {
+        const lifecycle = this.privateChannels.removeListener(channelId, contextType, event.sender.id);
+        if (lifecycle) this.fanoutLifecycle(IpcEvents.PRIVATE_CHANNEL_LISTENER_REMOVED, lifecycle);
+      },
+    );
+  }
+
+  private handlePrivateChannelGetCurrentContext(): void {
+    ipcMain.handle(
+      IpcEvents.PRIVATE_CHANNEL_GET_CURRENT_CONTEXT,
+      (_event, { channelId, contextType }: { channelId: string; contextType?: string }): Fdc3Context | null => {
+        return this.privateChannels.getCurrentContext(channelId, contextType);
+      },
+    );
+  }
+
+  private handlePrivateChannelDisconnect(): void {
+    ipcMain.handle(IpcEvents.PRIVATE_CHANNEL_DISCONNECT, (event, channelId: string) => {
+      const lifecycle = this.privateChannels.disconnect(channelId, event.sender.id);
+      if (lifecycle) {
+        for (const id of lifecycle.notify) {
+          this.windowManager.sendTo(id, IpcEvents.PRIVATE_CHANNEL_DISCONNECTED, { channelId });
+        }
+      }
+    });
+  }
+
+  private fanoutLifecycle(eventName: typeof IpcEvents.PRIVATE_CHANNEL_LISTENER_ADDED | typeof IpcEvents.PRIVATE_CHANNEL_LISTENER_REMOVED, ev: PrivateChannelLifecycleEvent): void {
+    for (const id of ev.notify) {
+      this.windowManager.sendTo(id, eventName, { channelId: ev.channelId, contextType: ev.contextType });
+    }
+  }
+
+  // ─── App Channels (FDC3 2.0 getOrCreateChannel) ────────────────────────────
+
+  private handleGetOrCreateAppChannel(): void {
+    ipcMain.handle(IpcEvents.GET_OR_CREATE_APP_CHANNEL, (_event, channelId: string): AppChannelMeta => {
+      return this.appChannels.getOrCreate(channelId);
+    });
+  }
+
+  private handleAppChannelBroadcast(): void {
+    ipcMain.handle(
+      IpcEvents.APP_CHANNEL_BROADCAST,
+      (event, { channelId, context }: { channelId: string; context: Fdc3Context }) => {
+        const targets = this.appChannels.broadcast(channelId, context);
+        for (const id of targets) {
+          if (id === event.sender.id) continue;
+          this.windowManager.sendTo(id, IpcEvents.APP_CHANNEL_CONTEXT, { channelId, context });
+        }
+      },
+    );
+  }
+
+  private handleAppChannelAddListener(): void {
+    ipcMain.handle(
+      IpcEvents.APP_CHANNEL_ADD_LISTENER,
+      (event, { channelId, contextType }: { channelId: string; contextType: string | null }): Fdc3Context[] => {
+        return this.appChannels.addListener(channelId, contextType, event.sender.id);
+      },
+    );
+  }
+
+  private handleAppChannelRemoveListener(): void {
+    ipcMain.handle(
+      IpcEvents.APP_CHANNEL_REMOVE_LISTENER,
+      (event, { channelId, contextType }: { channelId: string; contextType: string | null }) => {
+        this.appChannels.removeListener(channelId, contextType, event.sender.id);
+      },
+    );
+  }
+
+  private handleAppChannelGetCurrentContext(): void {
+    ipcMain.handle(
+      IpcEvents.APP_CHANNEL_GET_CURRENT_CONTEXT,
+      (_event, { channelId, contextType }: { channelId: string; contextType?: string }): Fdc3Context | null => {
+        return this.appChannels.getCurrentContext(channelId, contextType);
+      },
+    );
+  }
+
+  /**
+   * FDC3 2.0 — `fdc3.findIntent(intent, context?, resultType?)`.
+   * Returns the AppIntent for `intent`, optionally filtered by context type.
+   * Rejects with `NoAppsFound` when nothing matches so callers can catch the
+   * standard FDC3 error code.
+   */
+  private handleFindIntent(): void {
+    ipcMain.handle(
+      IpcEvents.FIND_INTENT,
+      (_event, { intent, context, resultType: _resultType }: { intent: string; context?: Fdc3Context; resultType?: string }): AppIntent => {
+        const match = this.appRegistry.findIntent(intent, context?.type);
+        if (!match) throw new NoAppsFoundError();
+        return match;
+      },
+    );
+  }
+
+  /**
+   * FDC3 2.0 — `fdc3.findIntentsByContext(context, resultType?)`.
+   * Returns the list of intents (and handler apps) that accept the given context type.
+   * Returns an empty array when nothing matches.
+   */
+  private handleFindIntentsByContext(): void {
+    ipcMain.handle(
+      IpcEvents.FIND_INTENTS_BY_CONTEXT,
+      (_event, { context, resultType: _resultType }: { context: Fdc3Context; resultType?: string }): AppIntent[] => {
+        return this.appRegistry.findIntentsByContext(context.type);
+      },
+    );
+  }
+
+  /**
+   * FDC3 2.0 — `fdc3.getInfo()`. Returns implementation metadata for the desktop
+   * agent and metadata for the *calling* app (resolved via its webContents id).
+   */
+  private handleGetInfo(): void {
+    ipcMain.handle(IpcEvents.GET_INFO, (event): ImplementationMetadata => {
+      const appId = this.getAppIdForWebContents(event.sender.id) ?? 'unknown';
+      const def = this.appDirectory.find((a) => a.appId === appId);
+      return {
+        fdc3Version: '2.0',
+        provider: 'fdc3-desktop-poc',
+        providerVersion: app.getVersion(),
+        appMetadata: {
+          appId,
+          instanceId: String(event.sender.id),
+          name: def?.appId ?? appId,
+          title: def?.title,
+          description: def?.description,
+          icons: def?.icon ? [{ src: def.icon }] : undefined,
+        },
+        optionalFeatures: {
+          // We don't yet attach the originating app to broadcast/intent payloads.
+          OriginatingAppMetadata: false,
+          // join/leave/getCurrent/getUser are all implemented.
+          UserChannelMembershipAPIs: true,
+          // No Desktop Agent Bridging in this POC.
+          DesktopAgentBridging: false,
+        },
+      };
+    });
+  }
+
   /** Call when a webContents is destroyed to clean up registrations. */
   cleanupWindow(webContentsId: number): void {
     this.channelManager.removeWindow(webContentsId);
     this.intentRegistry.removeWindow(webContentsId);
+    this.appChannels.removeWindow(webContentsId);
+    const events = this.privateChannels.removeWindow(webContentsId);
+    for (const ev of events) {
+      for (const id of ev.notify) {
+        this.windowManager.sendTo(id, IpcEvents.PRIVATE_CHANNEL_DISCONNECTED, { channelId: ev.channelId });
+      }
+    }
   }
 }

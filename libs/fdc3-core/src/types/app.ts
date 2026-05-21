@@ -32,6 +32,44 @@ export interface FlowPolicy {
   disabledIntentRoutes: string[];
 }
 
+/**
+ * App metadata returned by the DesktopAgent for the *calling* app
+ * (FDC3 2.0 `AppMetadata`, narrowed to what this POC populates).
+ */
+export interface AppMetadata extends AppIdentifier {
+  /** Stable name (usually equals appId) */
+  name?: string;
+  /** Human-readable title from the app directory */
+  title?: string;
+  /** Description from the app directory */
+  description?: string;
+  /** App version (from package.json or directory) */
+  version?: string;
+  /** Optional icon URL or emoji shorthand */
+  icons?: { src: string }[];
+}
+
+/**
+ * Implementation metadata returned by `fdc3.getInfo()` per FDC3 2.0.
+ * Lets apps verify the desktop agent version, capabilities, and their own identity.
+ */
+export interface ImplementationMetadata {
+  /** FDC3 protocol version this agent implements */
+  fdc3Version: string;
+  /** Stable provider identifier — e.g. "fdc3-desktop-poc", "io.Connect", "OpenFin" */
+  provider: string;
+  /** Provider package version */
+  providerVersion: string;
+  /** Metadata about the calling app */
+  appMetadata: AppMetadata;
+  /** Capability flags */
+  optionalFeatures: {
+    OriginatingAppMetadata: boolean;
+    UserChannelMembershipAPIs: boolean;
+    DesktopAgentBridging: boolean;
+  };
+}
+
 export interface AppDefinition {
   /** Unique, stable identifier */
   appId: string;

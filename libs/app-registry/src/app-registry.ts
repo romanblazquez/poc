@@ -1,4 +1,23 @@
-import type { AppDefinition } from '@fdc3-poc/fdc3-core';
+import type { AppDefinition, AppIntent, AppMetadata } from '@fdc3-poc/fdc3-core';
+
+function toAppMetadata(app: AppDefinition): AppMetadata {
+  return {
+    appId: app.appId,
+    name: app.appId,
+    title: app.title,
+    description: app.description,
+    icons: app.icon ? [{ src: app.icon }] : undefined,
+  };
+}
+
+function intentAcceptsContextType(
+  defContextTypes: string[] | null | undefined,
+  contextType: string | undefined,
+): boolean {
+  if (!contextType) return true;
+  if (defContextTypes == null) return true; // null = any
+  return defContextTypes.includes(contextType);
+}
 
 /**
  * In-memory registry of available applications.
@@ -38,5 +57,49 @@ export class AppRegistry {
 
   size(): number {
     return this.apps.size;
+  }
+
+  /**
+   * FDC3 2.0 — return the apps and metadata for a named intent.
+   * Optional `contextType` narrows to handlers that accept that context type
+   * (or whose contextTypes is null/empty, meaning "any").
+   * Returns null when nothing matches — callers translate this to NoAppsFound.
+   */
+  findIntent(intent: string, contextType?: string): AppIntent | null {
+    const matches: { app: AppDefinition; displayName?: string }[] = [];
+    for (const app of this.apps.values()) {
+      const intentDef = app.intents?.find(
+        (i) => i.intent === intent && intentAcceptsContextType(i.contextTypes, contextType),
+      );
+      if (intentDef) matches.push({ app, displayName: intentDef.displayName });
+    }
+    if (matches.length === 0) return null;
+    return {
+      intent: { name: intent, displayName: matches[0].displayName },
+      apps: matches.map((m) => toAppMetadata(m.app)),
+    };
+  }
+
+  /**
+   * FDC3 2.0 — return every intent that accepts the given context type,
+   * grouped as `AppIntent`. Apps with multiple matching intents appear once per intent.
+   */
+  findIntentsByContext(contextType: string): AppIntent[] {
+    const grouped = new Map<string, { displayName?: string; apps: AppDefinition[] }>();
+    for (const app of this.apps.values()) {
+      for (const intentDef of app.intents ?? []) {
+        if (!intentAcceptsContextType(intentDef.contextTypes, contextType)) continue;
+        let bucket = grouped.get(intentDef.intent);
+        if (!bucket) {
+          bucket = { displayName: intentDef.displayName, apps: [] };
+          grouped.set(intentDef.intent, bucket);
+        }
+        if (!bucket.apps.some((a) => a.appId === app.appId)) bucket.apps.push(app);
+      }
+    }
+    return [...grouped.entries()].map(([name, { displayName, apps }]) => ({
+      intent: { name, displayName },
+      apps: apps.map(toAppMetadata),
+    }));
   }
 }

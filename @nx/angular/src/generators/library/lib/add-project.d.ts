@@ -1,5 +1,0 @@
-import type { Tree } from '@nx/devkit';
-import type { AngularProjectConfiguration } from '../../../utils/types';
-import type { NormalizedSchema } from './normalized-schema';
-export declare function addProject(tree: Tree, libraryOptions: NormalizedSchema['libraryOptions']): Promise<AngularProjectConfiguration>;
-//# sourceMappingURL=add-project.d.ts.map

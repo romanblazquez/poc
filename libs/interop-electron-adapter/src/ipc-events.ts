@@ -34,6 +34,24 @@ export const IpcEvents = {
   SET_THEME: 'fdc3:setTheme',
   SET_FLOW_POLICY: 'fdc3:setFlowPolicy',
   GET_DISPLAYS: 'fdc3:getDisplays',
+  GET_INFO: 'fdc3:getInfo',
+  FIND_INTENT: 'fdc3:findIntent',
+  FIND_INTENTS_BY_CONTEXT: 'fdc3:findIntentsByContext',
+  GET_OR_CREATE_APP_CHANNEL: 'fdc3:getOrCreateAppChannel',
+  APP_CHANNEL_BROADCAST: 'fdc3:appChannelBroadcast',
+  APP_CHANNEL_ADD_LISTENER: 'fdc3:appChannelAddListener',
+  APP_CHANNEL_REMOVE_LISTENER: 'fdc3:appChannelRemoveListener',
+  APP_CHANNEL_GET_CURRENT_CONTEXT: 'fdc3:appChannelGetCurrentContext',
+  CREATE_PRIVATE_CHANNEL: 'fdc3:createPrivateChannel',
+  PRIVATE_CHANNEL_BROADCAST: 'fdc3:privateChannelBroadcast',
+  PRIVATE_CHANNEL_ADD_LISTENER: 'fdc3:privateChannelAddListener',
+  PRIVATE_CHANNEL_REMOVE_LISTENER: 'fdc3:privateChannelRemoveListener',
+  PRIVATE_CHANNEL_GET_CURRENT_CONTEXT: 'fdc3:privateChannelGetCurrentContext',
+  PRIVATE_CHANNEL_DISCONNECT: 'fdc3:privateChannelDisconnect',
+  PRIVATE_CHANNEL_CONNECT: 'fdc3:privateChannelConnect',
+  INTENT_RESOLVER_GET_PAYLOAD: 'fdc3:intentResolverGetPayload',
+  INTENT_RESOLVER_PICK: 'fdc3:intentResolverPick',
+  INTENT_RESOLVER_CANCEL: 'fdc3:intentResolverCancel',
 
   // ─── Main → Renderer (webContents.send) ──────────────────────────────────
   CONTEXT_UPDATE: 'fdc3:contextUpdate',
@@ -42,6 +60,11 @@ export const IpcEvents = {
   APP_LIST_CHANGED: 'fdc3:appListChanged',
   WORKSPACE_WINDOW_CLOSED: 'fdc3:workspaceWindowClosed',
   THEME_CHANGED: 'fdc3:themeChanged',
+  APP_CHANNEL_CONTEXT: 'fdc3:appChannelContext',
+  PRIVATE_CHANNEL_CONTEXT: 'fdc3:privateChannelContext',
+  PRIVATE_CHANNEL_LISTENER_ADDED: 'fdc3:privateChannelListenerAdded',
+  PRIVATE_CHANNEL_LISTENER_REMOVED: 'fdc3:privateChannelListenerRemoved',
+  PRIVATE_CHANNEL_DISCONNECTED: 'fdc3:privateChannelDisconnected',
 } as const;
 
 export type IpcEventKey = keyof typeof IpcEvents;

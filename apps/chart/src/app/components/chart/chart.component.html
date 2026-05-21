@@ -1,0 +1,116 @@
+<div class="workstation-app">
+  <div class="ws-header">
+    <div class="ws-title">
+      <span class="ws-title-mark">CH</span>
+      <span class="ws-title-text">Chart</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <p-selectButton [options]="ranges" [(ngModel)]="range" optionLabel="label" optionValue="value"
+                      [allowEmpty]="false" (onChange)="setRange($any($event).value)"></p-selectButton>
+      <p-tag *ngIf="tradeBanner" [value]="tradeBanner" severity="warn"></p-tag>
+      <p-tag *ngIf="activeOrderStream" value="Linked to order stream" severity="success"></p-tag>
+    </div>
+  </div>
+
+  <div class="ws-content">
+
+    <!-- Empty state -->
+    <div *ngIf="!instrument" class="ws-empty">
+      <div class="ws-empty-icon">CH</div>
+      <div style="font-weight:800">No instrument selected</div>
+      <div style="font-size:13px;max-width:340px;line-height:1.5">
+        Broadcast an fdc3.instrument from Market Watch or Portfolio View — or raise the ViewChart intent.
+      </div>
+    </div>
+
+    <!-- Header ribbon -->
+    <div *ngIf="instrument" class="ws-card" style="display:flex;align-items:center;gap:18px;padding:10px 14px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:11px;color:var(--ws-muted);text-transform:uppercase;letter-spacing:.06em">Instrument</div>
+        <div style="font-size:18px;font-weight:850">{{ instrument.ticker }}</div>
+        <div style="font-size:12px;color:var(--ws-muted)">{{ instrument.name }}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--ws-muted)">Last</div>
+        <div style="font-size:20px;font-weight:900">{{ last | number:'1.2-2' }} {{ instrument.currency }}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--ws-muted)">Change</div>
+        <div style="font-size:14px;font-weight:800"
+             [style.color]="changeAbs >= 0 ? 'var(--ws-positive)' : 'var(--ws-negative)'">
+          {{ changeAbs >= 0 ? '+' : '' }}{{ changeAbs | number:'1.2-2' }}
+          ({{ changeAbs >= 0 ? '+' : '' }}{{ changePct | number:'1.2-2' }}%)
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--ws-muted)">Open / High / Low</div>
+        <div style="font-size:13px;font-weight:700">
+          {{ open | number:'1.2-2' }} <span style="color:var(--ws-positive)">{{ high | number:'1.2-2' }}</span>
+          <span style="color:var(--ws-negative)">{{ low | number:'1.2-2' }}</span>
+        </div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button pButton type="button" label="Trade this" severity="success" (click)="tradeThis()"></button>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div *ngIf="instrument && view.pathLine" class="ws-card" style="padding:6px;flex:1;display:flex">
+      <svg [attr.viewBox]="'0 0 ' + view.width + ' ' + view.height" preserveAspectRatio="none"
+           style="width:100%;height:100%;min-height:240px;display:block"
+           xmlns="http://www.w3.org/2000/svg">
+        <!-- gradient fill -->
+        <defs>
+          <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" [attr.stop-color]="changeAbs >= 0 ? 'var(--ws-positive)' : 'var(--ws-negative)'" stop-opacity="0.35"/>
+            <stop offset="100%" [attr.stop-color]="changeAbs >= 0 ? 'var(--ws-positive)' : 'var(--ws-negative)'" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+
+        <!-- horizontal grid -->
+        <g>
+          <line x1="0" [attr.x2]="view.width" y1="20" [attr.y2]="20"
+                stroke="var(--ws-border)" stroke-dasharray="2 4" />
+          <line x1="0" [attr.x2]="view.width"
+                [attr.y1]="(view.height - 24) * 0.5 + 10"
+                [attr.y2]="(view.height - 24) * 0.5 + 10"
+                stroke="var(--ws-border)" stroke-dasharray="2 4" />
+          <line x1="0" [attr.x2]="view.width" [attr.y1]="view.height - 24" [attr.y2]="view.height - 24"
+                stroke="var(--ws-border)" stroke-dasharray="2 4" />
+          <text x="6" y="14" font-size="10" fill="var(--ws-muted)">{{ view.max | number:'1.2-2' }}</text>
+          <text x="6" [attr.y]="view.height - 28" font-size="10" fill="var(--ws-muted)">{{ view.min | number:'1.2-2' }}</text>
+        </g>
+
+        <!-- area under the line -->
+        <path [attr.d]="view.pathFill" fill="url(#chartFill)" />
+        <!-- the price line -->
+        <path [attr.d]="view.pathLine" fill="none"
+              [attr.stroke]="changeAbs >= 0 ? 'var(--ws-positive)' : 'var(--ws-negative)'" stroke-width="1.6" />
+        <!-- last price marker -->
+        <circle [attr.cx]="view.lastX" [attr.cy]="view.lastY" r="3"
+                [attr.fill]="changeAbs >= 0 ? 'var(--ws-positive)' : 'var(--ws-negative)'" />
+
+        <!-- Fill markers on the chart for the last few PrivateChannel updates -->
+        <g *ngFor="let f of recentFills; trackBy: trackByFill">
+          <circle [attr.cx]="view.lastX" [attr.cy]="yFor(f.price)" r="4" fill="var(--ws-accent, #4080e8)" stroke="var(--ws-bg)" stroke-width="1.5" />
+        </g>
+      </svg>
+    </div>
+
+    <!-- Fill list / channel pane -->
+    <div *ngIf="instrument && recentFills.length" class="ws-card" style="padding:8px 12px">
+      <div style="font-weight:800;font-size:12px;margin-bottom:6px">Recent fills</div>
+      <div style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+        <div *ngFor="let f of recentFills; trackBy: trackByFill"
+             style="display:grid;grid-template-columns:90px 60px 1fr 1fr;gap:8px;align-items:center">
+          <span style="color:var(--ws-muted)">{{ f.ts | date:'HH:mm:ss' }}</span>
+          <span [style.color]="f.side === 'Buy' ? 'var(--ws-positive)' : 'var(--ws-negative)'" style="font-weight:800">
+            {{ f.side }}
+          </span>
+          <span style="text-align:right;font-variant-numeric:tabular-nums">{{ f.qty | number }}</span>
+          <span style="text-align:right;font-variant-numeric:tabular-nums">{{ f.price | number:'1.2-2' }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

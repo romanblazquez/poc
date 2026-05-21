@@ -1,7 +1,0 @@
-import type { Tree } from 'nx/src/generators/tree';
-export declare function getComponentDataFromAST(tree: Tree, normalizedComponentPath: string): {
-    componentFileContents: string;
-    componentAST: any;
-    componentName: any;
-};
-//# sourceMappingURL=get-component-data-from-ast.d.ts.map

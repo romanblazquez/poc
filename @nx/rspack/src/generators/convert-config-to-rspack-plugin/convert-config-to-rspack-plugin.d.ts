@@ -1,8 +1,0 @@
-import { Tree } from '@nx/devkit';
-interface Schema {
-    project?: string;
-    skipFormat?: boolean;
-}
-export declare function convertConfigToRspackPluginGenerator(tree: Tree, options: Schema): Promise<void>;
-export default convertConfigToRspackPluginGenerator;
-//# sourceMappingURL=convert-config-to-rspack-plugin.d.ts.map

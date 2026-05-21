@@ -1,4 +1,0 @@
-import { type Tree } from '@nx/devkit';
-import type { NormalizedSchema } from './normalized-schema';
-export declare function createProject(tree: Tree, options: NormalizedSchema): void;
-//# sourceMappingURL=create-project.d.ts.map

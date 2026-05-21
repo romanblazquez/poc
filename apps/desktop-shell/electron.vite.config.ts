@@ -61,7 +61,10 @@ export default defineConfig({
     build: {
       outDir: resolve(__dirname, 'out/renderer'),
       rollupOptions: {
-        input: resolve(__dirname, 'src/renderer/index.html'),
+        input: {
+          index: resolve(__dirname, 'src/renderer/index.html'),
+          'intent-resolver': resolve(__dirname, 'src/renderer/intent-resolver.html'),
+        },
       },
     },
   },

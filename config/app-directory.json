@@ -5,8 +5,8 @@
       "appId": "customer-search",
       "title": "Customer Search",
       "description": "Search and browse customers by name, ID, or segment.",
-      "url": "http://localhost:4001",
-      "devPort": 0,
+      "url": "file://apps/customer-search/dist/browser/index.html",
+      "devPort": 4001,
       "icon": "🔍",
       "category": "CRM",
       "initialLayout": { "x": 50, "y": 80, "width": 480, "height": 560 },
@@ -22,7 +22,7 @@
       "appId": "customer-profile",
       "title": "Customer Profile",
       "description": "Full customer profile including KYC, accounts, and recent activity.",
-      "url": "http://localhost",
+      "url": "file://apps/customer-profile/dist/browser/index.html",
       "devPort": 4002,
       "icon": "👤",
       "category": "CRM",
@@ -47,7 +47,7 @@
       "appId": "portfolio-view",
       "title": "Portfolio View",
       "description": "Real-time portfolio positions, P&L, and allocation.",
-      "url": "http://localhost",
+      "url": "file://apps/portfolio-view/dist/browser/index.html",
       "devPort": 4003,
       "icon": "📊",
       "category": "Investments",
@@ -72,7 +72,7 @@
       "appId": "market-watch",
       "title": "Market Watch",
       "description": "Live instrument prices, news, and market data.",
-      "url": "http://localhost",
+      "url": "file://apps/market-watch/dist/browser/index.html",
       "devPort": 4004,
       "icon": "📈",
       "category": "Markets",
@@ -97,7 +97,7 @@
       "appId": "payment-action",
       "title": "Payment Action",
       "description": "Initiate and authorise customer payment instructions.",
-      "url": "http://localhost",
+      "url": "file://apps/payment-action/dist/browser/index.html",
       "devPort": 4005,
       "icon": "💳",
       "category": "Payments",
@@ -119,10 +119,133 @@
       }
     },
     {
+      "appId": "order-ticket",
+      "title": "Order Ticket",
+      "description": "Equity order ticket — buy/sell, qty, limit/market, TIF, venue. Streams fills via PrivateChannel.",
+      "url": "file://apps/order-ticket/dist/browser/index.html",
+      "devPort": 4006,
+      "icon": "🧾",
+      "category": "Trading",
+      "initialLayout": { "x": 200, "y": 80, "width": 520, "height": 720 },
+      "listensForContexts": ["fdc3.instrument", "com.demo.theme"],
+      "intents": [
+        {
+          "intent": "CreateOrder",
+          "contextTypes": ["fdc3.instrument"],
+          "appId": "order-ticket",
+          "displayName": "Trade Instrument"
+        },
+        {
+          "intent": "StartOrder",
+          "contextTypes": ["fdc3.instrument"],
+          "appId": "order-ticket",
+          "displayName": "Open Order Ticket"
+        }
+      ],
+      "capabilities": {
+        "broadcasts": ["com.demo.traderOrder", "com.demo.orderStatus"],
+        "listensTo": ["fdc3.instrument", "com.demo.theme"],
+        "raisesIntents": [],
+        "handlesIntents": ["CreateOrder", "StartOrder"]
+      }
+    },
+    {
+      "appId": "order-blotter",
+      "title": "Order Blotter",
+      "description": "AG Grid blotter that listens for trader orders and fills, with cancel and view actions.",
+      "url": "file://apps/order-blotter/dist/browser/index.html",
+      "devPort": 4007,
+      "icon": "🗒",
+      "category": "Trading",
+      "initialLayout": { "x": 740, "y": 80, "width": 1100, "height": 540 },
+      "listensForContexts": ["com.demo.traderOrder", "com.demo.orderStatus", "fdc3.instrument", "com.demo.theme"],
+      "intents": [
+        {
+          "intent": "ViewOrders",
+          "contextTypes": ["fdc3.instrument"],
+          "appId": "order-blotter",
+          "displayName": "View Orders for Instrument"
+        }
+      ],
+      "capabilities": {
+        "broadcasts": ["fdc3.instrument"],
+        "listensTo": ["com.demo.traderOrder", "com.demo.orderStatus", "fdc3.instrument", "com.demo.theme"],
+        "raisesIntents": ["CancelOrder", "ModifyOrder"],
+        "handlesIntents": ["ViewOrders"]
+      }
+    },
+    {
+      "appId": "chart",
+      "title": "Chart",
+      "description": "Live SVG price chart that listens to fdc3.instrument and handles ViewChart. Trade-this raises CreateOrder.",
+      "url": "file://apps/chart/dist/browser/index.html",
+      "devPort": 4008,
+      "icon": "📉",
+      "category": "Markets",
+      "initialLayout": { "x": 200, "y": 80, "width": 900, "height": 560 },
+      "listensForContexts": ["fdc3.instrument", "com.demo.orderStatus", "com.demo.theme"],
+      "intents": [
+        {
+          "intent": "ViewChart",
+          "contextTypes": ["fdc3.instrument"],
+          "appId": "chart",
+          "displayName": "View Chart"
+        }
+      ],
+      "capabilities": {
+        "broadcasts": [],
+        "listensTo": ["fdc3.instrument", "com.demo.orderStatus", "com.demo.theme"],
+        "raisesIntents": ["CreateOrder"],
+        "handlesIntents": ["ViewChart"]
+      }
+    },
+    {
+      "appId": "news",
+      "title": "News",
+      "description": "Instrument-driven news feed. Per-headline actions are discovered live via findIntentsByContext.",
+      "url": "file://apps/news/dist/browser/index.html",
+      "devPort": 4009,
+      "icon": "📰",
+      "category": "Markets",
+      "initialLayout": { "x": 1140, "y": 80, "width": 560, "height": 700 },
+      "listensForContexts": ["fdc3.instrument", "com.demo.theme"],
+      "intents": [
+        {
+          "intent": "ViewNews",
+          "contextTypes": ["fdc3.instrument"],
+          "appId": "news",
+          "displayName": "View Related News"
+        }
+      ],
+      "capabilities": {
+        "broadcasts": ["fdc3.instrument"],
+        "listensTo": ["fdc3.instrument", "com.demo.theme"],
+        "raisesIntents": ["ViewChart", "CreateOrder", "ViewPortfolio", "ViewInstrument"],
+        "handlesIntents": ["ViewNews"]
+      }
+    },
+    {
+      "appId": "rfq-quote",
+      "title": "RFQ Quote",
+      "description": "Request quotes from N venues over a PrivateChannel. Accept routes a TraderOrder to the blotter.",
+      "url": "file://apps/rfq-quote/dist/browser/index.html",
+      "devPort": 4010,
+      "icon": "💱",
+      "category": "Trading",
+      "initialLayout": { "x": 200, "y": 80, "width": 700, "height": 720 },
+      "listensForContexts": ["fdc3.instrument", "com.demo.theme"],
+      "capabilities": {
+        "broadcasts": ["com.demo.traderOrder"],
+        "listensTo": ["fdc3.instrument", "com.demo.theme"],
+        "raisesIntents": [],
+        "handlesIntents": []
+      }
+    },
+    {
       "appId": "funds-allocations",
       "title": "Funds Allocations",
       "description": "AG Grid allocation monitor for fund weights, drift, risk, and manager ownership.",
-      "url": "http://localhost",
+      "url": "file://apps/funds-allocations/dist/browser/index.html",
       "devPort": 4011,
       "icon": "▦",
       "category": "Funds",
@@ -147,7 +270,7 @@
       "appId": "incoming-orders",
       "title": "Incoming Orders",
       "description": "AG Grid blotter for incoming fund orders, filtered by selected fund context.",
-      "url": "http://localhost",
+      "url": "file://apps/incoming-orders/dist/browser/index.html",
       "devPort": 4012,
       "icon": "≡",
       "category": "Funds",
@@ -164,7 +287,7 @@
       "appId": "audit-log",
       "title": "Audit",
       "description": "AG Grid audit trail that listens to fund and order context.",
-      "url": "http://localhost",
+      "url": "file://apps/audit-log/dist/browser/index.html",
       "devPort": 4013,
       "icon": "!",
       "category": "Funds",
@@ -198,7 +321,7 @@
       "appId": "cloud-sample",
       "title": "Cloud App",
       "description": "Sample cloud-hosted app loaded directly from a remote URL — demonstrates embedding external web content.",
-      "url": "https://www.youtube.com",
+      "url": "https://example.com",
       "devPort": 0,
       "icon": "☁",
       "category": "Cloud",

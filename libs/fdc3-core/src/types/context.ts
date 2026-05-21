@@ -106,6 +106,38 @@ export interface OrderContext extends Fdc3Context {
   status: string;
 }
 
+/** Equity-trader order ticket context broadcast by the order-ticket app. */
+export interface TraderOrderContext extends Fdc3Context {
+  type: 'com.demo.traderOrder';
+  orderId: string;
+  instrument: { ticker: string; ISIN?: string; name?: string };
+  side: 'Buy' | 'Sell';
+  orderType: 'Market' | 'Limit';
+  quantity: number;
+  limitPrice?: number;
+  tif: 'DAY' | 'IOC' | 'GTC' | 'FOK';
+  venue: string;
+  account: string;
+  currency: string;
+  notional?: number;
+  status: 'New' | 'Working' | 'PartiallyFilled' | 'Filled' | 'Cancelled' | 'Rejected';
+  createdAt: string;
+}
+
+/** Stream message a venue/OMS pushes back over the PrivateChannel returned from CreateOrder. */
+export interface OrderStatusContext extends Fdc3Context {
+  type: 'com.demo.orderStatus';
+  orderId: string;
+  status: 'New' | 'Working' | 'PartiallyFilled' | 'Filled' | 'Cancelled' | 'Rejected';
+  filledQty?: number;
+  remainingQty?: number;
+  avgPrice?: number;
+  lastPrice?: number;
+  lastQty?: number;
+  message?: string;
+  ts: string;
+}
+
 export type ThemeName = 'dark-financial' | 'light-financial' | 'high-contrast' | 'luxury-neutral';
 
 export interface ThemeContext extends Fdc3Context {
@@ -133,6 +165,14 @@ export function isFundContext(ctx: Fdc3Context): ctx is FundContext {
 
 export function isOrderContext(ctx: Fdc3Context): ctx is OrderContext {
   return ctx.type === 'com.demo.order';
+}
+
+export function isTraderOrderContext(ctx: Fdc3Context): ctx is TraderOrderContext {
+  return ctx.type === 'com.demo.traderOrder';
+}
+
+export function isOrderStatusContext(ctx: Fdc3Context): ctx is OrderStatusContext {
+  return ctx.type === 'com.demo.orderStatus';
 }
 
 export function isThemeContext(ctx: Fdc3Context): ctx is ThemeContext {
