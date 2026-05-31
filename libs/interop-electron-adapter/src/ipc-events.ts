@@ -33,6 +33,10 @@ export const IpcEvents = {
   GET_THEME: 'fdc3:getTheme',
   SET_THEME: 'fdc3:setTheme',
   SET_FLOW_POLICY: 'fdc3:setFlowPolicy',
+  GET_INTEROP_SNAPSHOT: 'fdc3:getInteropSnapshot',
+  APP_LOG_WRITE: 'platform:appLogWrite',
+  GET_APP_LOGS: 'platform:getAppLogs',
+  CLEAR_APP_LOGS: 'platform:clearAppLogs',
   GET_DISPLAYS: 'fdc3:getDisplays',
   GET_INFO: 'fdc3:getInfo',
   FIND_INTENT: 'fdc3:findIntent',
@@ -65,6 +69,8 @@ export const IpcEvents = {
   PRIVATE_CHANNEL_LISTENER_ADDED: 'fdc3:privateChannelListenerAdded',
   PRIVATE_CHANNEL_LISTENER_REMOVED: 'fdc3:privateChannelListenerRemoved',
   PRIVATE_CHANNEL_DISCONNECTED: 'fdc3:privateChannelDisconnected',
+  INTEROP_ACTIVITY: 'fdc3:interopActivity',
+  APP_LOG: 'platform:appLog',
 } as const;
 
 export type IpcEventKey = keyof typeof IpcEvents;

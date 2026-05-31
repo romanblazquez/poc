@@ -21,6 +21,8 @@
 | Multi-monitor | Detach the workspace into any connected display |
 | Theming | 4 themes (`dark-financial`, `light-financial`, `high-contrast`, `luxury-neutral`) broadcast as `com.demo.theme` |
 | Interop Flow designer | React Flow editor for visualising and gating context/intent routes between apps |
+| Interop Command Center | Live activity timeline, channel visualizer, route matrix, and executive demo controls |
+| Platform logging | Automatic console/error capture plus `window.platformLogs` structured logging for hosted apps |
 | Cloud apps | Apps with `devPort: 0` are embedded directly from an external URL |
 | Adapter architecture | `InteropAdapter` interface — swap Electron IPC for io.Connect or OpenFin at runtime |
 | Security | `contextIsolation: true`, no `nodeIntegration`, preload-only bridge |
@@ -41,6 +43,8 @@ Custom Electron Shell (this POC)          io.Connect / Interop.io
 ✅ PrivateChannel + AppChannel            ✅ Full FDC3 2.0 channel model
 ✅ getAgent() Desktop Agent Discovery     ✅ getAgent() (FDC3 for the Web)
 ✅ Built-in conformance console           ⚠️  No in-shell self-test harness
+✅ Live Command Center                    ✅ io.Insights / telemetry products
+✅ Platform logging API                   ✅ Central logging / diagnostics products
 ❌ No native/COM app support              ✅ Native, .NET, Java, web
 Free (open source)                        Commercial licence required
 ```
@@ -66,6 +70,25 @@ launcher to prove interop end to end.
 
 The **adapter pattern** ensures apps written for this POC run on io.Connect with a
 one-file bootstrap swap. See [`docs/interop-vs-custom-shell.md`](docs/interop-vs-custom-shell.md).
+
+### Platform logging — beyond FDC3
+
+Logging is intentionally **not** part of the FDC3 surface. Every hosted app also receives a
+separate `window.platformLogs` API from the preload bridge:
+
+```ts
+await window.platformLogs.info('Order ticket opened', { ticker: 'AAPL', side: 'BUY' }, 'order-ticket');
+await window.platformLogs.error('Pricing failed', err, 'rfq');
+
+const logs = await window.platformLogs.getLogs();
+const unsubscribe = window.platformLogs.onLog((entry) => console.log(entry));
+```
+
+The shell also captures browser console output automatically from every hosted `webContents`:
+Angular dev-server apps, standalone Electron windows, embedded Dockview webviews, and remote
+cloud apps. The **Command Center** shows a live platform log trace with level filtering, error
+counts, structured payloads, and shell-controlled clear. Non-shell apps can write logs and read
+their own logs; the shell/workspace windows can manage the global trace.
 
 ---
 
@@ -203,7 +226,8 @@ fdc3-desktop-poc/
 8. In Portfolio View, click **AAPL** → open Market Watch → AAPL highlights.
 9. Open **Funds Allocations**, click a fund row → **Incoming Orders** filters to that fund → **Audit Log** shows related events.
 10. Toggle theme via **Theme Toggle** — every participating app re-themes in unison.
-11. In the Shell, click **💾 Save Workspace** → quit → relaunch → layout, channels, and detached windows all restore.
+11. Open **Command Center** to show the live activity feed, channel visualizer, route matrix, and platform log trace.
+12. In the Shell, click **💾 Save Workspace** → quit → relaunch → layout, channels, and detached windows all restore.
 
 Full script with narration: [`docs/demo-script.md`](docs/demo-script.md).
 

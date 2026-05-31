@@ -19,7 +19,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
-import type { AppIntent, Channel, ChannelDisplayMetadata, ChannelListener, Fdc3Context, FlowPolicy, ImplementationMetadata, IntentInvocationMetadata, IntentResolution, PrivateChannel, PrivateChannelEventListener, PrivateChannelMarker, UserChannel, ThemeName } from '@fdc3-poc/fdc3-core';
+import type { AppIntent, AppLogEvent, AppLogLevel, Channel, ChannelDisplayMetadata, ChannelListener, Fdc3Context, FlowPolicy, ImplementationMetadata, IntentInvocationMetadata, IntentResolution, InteropActivityEvent, InteropSnapshot, PrivateChannel, PrivateChannelEventListener, PrivateChannelMarker, UserChannel, ThemeName } from '@fdc3-poc/fdc3-core';
 import { isPrivateChannelMarker } from '@fdc3-poc/fdc3-core';
 
 // ─── Handler registries (live in preload isolate, not renderer) ────────────
@@ -76,6 +76,8 @@ function ensurePrivateChannelLifecycle(channelId: string): PrivateChannelLifecyc
 }
 const workspaceWindowClosedHandlers = new Set<(payload: DetachedWorkspacePayload) => void>();
 const themeChangeHandlers = new Set<(theme: ThemeName) => void>();
+const interopActivityHandlers = new Set<(event: InteropActivityEvent) => void>();
+const appLogHandlers = new Set<(event: AppLogEvent) => void>();
 
 // ─── Inbound IPC listeners (main → preload) ───────────────────────────────
 
@@ -122,6 +124,26 @@ ipcRenderer.on(IpcEvents.WORKSPACE_WINDOW_CLOSED, (_event, payload: DetachedWork
 ipcRenderer.on(IpcEvents.THEME_CHANGED, (_event, theme: ThemeName) => {
   for (const handler of themeChangeHandlers) {
     handler(theme);
+  }
+});
+
+ipcRenderer.on(IpcEvents.INTEROP_ACTIVITY, (_event, activity: InteropActivityEvent) => {
+  for (const handler of interopActivityHandlers) {
+    try {
+      handler(activity);
+    } catch (e) {
+      console.error('[fdc3 preload] Interop activity handler threw:', e);
+    }
+  }
+});
+
+ipcRenderer.on(IpcEvents.APP_LOG, (_event, log: AppLogEvent) => {
+  for (const handler of appLogHandlers) {
+    try {
+      handler(log);
+    } catch (e) {
+      console.error('[fdc3 preload] App log handler threw:', e);
+    }
   }
 });
 
@@ -316,6 +338,72 @@ async function unwrapIntentResult(result: unknown): Promise<unknown> {
   await ipcRenderer.invoke(IpcEvents.PRIVATE_CHANNEL_CONNECT, channelId);
   return buildPrivateChannel(channelId);
 }
+
+type PlatformLogLevelInput = AppLogLevel | 'warn';
+
+function normalizePlatformLogLevel(level: PlatformLogLevelInput): AppLogLevel {
+  return level === 'warn' ? 'warning' : level;
+}
+
+function toSerializableLogData(data: unknown): unknown {
+  if (data === undefined) return undefined;
+  if (data instanceof Error) {
+    return { name: data.name, message: data.message, stack: data.stack };
+  }
+  try {
+    return JSON.parse(JSON.stringify(data)) as unknown;
+  } catch {
+    return String(data);
+  }
+}
+
+function writePlatformLog(level: PlatformLogLevelInput, message: unknown, data?: unknown, category?: string): Promise<boolean> {
+  return ipcRenderer.invoke(IpcEvents.APP_LOG_WRITE, {
+    level: normalizePlatformLogLevel(level),
+    message: String(message),
+    category,
+    data: toSerializableLogData(data),
+  }) as Promise<boolean>;
+}
+
+// ─── window.platformLogs surface ─────────────────────────────────────────────
+// Deliberately separate from window.fdc3: this is platform observability, not
+// interoperability semantics. Every hosted app gets it automatically.
+
+contextBridge.exposeInMainWorld('platformLogs', {
+  log(level: PlatformLogLevelInput, message: unknown, data?: unknown, category?: string): Promise<boolean> {
+    return writePlatformLog(level, message, data, category);
+  },
+  debug(message: unknown, data?: unknown, category?: string): Promise<boolean> {
+    return writePlatformLog('debug', message, data, category);
+  },
+  info(message: unknown, data?: unknown, category?: string): Promise<boolean> {
+    return writePlatformLog('info', message, data, category);
+  },
+  warn(message: unknown, data?: unknown, category?: string): Promise<boolean> {
+    return writePlatformLog('warning', message, data, category);
+  },
+  error(message: unknown, data?: unknown, category?: string): Promise<boolean> {
+    return writePlatformLog('error', message, data, category);
+  },
+  getLogs(): Promise<AppLogEvent[]> {
+    return ipcRenderer.invoke(IpcEvents.GET_APP_LOGS) as Promise<AppLogEvent[]>;
+  },
+  clear(): Promise<boolean> {
+    return ipcRenderer.invoke(IpcEvents.CLEAR_APP_LOGS) as Promise<boolean>;
+  },
+  onLog(handler: (event: AppLogEvent) => void): () => void {
+    appLogHandlers.add(handler);
+    return () => appLogHandlers.delete(handler);
+  },
+  getInfo(): { provider: string; apiVersion: string; capabilities: string[] } {
+    return {
+      provider: 'fdc3-desktop-poc',
+      apiVersion: '0.1',
+      capabilities: ['automatic-console-capture', 'structured-app-logs', 'live-subscriptions', 'scoped-log-access'],
+    };
+  },
+});
 
 // ─── window.fdc3 surface ──────────────────────────────────────────────────
 
@@ -658,6 +746,17 @@ contextBridge.exposeInMainWorld('fdc3', {
    */
   setFlowPolicy(policy: FlowPolicy): Promise<void> {
     return ipcRenderer.invoke(IpcEvents.SET_FLOW_POLICY, policy) as Promise<void>;
+  },
+
+  /** Get the local interop observability snapshot for the Command Center. */
+  getInteropSnapshot(): Promise<InteropSnapshot> {
+    return ipcRenderer.invoke(IpcEvents.GET_INTEROP_SNAPSHOT) as Promise<InteropSnapshot>;
+  },
+
+  /** Subscribe to interop telemetry events emitted by the main-process router. */
+  onInteropActivity(handler: (event: InteropActivityEvent) => void): () => void {
+    interopActivityHandlers.add(handler);
+    return () => interopActivityHandlers.delete(handler);
   },
 
   /** Get all connected displays with bounds and primary flag. */

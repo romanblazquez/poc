@@ -4,8 +4,9 @@ import { ChannelBar } from './components/ChannelBar.js';
 import { WorkspaceToolbar } from './components/WorkspaceToolbar.js';
 import { DockviewWorkspace } from './components/DockviewWorkspace.js';
 import type { DetachedWorkspacePayload, DisplayInfo } from './components/DockviewWorkspace.js';
+import { CommandCenter } from './components/CommandCenter.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
-import type { UserChannel } from '@fdc3-poc/fdc3-core';
+import type { Fdc3Context, UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { FlowPolicy, ThemeName } from '@fdc3-poc/fdc3-core';
 
@@ -59,7 +60,7 @@ export interface AppEntry {
 }
 
 type ThemeMode = ThemeName;
-type WorkspaceMode = 'launcher' | 'workspace' | 'interop-flow';
+type WorkspaceMode = 'launcher' | 'workspace' | 'interop-flow' | 'command-center';
 
 interface WorkspaceState {
   channelId: string | null;
@@ -71,6 +72,14 @@ interface WorkspaceTab {
   id: string;
   name: string;
   panelIds: string[];
+}
+
+export interface SmartWorkspaceTemplate {
+  id: string;
+  name: string;
+  channelId: string | null;
+  panelIds: string[];
+  seedContext?: Fdc3Context;
 }
 
 const WORKSPACE_STORAGE_KEY = 'fdc3.workspace-tabs.v5';
@@ -405,6 +414,45 @@ export function App() {
     setWorkspaceEpoch((value) => value + 1);
   }, [activeWorkspaceState.channelId, activeWorkspaceState.theme, workspaceTabs.length]);
 
+  const handleComposeWorkspace = useCallback(async (template: SmartWorkspaceTemplate) => {
+    const existing = workspaceTabs.find((tab) => tab.id === template.id);
+    if (existing) {
+      setWorkspaceTabs((prev) => prev.map((tab) => (
+        tab.id === template.id
+          ? { ...tab, name: template.name, panelIds: uniquePanelIds(template.panelIds) }
+          : tab
+      )));
+    } else {
+      setWorkspaceTabs((prev) => ([
+        ...prev,
+        { id: template.id, name: template.name, panelIds: uniquePanelIds(template.panelIds) },
+      ]));
+    }
+
+    setWorkspaceStates((prev) => ({
+      ...prev,
+      [template.id]: {
+        channelId: template.channelId,
+        theme,
+        layout: null,
+      },
+    }));
+    setActiveWorkspaceId(template.id);
+    setActiveMode('workspace');
+    setOpenPanelIds(uniquePanelIds(template.panelIds));
+    setWorkspaceEpoch((value) => value + 1);
+
+    if (template.channelId) {
+      await window.fdc3.joinUserChannel(template.channelId);
+    } else {
+      await window.fdc3.leaveCurrentChannel();
+    }
+
+    if (template.seedContext) {
+      await window.fdc3.broadcast(template.seedContext);
+    }
+  }, [theme, workspaceTabs]);
+
   const commitWorkspaceRename = useCallback((workspaceId: string) => {
     const trimmed = editingWorkspaceName.trim();
     setWorkspaceTabs((prev) => prev.map((tab) => (
@@ -648,6 +696,9 @@ export function App() {
           <TabButton active={activeMode === 'interop-flow'} grouped onClick={() => setActiveMode('interop-flow')}>
             Interop Flow
           </TabButton>
+          <TabButton active={activeMode === 'command-center'} grouped onClick={() => setActiveMode('command-center')}>
+            Command Center
+          </TabButton>
           <TabButton active={activeMode === 'launcher'} grouped onClick={() => setActiveMode('launcher')}>
             App Launcher
           </TabButton>
@@ -692,6 +743,13 @@ export function App() {
             workspaceName={activeWorkspaceTab.name}
             theme={theme}
             appIds={interopWorkspaceAppIds}
+          />
+        ) : activeMode === 'command-center' ? (
+          <CommandCenter
+            apps={apps}
+            currentChannel={currentChannel}
+            onOpen={handleOpen}
+            onComposeWorkspace={handleComposeWorkspace}
           />
         ) : (
           <div style={{ flex: 1, overflow: 'auto' }}>

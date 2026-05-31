@@ -70,7 +70,7 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
       cellStyle: ({ data, node }) => ({
         color: node?.isSelected() ? 'var(--ws-selection-text)' :
                data?.lastDir === 'up' ? 'var(--ws-positive)' :
-               data?.lastDir === 'down' ? 'var(--ws-negative)' : undefined,
+               data?.lastDir === 'down' ? 'var(--ws-negative)' : 'var(--ws-text)',
         fontWeight: 800,
       }),
     },

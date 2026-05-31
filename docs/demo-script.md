@@ -128,7 +128,27 @@ Show the FDC3 payload:
 
 ---
 
-## Scene 9: The Architecture Reveal (2 min)
+## Scene 9: The Command Center Reveal (2 min)
+
+1. In the Shell, switch to **Command Center**.
+2. Point to **Live Activity Timeline** after selecting a customer or instrument.
+3. Point to **Channel Visualizer** and show which apps are joined to the active channel.
+4. Point to **Route Matrix** and explain allowed vs blocked routes.
+5. Point to **Platform Log Trace** and explain that console logs, app errors, navigation failures,
+   and `window.platformLogs` structured messages are traced automatically across hosted apps.
+6. Click **Write Platform Log**, then filter by `info` or `error`.
+7. Click **Broadcast AAPL** or **Raise ViewInstrument** from the demo controls.
+
+> *"This is the part most interop desktops hide. We can see the actual operational
+> mesh: who spoke, who received, what was blocked, and which workflow routes are
+> active. For executives, it proves value. For support and compliance teams, it
+> explains behavior without asking engineers to inspect logs. The same pane also
+> captures the technical evidence: browser console output and structured app logs
+> from served, standalone, embedded, and cloud apps."*
+
+---
+
+## Scene 10: The Architecture Reveal (2 min)
 
 Switch to a screen share of `docs/architecture.md`:
 

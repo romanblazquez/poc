@@ -1,6 +1,7 @@
-import { app, ipcMain, webContents, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, webContents, screen } from 'electron';
+import type { WebContents } from 'electron';
 import { randomUUID } from 'crypto';
-import type { AppIntent, Fdc3Context, FlowPolicy, ImplementationMetadata, IntentResolution, PrivateChannelMarker, ThemeContext, ThemeName } from '@fdc3-poc/fdc3-core';
+import type { AppIntent, AppLogEvent, AppLogLevel, AppLogOrigin, AppLogRuntime, Fdc3Context, FlowPolicy, ImplementationMetadata, IntentResolution, InteropActivityEvent, InteropActivityKind, InteropActivityStatus, InteropRouteSnapshot, InteropSnapshot, PrivateChannelMarker, RuntimeAppSnapshot, RuntimeChannelSnapshot, ThemeContext, ThemeName } from '@fdc3-poc/fdc3-core';
 import { NoAppsFoundError } from '@fdc3-poc/fdc3-core';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
 import type { ChannelManager } from '@fdc3-poc/channel-engine';
@@ -15,7 +16,6 @@ import type { DetachedWorkspacePayload } from './window-manager.js';
 import type { WorkspaceManager } from './workspace-manager.js';
 import type { ThemeManager } from './theme-manager.js';
 import type { AppDefinition } from '@fdc3-poc/fdc3-core';
-import { BrowserWindow } from 'electron';
 
 /**
  * IpcRouter — the heart of the FDC3 main-process implementation.
@@ -24,8 +24,14 @@ import { BrowserWindow } from 'electron';
  * context, intents, and channel commands to the correct windows.
  */
 export class IpcRouter {
+  private static readonly ACTIVITY_LIMIT = 250;
+  private static readonly APP_LOG_LIMIT = 500;
   private readonly intentResolver: IntentResolver;
   private readonly pendingIntentResults = new Map<string, (result?: Fdc3Context) => void>();
+  private readonly activityLog: InteropActivityEvent[] = [];
+  private readonly appLogs: AppLogEvent[] = [];
+  private readonly logCaptureWebContentsIds = new Set<number>();
+  private appLogCaptureRegistered = false;
   /** Routing policy pushed by the renderer Interop Flow designer. null = unrestricted. */
   private flowPolicy: FlowPolicy | null = null;
   /** Read-only registry used by FDC3 discovery (findIntent / findIntentsByContext). */
@@ -62,7 +68,188 @@ export class IpcRouter {
     this.appRegistry = new AppRegistry(appDirectory);
   }
 
+  private emitActivity(input: {
+    kind: InteropActivityKind;
+    status: InteropActivityStatus;
+    message: string;
+    sourceAppId?: string;
+    targetAppId?: string;
+    appId?: string;
+    channelId?: string | null;
+    contextType?: string;
+    intentName?: string;
+    payload?: unknown;
+  }): void {
+    const event: InteropActivityEvent = {
+      id: randomUUID(),
+      ts: Date.now(),
+      ...input,
+    };
+    this.activityLog.unshift(event);
+    if (this.activityLog.length > IpcRouter.ACTIVITY_LIMIT) {
+      this.activityLog.length = IpcRouter.ACTIVITY_LIMIT;
+    }
+    for (const id of this.windowManager.getAllWebContentsIds()) {
+      this.windowManager.sendTo(id, IpcEvents.INTEROP_ACTIVITY, event);
+    }
+  }
+
+  private registerAppLogCapture(): void {
+    if (this.appLogCaptureRegistered) return;
+    this.appLogCaptureRegistered = true;
+
+    for (const contents of webContents.getAllWebContents()) {
+      this.attachAppLogCapture(contents);
+    }
+
+    app.on('web-contents-created', (_event, contents) => {
+      this.attachAppLogCapture(contents);
+    });
+  }
+
+  private attachAppLogCapture(contents: WebContents): void {
+    if (contents.isDestroyed() || this.logCaptureWebContentsIds.has(contents.id)) return;
+    this.logCaptureWebContentsIds.add(contents.id);
+
+    contents.on('console-message', (_event, level, message, line, sourceId) => {
+      this.emitAppLog(contents, {
+        level: this.normalizeConsoleLevel(level),
+        origin: 'console',
+        message,
+        line,
+        sourceUrl: sourceId,
+      });
+    });
+
+    contents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      if (!isMainFrame || errorCode === -3) return; // -3 = aborted navigation, common during reloads.
+      this.emitAppLog(contents, {
+        level: 'error',
+        origin: 'navigation',
+        message: `Navigation failed (${errorCode}): ${errorDescription}`,
+        sourceUrl: validatedURL,
+      });
+    });
+
+    contents.on('render-process-gone', (_event, details) => {
+      this.emitAppLog(contents, {
+        level: 'error',
+        origin: 'renderer',
+        message: `Renderer process gone: ${details.reason}${details.exitCode !== undefined ? ` (${details.exitCode})` : ''}`,
+      });
+    });
+
+    contents.on('destroyed', () => {
+      this.logCaptureWebContentsIds.delete(contents.id);
+    });
+  }
+
+  private normalizeConsoleLevel(level: number): AppLogLevel {
+    if (level >= 3) return 'error';
+    if (level === 2) return 'warning';
+    if (level === 1) return 'info';
+    return 'debug';
+  }
+
+  private emitAppLog(
+    contents: WebContents,
+    input: { level: AppLogLevel; origin: AppLogOrigin; message: string; category?: string; data?: unknown; line?: number; sourceUrl?: string },
+  ): void {
+    const pageUrl = contents.isDestroyed() ? undefined : contents.getURL();
+    const entry = this.windowManager.getEntry(contents.id);
+    const resolvedAppId =
+      entry?.appId ??
+      (pageUrl ? resolveAppIdentityFromUrl(pageUrl, this.appDirectory) : undefined) ??
+      (input.sourceUrl ? resolveAppIdentityFromUrl(input.sourceUrl, this.appDirectory) : undefined);
+    const appId = resolvedAppId ?? 'unknown';
+    const event: AppLogEvent = {
+      id: randomUUID(),
+      ts: Date.now(),
+      appId,
+      appTitle: this.appTitle(appId),
+      runtime: this.resolveLogRuntime(contents, appId),
+      webContentsId: contents.id,
+      level: input.level,
+      origin: input.origin,
+      message: this.trimLogMessage(input.message),
+      category: input.category,
+      data: input.data,
+      line: input.line && input.line > 0 ? input.line : undefined,
+      sourceUrl: input.sourceUrl || undefined,
+      pageUrl,
+    };
+
+    this.appLogs.unshift(event);
+    if (this.appLogs.length > IpcRouter.APP_LOG_LIMIT) {
+      this.appLogs.length = IpcRouter.APP_LOG_LIMIT;
+    }
+
+    for (const id of this.windowManager.getAllWebContentsIds()) {
+      if (this.canReceiveAppLog(id, event)) {
+        this.windowManager.sendTo(id, IpcEvents.APP_LOG, event);
+      }
+    }
+  }
+
+  private canManageAppLogs(webContentsId: number): boolean {
+    const appId = this.getAppIdForWebContents(webContentsId);
+    return appId === 'shell' || appId?.startsWith('workspace:') === true;
+  }
+
+  private canReceiveAppLog(webContentsId: number, log: AppLogEvent): boolean {
+    if (this.canManageAppLogs(webContentsId)) return true;
+    return this.getAppIdForWebContents(webContentsId) === log.appId;
+  }
+
+  private resolveLogRuntime(contents: WebContents, appId: string): AppLogRuntime {
+    const entry = this.windowManager.getEntry(contents.id);
+    if (entry?.appId === 'shell') return 'shell';
+    if (entry?.appId.startsWith('workspace:')) return 'workspace';
+    if (entry) return 'standalone';
+    if (appId !== 'unknown') return 'embedded';
+
+    const url = contents.isDestroyed() ? '' : contents.getURL();
+    if (url.startsWith('http://') || url.startsWith('https://')) return 'external';
+    return 'unknown';
+  }
+
+  private trimLogMessage(message: string): string {
+    const maxLength = 2_000;
+    return message.length > maxLength ? `${message.slice(0, maxLength)}...` : message;
+  }
+
+  private normalizeAppLogLevel(level: unknown): AppLogLevel {
+    if (level === 'error') return 'error';
+    if (level === 'warning' || level === 'warn') return 'warning';
+    if (level === 'debug') return 'debug';
+    return 'info';
+  }
+
+  private appTitle(appId: string | undefined): string {
+    if (!appId) return 'unknown';
+    return this.appDirectory.find((app) => app.appId === appId)?.title ?? appId;
+  }
+
+  private isRegisteredApp(appId: string | undefined): appId is string {
+    return !!appId && this.appDirectory.some((entry) => entry.appId === appId);
+  }
+
+  private routeKey(sourceAppId: string, signal: string, targetAppId: string): string {
+    return `${sourceAppId}:${signal}:${targetAppId}`;
+  }
+
+  private isContextRouteAllowedForApp(sourceAppId: string | undefined, contextType: string, targetAppId: string | undefined): boolean {
+    if (!this.flowPolicy || !this.flowPolicy.enabled || !sourceAppId || !targetAppId) return true;
+    return !this.flowPolicy.disabledContextRoutes.includes(this.routeKey(sourceAppId, contextType, targetAppId));
+  }
+
+  private isIntentRouteAllowedForApp(sourceAppId: string | undefined, intentName: string, targetAppId: string | undefined): boolean {
+    if (!this.flowPolicy || !this.flowPolicy.enabled || !sourceAppId || !targetAppId) return true;
+    return !this.flowPolicy.disabledIntentRoutes.includes(this.routeKey(sourceAppId, intentName, targetAppId));
+  }
+
   register(): void {
+    this.registerAppLogCapture();
     this.handleBroadcast();
     this.handleRaiseIntent();
     this.handleAddContextListener();
@@ -82,6 +269,10 @@ export class IpcRouter {
     this.handleGetTheme();
     this.handleSetTheme();
     this.handleSetFlowPolicy();
+    this.handleGetInteropSnapshot();
+    this.handleAppLogWrite();
+    this.handleGetAppLogs();
+    this.handleClearAppLogs();
     this.handleOpenWorkspaceWindow();
     this.handleGetWorkspaceWindowPayload();
     this.handleUpdateWorkspaceWindowPayload();
@@ -115,12 +306,42 @@ export class IpcRouter {
       const senderId = event.sender.id;
       const senderAppId = this.getAppIdForWebContents(senderId);
       const channelId = this.channelManager.getCurrentChannelId(senderId);
+      this.emitActivity({
+        kind: 'context.broadcasted',
+        status: 'ok',
+        sourceAppId: senderAppId,
+        channelId,
+        contextType: context.type,
+        message: `${this.appTitle(senderAppId)} broadcast ${context.type}${channelId ? ` on ${channelId}` : ' globally'}`,
+        payload: context,
+      });
 
       if (!channelId) {
         // No channel: global broadcast to ALL windows except sender
         for (const id of this.windowManager.getAllWebContentsIds()) {
-          if (id !== senderId && this.isContextRouteAllowed(senderAppId, context.type, id)) {
+          if (id === senderId) continue;
+          const targetAppId = this.getAppIdForWebContents(id);
+          if (this.isContextRouteAllowed(senderAppId, context.type, id)) {
             this.windowManager.sendTo(id, IpcEvents.CONTEXT_UPDATE, context);
+            if (this.isRegisteredApp(targetAppId)) {
+              this.emitActivity({
+                kind: 'context.delivered',
+                status: 'ok',
+                sourceAppId: senderAppId,
+                targetAppId,
+                contextType: context.type,
+                message: `${context.type} delivered to ${this.appTitle(targetAppId)}`,
+              });
+            }
+          } else if (this.isRegisteredApp(targetAppId)) {
+            this.emitActivity({
+              kind: 'context.blocked',
+              status: 'blocked',
+              sourceAppId: senderAppId,
+              targetAppId,
+              contextType: context.type,
+              message: `${context.type} blocked from ${this.appTitle(senderAppId)} to ${this.appTitle(targetAppId)}`,
+            });
           }
         }
         return;
@@ -130,8 +351,31 @@ export class IpcRouter {
       this.channelManager.recordBroadcast(channelId, context);
       const targets = this.channelManager.getWindowsInChannel(channelId);
       for (const targetId of targets) {
-        if (targetId !== senderId && this.isContextRouteAllowed(senderAppId, context.type, targetId)) {
+        if (targetId === senderId) continue;
+        const targetAppId = this.getAppIdForWebContents(targetId);
+        if (this.isContextRouteAllowed(senderAppId, context.type, targetId)) {
           this.windowManager.sendTo(targetId, IpcEvents.CONTEXT_UPDATE, context);
+          if (this.isRegisteredApp(targetAppId)) {
+            this.emitActivity({
+              kind: 'context.delivered',
+              status: 'ok',
+              sourceAppId: senderAppId,
+              targetAppId,
+              channelId,
+              contextType: context.type,
+              message: `${context.type} delivered to ${this.appTitle(targetAppId)} on ${channelId}`,
+            });
+          }
+        } else if (this.isRegisteredApp(targetAppId)) {
+          this.emitActivity({
+            kind: 'context.blocked',
+            status: 'blocked',
+            sourceAppId: senderAppId,
+            targetAppId,
+            channelId,
+            contextType: context.type,
+            message: `${context.type} blocked from ${this.appTitle(senderAppId)} to ${this.appTitle(targetAppId)}`,
+          });
         }
       }
     });
@@ -145,9 +389,7 @@ export class IpcRouter {
   private isContextRouteAllowed(sourceAppId: string | undefined, contextType: string, targetWebContentsId: number): boolean {
     if (!this.flowPolicy || !this.flowPolicy.enabled || !sourceAppId) return true;
     const targetAppId = this.getAppIdForWebContents(targetWebContentsId);
-    if (!targetAppId) return true;
-    const key = `${sourceAppId}:${contextType}:${targetAppId}`;
-    return !this.flowPolicy.disabledContextRoutes.includes(key);
+    return this.isContextRouteAllowedForApp(sourceAppId, contextType, targetAppId);
   }
 
   /**
@@ -157,9 +399,7 @@ export class IpcRouter {
   private isIntentRouteAllowed(sourceAppId: string | undefined, intentName: string, targetWebContentsId: number): boolean {
     if (!this.flowPolicy || !this.flowPolicy.enabled || !sourceAppId) return true;
     const targetAppId = this.getAppIdForWebContents(targetWebContentsId);
-    if (!targetAppId) return true;
-    const key = `${sourceAppId}:${intentName}:${targetAppId}`;
-    return !this.flowPolicy.disabledIntentRoutes.includes(key);
+    return this.isIntentRouteAllowedForApp(sourceAppId, intentName, targetAppId);
   }
 
   // ─── Context listener registration ──────────────────────────────────────
@@ -188,58 +428,144 @@ export class IpcRouter {
         const expectsCompletion = intent === 'StartPayment';
         const requestId = expectsCompletion ? randomUUID() : undefined;
         const parentWindow = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+        this.emitActivity({
+          kind: 'intent.raised',
+          status: 'ok',
+          sourceAppId: senderAppId,
+          intentName: intent,
+          contextType: context?.type,
+          message: `${this.appTitle(senderAppId)} raised ${intent}`,
+          payload: context,
+        });
 
-        const resolution = await this.intentResolver.resolve({
-          intent,
-          context,
-          registry: this.intentRegistry,
-          appDirectory: this.appDirectory,
-          chooseHandler: (intentName, ctx, candidates) =>
-            this.intentResolverWindows.show(
-              {
+        let resolution: IntentResolution;
+        try {
+          resolution = await this.intentResolver.resolve({
+            intent,
+            context,
+            registry: this.intentRegistry,
+            appDirectory: this.appDirectory,
+            chooseHandler: (intentName, ctx, candidates) =>
+              this.intentResolverWindows.show(
+                {
+                  intent: intentName,
+                  context: ctx,
+                  contextType: ctx?.type,
+                  contextName: typeof ctx?.name === 'string' ? ctx?.name : undefined,
+                  theme: this.themeManager.getTheme(),
+                  candidates,
+                },
+                parentWindow,
+              ),
+            deliverToWindow: (targetId, intentName, ctx) => {
+              const targetAppId = this.getAppIdForWebContents(targetId);
+              if (!this.isIntentRouteAllowed(senderAppId, intentName, targetId)) {
+                this.emitActivity({
+                  kind: 'intent.blocked',
+                  status: 'blocked',
+                  sourceAppId: senderAppId,
+                  targetAppId,
+                  intentName: intentName,
+                  contextType: ctx?.type,
+                  message: `${intentName} blocked from ${this.appTitle(senderAppId)} to ${this.appTitle(targetAppId)}`,
+                });
+                return;
+              }
+              this.windowManager.sendTo(targetId, IpcEvents.INTENT_FIRE, {
                 intent: intentName,
                 context: ctx,
+                requestId,
+              });
+              this.emitActivity({
+                kind: 'intent.delivered',
+                status: 'ok',
+                sourceAppId: senderAppId,
+                targetAppId,
+                intentName: intentName,
                 contextType: ctx?.type,
-                contextName: typeof ctx?.name === 'string' ? ctx?.name : undefined,
-                theme: this.themeManager.getTheme(),
-                candidates,
-              },
-              parentWindow,
-            ),
-          deliverToWindow: (targetId, intentName, ctx) => {
-            if (!this.isIntentRouteAllowed(senderAppId, intentName, targetId)) return;
-            this.windowManager.sendTo(targetId, IpcEvents.INTENT_FIRE, {
-              intent: intentName,
-              context: ctx,
-              requestId,
-            });
-          },
-          openApp: (appId, ctx) => {
-            const win = this.windowManager.openApp(appId);
-            if (!win) throw new Error(`Failed to open app: ${appId}`);
+                message: `${intentName} delivered to ${this.appTitle(targetAppId)}`,
+              });
+            },
+            openApp: (appId, ctx) => {
+              const wasRunning = !!this.windowManager.findByAppId(appId);
+              const win = this.windowManager.openApp(appId);
+              if (!win) throw new Error(`Failed to open app: ${appId}`);
+              this.emitActivity({
+                kind: wasRunning ? 'app.focused' : 'app.opened',
+                status: 'ok',
+                appId,
+                message: `${this.appTitle(appId)} ${wasRunning ? 'focused' : 'opened'} for ${intent}`,
+              });
 
-            // Wait for the app to register its intent listener (up to 1.2s),
-            // then deliver — or deliver on timeout if no listener shows up.
-            return new Promise<void>((resolve) => {
-              const timeout = setTimeout(() => {
-                win.webContents.send(IpcEvents.INTENT_FIRE, { intent, context: ctx, requestId });
-                resolve();
-              }, 1200);
-
-              const checkInterval = setInterval(() => {
-                if (this.intentRegistry.hasListeners(intent)) {
-                  clearInterval(checkInterval);
-                  clearTimeout(timeout);
-                  this.windowManager.sendTo(win.webContents.id, IpcEvents.INTENT_FIRE, {
-                    intent,
-                    context: ctx,
-                    requestId,
+              const deliver = (): void => {
+                if (!this.isIntentRouteAllowed(senderAppId, intent, win.webContents.id)) {
+                  this.emitActivity({
+                    kind: 'intent.blocked',
+                    status: 'blocked',
+                    sourceAppId: senderAppId,
+                    targetAppId: appId,
+                    intentName: intent,
+                    contextType: ctx?.type,
+                    message: `${intent} blocked from ${this.appTitle(senderAppId)} to ${this.appTitle(appId)}`,
                   });
-                  resolve();
+                  return;
                 }
-              }, 100);
-            });
-          },
+                win.webContents.send(IpcEvents.INTENT_FIRE, { intent, context: ctx, requestId });
+                this.emitActivity({
+                  kind: 'intent.delivered',
+                  status: 'ok',
+                  sourceAppId: senderAppId,
+                  targetAppId: appId,
+                  intentName: intent,
+                  contextType: ctx?.type,
+                  message: `${intent} delivered to ${this.appTitle(appId)}`,
+                });
+              };
+
+              // Wait for the app to register its intent listener (up to 1.2s),
+              // then deliver — or deliver on timeout if no listener shows up.
+              return new Promise<void>((resolve) => {
+                let done = false;
+                const finish = (timer: ReturnType<typeof setTimeout>, interval: ReturnType<typeof setInterval>): void => {
+                  if (done) return;
+                  done = true;
+                  clearTimeout(timer);
+                  clearInterval(interval);
+                  deliver();
+                  resolve();
+                };
+                const timeout = setTimeout(() => {
+                  finish(timeout, checkInterval);
+                }, 1200);
+
+                const checkInterval = setInterval(() => {
+                  if (this.intentRegistry.hasListeners(intent)) {
+                    finish(timeout, checkInterval);
+                  }
+                }, 100);
+              });
+            },
+          });
+        } catch (error) {
+          this.emitActivity({
+            kind: 'intent.failed',
+            status: 'error',
+            sourceAppId: senderAppId,
+            intentName: intent,
+            contextType: context?.type,
+            message: `${intent} failed: ${error instanceof Error ? error.message : String(error)}`,
+          });
+          throw error;
+        }
+
+        this.emitActivity({
+          kind: 'intent.resolved',
+          status: 'ok',
+          sourceAppId: senderAppId,
+          targetAppId: resolution.source.appId,
+          intentName: intent,
+          contextType: context?.type,
+          message: `${intent} resolved to ${this.appTitle(resolution.source.appId)}`,
         });
 
         if (!expectsCompletion || !requestId) {
@@ -286,12 +612,28 @@ export class IpcRouter {
 
   private handleJoinChannel(): void {
     ipcMain.handle(IpcEvents.JOIN_CHANNEL, (event, channelId: string) => {
+      const appId = this.getAppIdForWebContents(event.sender.id);
       this.channelManager.joinChannel(event.sender.id, channelId);
+      this.emitActivity({
+        kind: 'channel.joined',
+        status: 'ok',
+        appId,
+        channelId,
+        message: `${this.appTitle(appId)} joined ${channelId}`,
+      });
 
       // Deliver last-value cache to the newly joined window
       const lastCtx = this.channelManager.getLastContext(channelId);
       if (lastCtx) {
         this.windowManager.sendTo(event.sender.id, IpcEvents.CONTEXT_UPDATE, lastCtx);
+        this.emitActivity({
+          kind: 'context.delivered',
+          status: 'ok',
+          targetAppId: appId,
+          channelId,
+          contextType: lastCtx.type,
+          message: `Last ${lastCtx.type} delivered to ${this.appTitle(appId)} on join`,
+        });
       }
 
       // Notify all windows on the channel about the membership change
@@ -302,7 +644,16 @@ export class IpcRouter {
 
   private handleLeaveChannel(): void {
     ipcMain.handle(IpcEvents.LEAVE_CHANNEL, (event) => {
+      const appId = this.getAppIdForWebContents(event.sender.id);
+      const channelId = this.channelManager.getCurrentChannelId(event.sender.id);
       this.channelManager.leaveChannel(event.sender.id);
+      this.emitActivity({
+        kind: 'channel.left',
+        status: 'ok',
+        appId,
+        channelId,
+        message: `${this.appTitle(appId)} left ${channelId ?? 'current channel'}`,
+      });
       this.windowManager.sendTo(event.sender.id, IpcEvents.CHANNEL_CHANGED, null);
     });
   }
@@ -325,12 +676,35 @@ export class IpcRouter {
     ipcMain.handle(
       IpcEvents.OPEN_APP,
       (_event, { appId, context }: { appId: string; context?: Fdc3Context }) => {
+        const wasRunning = !!this.windowManager.findByAppId(appId);
         const win = this.windowManager.openApp(appId);
-        if (win && context) {
-          // Send context once the window is ready
-          win.webContents.once('did-finish-load', () => {
-            win.webContents.send(IpcEvents.CONTEXT_UPDATE, context);
+        if (win) {
+          this.emitActivity({
+            kind: wasRunning ? 'app.focused' : 'app.opened',
+            status: 'ok',
+            appId,
+            contextType: context?.type,
+            message: `${this.appTitle(appId)} ${wasRunning ? 'focused' : 'opened'}`,
           });
+        }
+        if (win && context) {
+          const deliverContext = (): void => {
+            if (win.isDestroyed()) return;
+            win.webContents.send(IpcEvents.CONTEXT_UPDATE, context);
+            this.emitActivity({
+              kind: 'context.delivered',
+              status: 'ok',
+              targetAppId: appId,
+              contextType: context.type,
+              message: `${context.type} delivered to ${this.appTitle(appId)} on open`,
+            });
+          };
+
+          if (wasRunning) {
+            deliverContext();
+          } else {
+            win.webContents.once('did-finish-load', deliverContext);
+          }
         }
         return { opened: !!win };
       },
@@ -381,6 +755,12 @@ export class IpcRouter {
   private handleSetFlowPolicy(): void {
     ipcMain.handle(IpcEvents.SET_FLOW_POLICY, (_event, policy: FlowPolicy) => {
       this.flowPolicy = policy;
+      this.emitActivity({
+        kind: 'policy.updated',
+        status: 'info',
+        message: `Interop Flow ${policy.enabled ? 'activated' : 'deactivated'} (${policy.disabledContextRoutes.length + policy.disabledIntentRoutes.length} blocked routes)`,
+        payload: policy,
+      });
     });
   }
 
@@ -454,6 +834,143 @@ export class IpcRouter {
     });
   }
 
+  private handleGetInteropSnapshot(): void {
+    ipcMain.handle(IpcEvents.GET_INTEROP_SNAPSHOT, (): InteropSnapshot => this.buildInteropSnapshot());
+  }
+
+  private handleAppLogWrite(): void {
+    ipcMain.handle(
+      IpcEvents.APP_LOG_WRITE,
+      (event, input: { level?: unknown; message?: unknown; category?: string; data?: unknown }) => {
+        const message = input?.message === undefined ? '' : String(input.message);
+        if (!message.trim()) return false;
+        this.emitAppLog(event.sender, {
+          level: this.normalizeAppLogLevel(input?.level),
+          origin: 'platform',
+          message,
+          category: input?.category,
+          data: input?.data,
+        });
+        return true;
+      },
+    );
+  }
+
+  private handleGetAppLogs(): void {
+    ipcMain.handle(IpcEvents.GET_APP_LOGS, (event): AppLogEvent[] => {
+      if (this.canManageAppLogs(event.sender.id)) return this.appLogs;
+      const appId = this.getAppIdForWebContents(event.sender.id);
+      return this.appLogs.filter((log) => log.appId === appId);
+    });
+  }
+
+  private handleClearAppLogs(): void {
+    ipcMain.handle(IpcEvents.CLEAR_APP_LOGS, (event): boolean => {
+      if (!this.canManageAppLogs(event.sender.id)) return false;
+      this.appLogs.length = 0;
+      return true;
+    });
+  }
+
+  private buildInteropSnapshot(): InteropSnapshot {
+    const webContentsIds = this.windowManager.getAllWebContentsIds();
+    const webContentsByApp = new Map<string, number[]>();
+    for (const id of webContentsIds) {
+      const appId = this.getAppIdForWebContents(id);
+      if (!this.isRegisteredApp(appId)) continue;
+      const list = webContentsByApp.get(appId) ?? [];
+      list.push(id);
+      webContentsByApp.set(appId, list);
+    }
+
+    const apps: RuntimeAppSnapshot[] = this.appDirectory.map((appDef) => {
+      const ids = webContentsByApp.get(appDef.appId) ?? [];
+      const currentChannelId = ids.map((id) => this.channelManager.getCurrentChannelId(id)).find((id) => id != null) ?? null;
+      return {
+        appId: appDef.appId,
+        title: appDef.title,
+        icon: appDef.icon,
+        category: appDef.category,
+        running: ids.length > 0,
+        webContentsIds: ids,
+        currentChannelId,
+      };
+    });
+
+    const channels: RuntimeChannelSnapshot[] = this.channelManager.getChannels().map((channel) => {
+      const members = this.channelManager.getWindowsInChannel(channel.id)
+        .map((id) => this.getAppIdForWebContents(id))
+        .filter((appId): appId is string => this.isRegisteredApp(appId));
+      const lastContext = this.channelManager.getLastContext(channel.id);
+      return {
+        id: channel.id,
+        name: channel.displayMetadata.name,
+        color: channel.displayMetadata.color,
+        memberAppIds: [...new Set(members)],
+        lastContext: lastContext ? { type: lastContext.type, name: lastContext.name, id: lastContext.id } : null,
+        trafficCount: this.activityLog.filter((event) => event.channelId === channel.id).length,
+      };
+    });
+
+    const routes = this.buildRouteSnapshots();
+    const blockedEvents = this.activityLog.filter((event) => event.status === 'blocked').length;
+    const deliveredEvents = this.activityLog.filter((event) => event.kind === 'context.delivered' || event.kind === 'intent.delivered').length;
+    const errorLogEvents = this.appLogs.filter((event) => event.level === 'error').length;
+    return {
+      generatedAt: Date.now(),
+      activity: this.activityLog,
+      appLogs: this.appLogs,
+      apps,
+      channels,
+      routes,
+      flowPolicy: this.flowPolicy,
+      metrics: {
+        totalEvents: this.activityLog.length,
+        blockedEvents,
+        deliveredEvents,
+        runningApps: apps.filter((runtimeApp) => runtimeApp.running).length,
+        logEvents: this.appLogs.length,
+        errorLogEvents,
+      },
+    };
+  }
+
+  private buildRouteSnapshots(): InteropRouteSnapshot[] {
+    const routes = new Map<string, InteropRouteSnapshot>();
+    for (const source of this.appDirectory) {
+      for (const target of this.appDirectory) {
+        if (source.appId === target.appId) continue;
+
+        for (const contextType of source.capabilities?.broadcasts ?? []) {
+          if (!(target.capabilities?.listensTo ?? target.listensForContexts ?? []).includes(contextType)) continue;
+          const id = this.routeKey(source.appId, contextType, target.appId);
+          routes.set(`context:${id}`, {
+            id: `context:${id}`,
+            type: 'context',
+            sourceAppId: source.appId,
+            targetAppId: target.appId,
+            contextType,
+            allowed: this.isContextRouteAllowedForApp(source.appId, contextType, target.appId),
+          });
+        }
+
+        for (const intentName of source.capabilities?.raisesIntents ?? []) {
+          if (!(target.capabilities?.handlesIntents ?? []).includes(intentName)) continue;
+          const id = this.routeKey(source.appId, intentName, target.appId);
+          routes.set(`intent:${id}`, {
+            id: `intent:${id}`,
+            type: 'intent',
+            sourceAppId: source.appId,
+            targetAppId: target.appId,
+            intentName,
+            allowed: this.isIntentRouteAllowedForApp(source.appId, intentName, target.appId),
+          });
+        }
+      }
+    }
+    return [...routes.values()].sort((a, b) => `${a.sourceAppId}:${a.targetAppId}`.localeCompare(`${b.sourceAppId}:${b.targetAppId}`));
+  }
+
   // ─── Intent resolver modal window ─────────────────────────────────────────
 
   private handleIntentResolverGetPayload(): void {
@@ -483,6 +1000,14 @@ export class IpcRouter {
     ipcMain.handle(IpcEvents.CREATE_PRIVATE_CHANNEL, (event): PrivateChannelMarker => {
       const id = `private:${randomUUID()}`;
       this.privateChannels.create(id, event.sender.id);
+      const appId = this.getAppIdForWebContents(event.sender.id);
+      this.emitActivity({
+        kind: 'privateChannel.created',
+        status: 'ok',
+        appId,
+        message: `${this.appTitle(appId)} created ${id}`,
+        payload: { channelId: id },
+      });
       return { __fdc3PrivateChannelId: id };
     });
   }
@@ -493,6 +1018,14 @@ export class IpcRouter {
     ipcMain.handle(IpcEvents.PRIVATE_CHANNEL_CONNECT, (event, channelId: string) => {
       if (!this.privateChannels.exists(channelId)) return false;
       this.privateChannels.ensureParticipant(channelId, event.sender.id);
+      const appId = this.getAppIdForWebContents(event.sender.id);
+      this.emitActivity({
+        kind: 'privateChannel.connected',
+        status: 'ok',
+        appId,
+        message: `${this.appTitle(appId)} connected to ${channelId}`,
+        payload: { channelId },
+      });
       return true;
     });
   }
@@ -501,6 +1034,15 @@ export class IpcRouter {
     ipcMain.handle(
       IpcEvents.PRIVATE_CHANNEL_BROADCAST,
       (event, { channelId, context }: { channelId: string; context: Fdc3Context }) => {
+        const sourceAppId = this.getAppIdForWebContents(event.sender.id);
+        this.emitActivity({
+          kind: 'privateChannel.broadcasted',
+          status: 'ok',
+          sourceAppId,
+          contextType: context.type,
+          message: `${this.appTitle(sourceAppId)} broadcast ${context.type} on ${channelId}`,
+          payload: { channelId, context },
+        });
         const targets = this.privateChannels.broadcast(channelId, context, event.sender.id);
         for (const id of targets) {
           this.windowManager.sendTo(id, IpcEvents.PRIVATE_CHANNEL_CONTEXT, { channelId, context });
@@ -568,6 +1110,15 @@ export class IpcRouter {
     ipcMain.handle(
       IpcEvents.APP_CHANNEL_BROADCAST,
       (event, { channelId, context }: { channelId: string; context: Fdc3Context }) => {
+        const sourceAppId = this.getAppIdForWebContents(event.sender.id);
+        this.emitActivity({
+          kind: 'appChannel.broadcasted',
+          status: 'ok',
+          sourceAppId,
+          contextType: context.type,
+          message: `${this.appTitle(sourceAppId)} broadcast ${context.type} on ${channelId}`,
+          payload: { channelId, context },
+        });
         const targets = this.appChannels.broadcast(channelId, context);
         for (const id of targets) {
           if (id === event.sender.id) continue;
@@ -672,6 +1223,7 @@ export class IpcRouter {
     this.channelManager.removeWindow(webContentsId);
     this.intentRegistry.removeWindow(webContentsId);
     this.appChannels.removeWindow(webContentsId);
+    this.logCaptureWebContentsIds.delete(webContentsId);
     const events = this.privateChannels.removeWindow(webContentsId);
     for (const ev of events) {
       for (const id of ev.notify) {
