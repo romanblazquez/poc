@@ -1,7 +1,7 @@
 # FDC3 Desktop POC
 
 > **Enterprise desktop interoperability shell** built on Electron + FDC3-compatible APIs,
-> with an Angular 21 app fleet, AG Grid blotters, Dockview workspaces, and a runtime-swappable
+> with an Angular 21 app fleet, a static FDC3 conformance app, AG Grid blotters, Dockview workspaces, and a runtime-swappable
 > adapter layer (Electron / Browser / io.Connect).
 >
 > Demonstrates the core concepts of Interop.io / Harmonix / io.Connect Desktop without vendor lock-in.
@@ -12,7 +12,7 @@
 
 | Capability | Implementation |
 |------------|---------------|
-| Multi-app desktop | 10 Angular apps, hosted either as detached Electron `BrowserWindow`s or as Dockview panels |
+| Multi-app desktop | Angular, static, and cloud apps hosted either as detached Electron `BrowserWindow`s or as Dockview panels |
 | Context broadcasting | `window.fdc3.broadcast()` → IPC → channel-filtered delivery |
 | User channels | 6 colour-coded channels; only apps on the same channel receive contexts |
 | Intent routing | `raiseIntent('StartPayment')` opens Payment Action and pre-fills it; results returned via `completeIntent` |
@@ -38,11 +38,31 @@ Custom Electron Shell (this POC)          io.Connect / Interop.io
 ✅ App directory (JSON, validated)        ✅ Remote AppD, live reload, versioning
 ✅ Workspace persistence + Dockview        ✅ Named workspaces, server-side, shared
 ✅ Multi-monitor detach                    ✅ Multi-monitor, tabbed groups
-⚠️  No resolver UI (first match wins)      ✅ Full intent resolver dialog
-⚠️  No PrivateChannel / AppChannel yet     ✅ Full FDC3 2.0 channel model
+✅ PrivateChannel + AppChannel            ✅ Full FDC3 2.0 channel model
+✅ getAgent() Desktop Agent Discovery     ✅ getAgent() (FDC3 for the Web)
+✅ Built-in conformance console           ⚠️  No in-shell self-test harness
 ❌ No native/COM app support              ✅ Native, .NET, Java, web
 Free (open source)                        Commercial licence required
 ```
+
+### Standards posture — "any FDC3 app just works"
+
+A core goal is that an **unmodified third-party FDC3 app** runs here with no shell-specific
+code. Two things make that true:
+
+1. **Modern discovery** — apps find the agent via the `getAgent()` pattern (FDC3 2.1 / "FDC3
+   for the Web"), not a hard dependency on `window.fdc3`. The preload exposes `window.fdc3`
+   synchronously and fires `fdc3Ready`, so both the legacy global and `getAgent()` resolve.
+2. **Spec-accurate surface** — `addContextListener` / `addIntentListener` return a handle that
+   satisfies the existing bare-function form plus the FDC3 2.0 `Promise<Listener>` form, so
+   `const l = await fdc3.addContextListener(...); l.unsubscribe();` and
+   `fdc3.addContextListener(...).then((l) => l.unsubscribe())` both work as written.
+
+The **FDC3 Conformance Console** app (`apps/fdc3-conformance`, port 4015) is a dependency-free
+vanilla web app that discovers the agent via `getAgent()` and runs live PASS/FAIL checks against
+`getInfo`, context listeners, broadcast, user channels, `findIntentsByContext`, App Channels and
+Private Channels, plus standalone and embedded app identity — then drives the real fleet by broadcasting standard contexts. Open it from the
+launcher to prove interop end to end.
 
 The **adapter pattern** ensures apps written for this POC run on io.Connect with a
 one-file bootstrap swap. See [`docs/interop-vs-custom-shell.md`](docs/interop-vs-custom-shell.md).
@@ -67,7 +87,8 @@ npm run dev
 ```
 
 This will:
-1. Start Angular dev servers for all 9 local apps (ports 4001–4005, 4011–4014)
+1. Start Angular dev servers for the local app fleet and the static FDC3 Conformance Console
+   (ports 4001-4015)
 2. Wait for them to be ready
 3. Launch `electron-vite dev` — builds the main + preload processes, starts Electron
 4. The **Shell Launcher** window opens automatically. Open apps from the launcher.
@@ -112,11 +133,12 @@ declared in `config/app-directory.json` and **validated at shell startup** — a
 | `incoming-orders` | 4012 | Buy-side — fund order blotter | `com.demo.order`, `com.demo.fund` | `com.demo.fund` | — |
 | `audit-log` | 4013 | Buy-side — fund/order audit trail | — | `com.demo.order`, `com.demo.fund` | handles `OpenAudit`, `ViewFund` |
 | `theme-toggle` | 4014 | Workspace — broadcasts theme | `com.demo.theme` | `com.demo.theme` | handles `ApplyTheme` |
+| `fdc3-conformance` | 4015 | Diagnostics — vanilla web app, `getAgent()` discovery + live FDC3 2.0 conformance self-test | `fdc3.instrument`, `fdc3.contact` | `fdc3.instrument`, `fdc3.contact` | raises `ViewInstrument` |
 | `cloud-sample` | — | Demo — externally-hosted URL via `devPort: 0` | — | — | — |
 
 ### App directory convention
 
-- `devPort > 0` ⇒ this is a local Angular app. **Dev** loads `http://localhost:<devPort>`,
+- `devPort > 0` ⇒ this is a local app served during development. **Dev** loads `http://localhost:<devPort>`,
   **production** loads the `url` (a `file://…` path under the app's `dist/browser/`).
 - `devPort === 0` ⇒ this is a cloud app. The `url` is loaded as-is in every environment.
 

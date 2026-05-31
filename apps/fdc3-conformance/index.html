@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FDC3 Interop Conformance Console</title>
+  <style>
+    :root {
+      --bg: #0e1116; --panel: #161b22; --border: #2b3440; --text: #e6edf3;
+      --muted: #8b949e; --accent: #2f81f7; --ok: #3fb950; --fail: #f85149; --warn: #d29922;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font: 13px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg); color: var(--text); padding: 14px;
+    }
+    h1 { font-size: 15px; margin: 0 0 2px; }
+    .sub { color: var(--muted); font-size: 11px; margin-bottom: 12px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+    .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
+    .row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
+    .row:last-child { border-bottom: 0; }
+    .badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
+    .badge.ok { background: rgba(63,185,80,.15); color: var(--ok); }
+    .badge.fail { background: rgba(248,81,73,.15); color: var(--fail); }
+    .badge.pend { background: rgba(210,153,34,.15); color: var(--warn); }
+    .name { flex: 1; }
+    .detail { color: var(--muted); font-size: 11px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    button {
+      background: var(--accent); color: #fff; border: 0; border-radius: 6px;
+      padding: 7px 11px; font-size: 12px; font-weight: 600; cursor: pointer; margin: 3px 4px 3px 0;
+    }
+    button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    button:hover { filter: brightness(1.1); }
+    #log { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
+      background: #0b0e13; border: 1px solid var(--border); border-radius: 6px; padding: 8px;
+      height: 180px; overflow: auto; white-space: pre-wrap; }
+    .agentbar { display: flex; gap: 14px; flex-wrap: wrap; background: var(--panel);
+      border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+    .agentbar b { color: var(--accent); }
+    .full { grid-column: 1 / -1; }
+  </style>
+</head>
+<body>
+  <h1>FDC3 Interop Conformance Console</h1>
+  <div class="sub">
+    A vanilla web app with <b>zero</b> shell-specific dependencies. It discovers the Desktop Agent
+    the modern <code>getAgent()</code> way and exercises the standard FDC3&nbsp;2.0 surface —
+    proving any third-party FDC3 app interoperates with this platform.
+  </div>
+
+  <div class="agentbar" id="agentbar">
+    <div>Agent: <b id="a-provider">discovering…</b></div>
+    <div>FDC3: <b id="a-version">—</b></div>
+    <div>App: <b id="a-appid">—</b></div>
+    <div>Discovery: <b id="a-mode">—</b></div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Conformance checks</h2>
+      <div id="checks"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Drive the fleet (live interop)</h2>
+      <div class="sub" style="margin:0 0 8px">
+        These broadcast standard contexts / raise standard intents. Join the same user channel
+        as Market&nbsp;Watch or Customer&nbsp;Profile and watch them react.
+      </div>
+      <button data-act="instrument">Broadcast fdc3.instrument (AAPL)</button>
+      <button data-act="contact">Broadcast fdc3.contact (Maria Garcia)</button>
+      <button data-act="raise-view-instrument" class="ghost">raiseIntent ViewInstrument</button>
+      <button data-act="raise-for-context" class="ghost">raiseIntentForContext (contact)</button>
+      <div style="margin-top:8px">
+        <span class="detail">User channel:</span>
+        <span id="channels"></span>
+      </div>
+    </div>
+
+    <div class="panel full">
+      <h2>Event log</h2>
+      <div id="log"></div>
+    </div>
+  </div>
+
+  <script>
+  // ─────────────────────────────────────────────────────────────────────────
+  // Modern FDC3 Desktop Agent discovery.
+  //
+  // In a real build you'd: import { getAgent } from '@finos/fdc3';
+  // Here we inline the spec's discovery algorithm so this file stays a single,
+  // dependency-free artifact: prefer an injected window.fdc3 (Electron/preload
+  // "container" path), waiting for the `fdc3Ready` event if it hasn't fired.
+  // ─────────────────────────────────────────────────────────────────────────
+  function getAgent({ timeoutMs = 5000 } = {}) {
+    return new Promise((resolve, reject) => {
+      if (window.fdc3) return resolve({ agent: window.fdc3, mode: 'window.fdc3 (preload)' });
+      const onReady = () => { cleanup(); resolve({ agent: window.fdc3, mode: 'fdc3Ready event' }); };
+      const timer = setTimeout(() => { cleanup(); reject(new Error('No FDC3 agent found')); }, timeoutMs);
+      function cleanup() { clearTimeout(timer); window.removeEventListener('fdc3Ready', onReady); }
+      window.addEventListener('fdc3Ready', onReady);
+    });
+  }
+
+  const logEl = document.getElementById('log');
+  function log(msg, obj) {
+    const t = new Date().toLocaleTimeString();
+    logEl.textContent += `[${t}] ${msg}` + (obj !== undefined ? '  ' + JSON.stringify(obj) : '') + '\n';
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  const checksEl = document.getElementById('checks');
+  function addCheck(id, name) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<span class="badge pend" id="b-${id}">…</span>
+                     <span class="name">${name}</span>
+                     <span class="detail" id="d-${id}"></span>`;
+    checksEl.appendChild(row);
+  }
+  function setCheck(id, ok, detail) {
+    const b = document.getElementById('b-' + id);
+    b.className = 'badge ' + (ok ? 'ok' : 'fail');
+    b.textContent = ok ? 'PASS' : 'FAIL';
+    if (detail != null) document.getElementById('d-' + id).textContent = detail;
+  }
+
+  [
+    ['getinfo', 'getInfo() returns ImplementationMetadata'],
+    ['appidentity', 'getInfo() resolves this app identity'],
+    ['ctxlistener', 'addContextListener() supports function, await and .then()'],
+    ['broadcast', 'broadcast() resolves'],
+    ['channels', 'getUserChannels() / joinUserChannel()'],
+    ['findctx', 'findIntentsByContext() returns AppIntent[]'],
+    ['appchannel', 'getOrCreateChannel() (App Channel) round-trips'],
+    ['privchannel', 'createPrivateChannel()'],
+  ].forEach(([id, name]) => addCheck(id, name));
+
+  let fdc3 = null;
+
+  async function runConformance() {
+    // getInfo
+    try {
+      const info = await fdc3.getInfo();
+      document.getElementById('a-provider').textContent = info?.provider ?? 'unknown';
+      document.getElementById('a-version').textContent = info?.fdc3Version ?? '—';
+      document.getElementById('a-appid').textContent = info?.appMetadata?.appId ?? info?.appId ?? '(no identity)';
+      setCheck('getinfo', !!info && !!info.fdc3Version, info?.provider ?? '');
+      setCheck('appidentity', info?.appMetadata?.appId === 'fdc3-conformance', info?.appMetadata?.appId ?? 'missing');
+    } catch (e) {
+      setCheck('getinfo', false, String(e));
+      setCheck('appidentity', false, String(e));
+    }
+
+    // addContextListener compatibility:
+    // - legacy POC code gets a callable unsubscribe function
+    // - standard FDC3 code can await a Listener
+    // - Promise-style standard code can use .then()
+    try {
+      const tempHandle = fdc3.addContextListener('fdc3.instrument', () => undefined);
+      const thenStyleOk = typeof tempHandle?.then === 'function';
+      const legacyOk = typeof tempHandle === 'function';
+      const tempListener = await tempHandle;
+      tempListener.unsubscribe();
+
+      const listenerHandle = fdc3.addContextListener('fdc3.instrument', (ctx) => {
+        log('◀ received fdc3.instrument', ctx?.id ?? ctx);
+      });
+      const listener = await listenerHandle;
+      const ok = legacyOk && thenStyleOk && listener && typeof listener.unsubscribe === 'function';
+      setCheck('ctxlistener', ok, ok ? 'callable + Promise<Listener>' : 'listener contract mismatch');
+      // Standard wildcard overload to surface everything in the log.
+      await fdc3.addContextListener((ctx) => log('◀ context (' + (ctx?.type) + ')', ctx?.id ?? ctx?.name ?? ''));
+    } catch (e) { setCheck('ctxlistener', false, String(e)); }
+
+    // broadcast
+    try {
+      await fdc3.broadcast({ type: 'fdc3.nothing', id: { ticker: 'PING' } });
+      setCheck('broadcast', true, 'ok');
+    } catch (e) { setCheck('broadcast', false, String(e)); }
+
+    // channels
+    try {
+      const list = await fdc3.getUserChannels();
+      renderChannels(list);
+      setCheck('channels', Array.isArray(list) && list.length > 0, (list?.length ?? 0) + ' channels');
+    } catch (e) { setCheck('channels', false, String(e)); }
+
+    // findIntentsByContext
+    try {
+      const res = await fdc3.findIntentsByContext({ type: 'fdc3.instrument' });
+      setCheck('findctx', Array.isArray(res), (res?.length ?? 0) + ' intents');
+    } catch (e) { setCheck('findctx', false, String(e)); }
+
+    // App Channel
+    try {
+      const ch = await fdc3.getOrCreateChannel('fdc3.conformance.appchannel');
+      await ch.broadcast({ type: 'fdc3.instrument', id: { ticker: 'ACN' } });
+      let cachedTicker = null;
+      const appListener = await ch.addContextListener((ctx) => { cachedTicker = ctx?.id?.ticker ?? null; });
+      appListener.unsubscribe();
+      const back = await ch.getCurrentContext('fdc3.instrument');
+      setCheck('appchannel', back?.id?.ticker === 'ACN' && cachedTicker === 'ACN', 'cached ' + (back?.id?.ticker ?? '-'));
+    } catch (e) { setCheck('appchannel', false, String(e)); }
+
+    // Private Channel
+    try {
+      const pc = await fdc3.createPrivateChannel();
+      setCheck('privchannel', pc && typeof pc.broadcast === 'function', pc?.id ?? '');
+    } catch (e) { setCheck('privchannel', false, String(e)); }
+  }
+
+  function renderChannels(list) {
+    const wrap = document.getElementById('channels');
+    wrap.innerHTML = '';
+    (list || []).forEach((c) => {
+      const b = document.createElement('button');
+      b.className = 'ghost';
+      b.textContent = c.displayMetadata?.name || c.id;
+      b.style.borderColor = c.displayMetadata?.color || 'var(--border)';
+      b.onclick = async () => { await fdc3.joinUserChannel(c.id); log('joined user channel', c.id); };
+      wrap.appendChild(b);
+    });
+  }
+
+  document.querySelectorAll('button[data-act]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const act = btn.getAttribute('data-act');
+      try {
+        if (act === 'instrument') {
+          await fdc3.broadcast({ type: 'fdc3.instrument', id: { ticker: 'AAPL' }, name: 'Apple Inc.' });
+          log('▶ broadcast fdc3.instrument', 'AAPL');
+        } else if (act === 'contact') {
+          await fdc3.broadcast({ type: 'fdc3.contact', id: { email: 'maria.garcia@example.com' }, name: 'Maria Garcia' });
+          log('▶ broadcast fdc3.contact', 'Maria Garcia');
+        } else if (act === 'raise-view-instrument') {
+          const r = await fdc3.raiseIntent('ViewInstrument', { type: 'fdc3.instrument', id: { ticker: 'AAPL' } });
+          log('▶ raiseIntent ViewInstrument →', r?.source ?? r);
+        } else if (act === 'raise-for-context') {
+          const r = await fdc3.raiseIntentForContext({ type: 'fdc3.contact', id: { email: 'maria.garcia@example.com' }, name: 'Maria Garcia' });
+          log('▶ raiseIntentForContext →', r?.source ?? r);
+        }
+      } catch (e) { log('✖ ' + act + ' failed', String(e)); }
+    });
+  });
+
+  (async () => {
+    try {
+      const { agent, mode } = await getAgent();
+      fdc3 = agent;
+      document.getElementById('a-mode').textContent = mode;
+      log('Desktop Agent discovered via ' + mode);
+      await runConformance();
+    } catch (e) {
+      document.getElementById('a-provider').textContent = 'NOT FOUND';
+      log('✖ getAgent() failed: ' + String(e));
+    }
+  })();
+  </script>
+</body>
+</html>

@@ -10,7 +10,7 @@ import type { IntentRegistry } from '@fdc3-poc/intent-engine';
 import { IntentResolver } from '@fdc3-poc/intent-engine';
 import { AppRegistry } from '@fdc3-poc/app-registry';
 import { IntentResolverWindowManager } from './intent-resolver-window.js';
-import type { WindowManager } from './window-manager.js';
+import { resolveAppIdentityFromUrl, type WindowManager } from './window-manager.js';
 import type { DetachedWorkspacePayload } from './window-manager.js';
 import type { WorkspaceManager } from './workspace-manager.js';
 import type { ThemeManager } from './theme-manager.js';
@@ -39,7 +39,7 @@ export class IpcRouter {
 
   /**
    * Resolve an appId for any webContents — BrowserWindow apps (via the registry)
-   * AND webview-embedded apps (via URL port → app-directory lookup).
+   * and webview-embedded apps (via fdc3AppId query or dev-port lookup).
    */
   private getAppIdForWebContents(webContentsId: number): string | undefined {
     const entry = this.windowManager.getEntry(webContentsId);
@@ -47,13 +47,7 @@ export class IpcRouter {
 
     const wc = webContents.fromId(webContentsId);
     if (!wc || wc.isDestroyed()) return undefined;
-    try {
-      const port = parseInt(new URL(wc.getURL()).port, 10);
-      if (!port) return undefined;
-      return this.appDirectory.find((a) => a.devPort === port)?.appId;
-    } catch {
-      return undefined;
-    }
+    return resolveAppIdentityFromUrl(wc.getURL(), this.appDirectory);
   }
 
   constructor(
@@ -277,8 +271,7 @@ export class IpcRouter {
   private handleAddIntentListener(): void {
     ipcMain.handle(IpcEvents.ADD_INTENT_LISTENER, (event, intent: string) => {
       const senderId = event.sender.id;
-      const entry = this.windowManager.getEntry(senderId);
-      const appId = entry?.appId ?? 'unknown';
+      const appId = this.getAppIdForWebContents(senderId) ?? 'unknown';
       this.intentRegistry.registerListener(senderId, appId, intent);
     });
   }

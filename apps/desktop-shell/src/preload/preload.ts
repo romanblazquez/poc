@@ -195,6 +195,50 @@ ipcRenderer.on(
   },
 );
 
+interface Listener {
+  unsubscribe(): void;
+}
+
+/**
+ * Build a listener handle that satisfies the calling conventions in use:
+ * - POC apps: const unsub = fdc3.addContextListener(...); unsub();
+ * - FDC3 apps: const l = await fdc3.addContextListener(...); l.unsubscribe();
+ * - Promise-style FDC3 apps: fdc3.addContextListener(...).then((l) => l.unsubscribe());
+ */
+type ListenerHandle = (() => void) & Listener & Promise<Listener>;
+function makeListenerHandle(cleanup: () => void): ListenerHandle {
+  let subscribed = true;
+  const listener: Listener = {
+    unsubscribe: () => {
+      if (!subscribed) return;
+      subscribed = false;
+      cleanup();
+    },
+  };
+  const promise = Promise.resolve(listener);
+  const handle = (() => listener.unsubscribe()) as ListenerHandle;
+  handle.unsubscribe = listener.unsubscribe;
+  handle.then = promise.then.bind(promise);
+  handle.catch = promise.catch.bind(promise);
+  handle.finally = promise.finally.bind(promise);
+  Object.defineProperty(handle, Symbol.toStringTag, { value: 'Promise' });
+  return handle;
+}
+
+function parseContextListenerArgs(
+  contextTypeOrHandler: string | null | ContextHandler,
+  maybeHandler?: ContextHandler,
+): { contextType: string | null; key: string; handler: ContextHandler } {
+  if (typeof contextTypeOrHandler === 'function') {
+    return { contextType: null, key: '*', handler: contextTypeOrHandler };
+  }
+  if (typeof maybeHandler !== 'function') {
+    throw new TypeError('addContextListener requires a context handler');
+  }
+  const contextType = contextTypeOrHandler === '*' ? null : contextTypeOrHandler;
+  return { contextType, key: contextType ?? '*', handler: maybeHandler };
+}
+
 /** Build a client-side PrivateChannel that proxies to the main-process store. */
 function buildPrivateChannel(channelId: string): PrivateChannel {
   return {
@@ -207,10 +251,17 @@ function buildPrivateChannel(channelId: string): PrivateChannel {
       return ipcRenderer.invoke(IpcEvents.PRIVATE_CHANNEL_GET_CURRENT_CONTEXT, { channelId, contextType }) as Promise<Fdc3Context | null>;
     },
     async addContextListener<T extends Fdc3Context>(
-      contextType: string | null,
-      handler: (context: T) => void,
+      contextTypeOrHandler: string | null | ((context: T) => void),
+      maybeHandler?: (context: T) => void,
     ): Promise<ChannelListener> {
-      const key = contextType ?? '*';
+      const {
+        contextType,
+        key,
+        handler,
+      } = parseContextListenerArgs(
+        contextTypeOrHandler as string | null | ContextHandler,
+        maybeHandler as ContextHandler | undefined,
+      );
       const channelMap = privateChannelHandlers.get(channelId) ?? new Map<string, Set<ContextHandler>>();
       const set = channelMap.get(key) ?? new Set<ContextHandler>();
       const wrapped: ContextHandler = (ctx) => handler(ctx as T);
@@ -282,10 +333,10 @@ contextBridge.exposeInMainWorld('fdc3', {
    * type = null or '*' means listen to all context types.
    */
   addContextListener(
-    type: string | null,
-    handler: ContextHandler,
-  ): () => void {
-    const key = type ?? '*';
+    typeOrHandler: string | null | ContextHandler,
+    maybeHandler?: ContextHandler,
+  ): ListenerHandle {
+    const { key, handler } = parseContextListenerArgs(typeOrHandler, maybeHandler);
     if (!contextHandlers.has(key)) {
       contextHandlers.set(key, new Set());
       void ipcRenderer.invoke(IpcEvents.ADD_CONTEXT_LISTENER, key);
@@ -306,14 +357,14 @@ contextBridge.exposeInMainWorld('fdc3', {
       });
     }
 
-    return () => {
+    return makeListenerHandle(() => {
       const set = contextHandlers.get(key);
       set?.delete(handler);
       if (set?.size === 0) {
         contextHandlers.delete(key);
         void ipcRenderer.invoke(IpcEvents.REMOVE_CONTEXT_LISTENER, key);
       }
-    };
+    });
   },
 
   /**
@@ -323,6 +374,32 @@ contextBridge.exposeInMainWorld('fdc3', {
    */
   async raiseIntent(intent: string, context?: Fdc3Context): Promise<IntentResolution> {
     const resolution = (await ipcRenderer.invoke(IpcEvents.RAISE_INTENT, { intent, context })) as IntentResolution;
+    if (resolution && resolution.result !== undefined) {
+      const unwrapped = await unwrapIntentResult(resolution.result);
+      return { ...resolution, result: unwrapped as IntentResolution['result'] };
+    }
+    return resolution;
+  },
+
+  /**
+   * FDC3 2.0 — `raiseIntentForContext(context, app?)`. Raises an intent chosen
+   * for the given context, letting the agent pick across every intent that
+   * accepts that context type. Composed from the already-wired
+   * `findIntentsByContext` + `raiseIntent`, so it shares the same resolver and
+   * PrivateChannel unwrapping. Rejects with the standard `NoAppsFound` error
+   * code when no intent accepts the context.
+   */
+  async raiseIntentForContext(context: Fdc3Context): Promise<IntentResolution> {
+    const appIntents = (await ipcRenderer.invoke(IpcEvents.FIND_INTENTS_BY_CONTEXT, {
+      context,
+    })) as AppIntent[];
+    if (!appIntents || appIntents.length === 0) {
+      throw new Error('NoAppsFound');
+    }
+    const resolution = (await ipcRenderer.invoke(IpcEvents.RAISE_INTENT, {
+      intent: appIntents[0].intent.name,
+      context,
+    })) as IntentResolution;
     if (resolution && resolution.result !== undefined) {
       const unwrapped = await unwrapIntentResult(resolution.result);
       return { ...resolution, result: unwrapped as IntentResolution['result'] };
@@ -353,21 +430,21 @@ contextBridge.exposeInMainWorld('fdc3', {
   /**
    * Register this window as a handler for a specific intent.
    */
-  addIntentListener(intent: string, handler: IntentHandler): () => void {
+  addIntentListener(intent: string, handler: IntentHandler): ListenerHandle {
     if (!intentHandlers.has(intent)) {
       intentHandlers.set(intent, new Set());
       void ipcRenderer.invoke(IpcEvents.ADD_INTENT_LISTENER, intent);
     }
     intentHandlers.get(intent)!.add(handler);
 
-    return () => {
+    return makeListenerHandle(() => {
       const set = intentHandlers.get(intent);
       set?.delete(handler);
       if (set?.size === 0) {
         intentHandlers.delete(intent);
         void ipcRenderer.invoke(IpcEvents.REMOVE_INTENT_LISTENER, intent);
       }
-    };
+    });
   },
 
   /** Join a named user channel (e.g. "channel-1"). */
@@ -455,10 +532,17 @@ contextBridge.exposeInMainWorld('fdc3', {
         return ipcRenderer.invoke(IpcEvents.APP_CHANNEL_GET_CURRENT_CONTEXT, { channelId: meta.id, contextType }) as Promise<Fdc3Context | null>;
       },
       async addContextListener<T extends Fdc3Context>(
-        contextType: string | null,
-        handler: (context: T) => void,
+        contextTypeOrHandler: string | null | ((context: T) => void),
+        maybeHandler?: (context: T) => void,
       ): Promise<ChannelListener> {
-        const key = contextType ?? '*';
+        const {
+          contextType,
+          key,
+          handler,
+        } = parseContextListenerArgs(
+          contextTypeOrHandler as string | null | ContextHandler,
+          maybeHandler as ContextHandler | undefined,
+        );
         const channelMap = appChannelHandlers.get(meta.id) ?? new Map<string, Set<ContextHandler>>();
         const set = channelMap.get(key) ?? new Set<ContextHandler>();
         const wrapped: ContextHandler = (ctx) => handler(ctx as T);

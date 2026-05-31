@@ -86,17 +86,33 @@ export interface InteropAdapter {
  * Matches the FDC3 2.0 DesktopAgent surface used in the POC.
  * Apps import this type — never the concrete adapter directly.
  */
+/** FDC3 listener object resolved by listener registration methods. */
+export interface Listener {
+  unsubscribe(): void;
+}
+
+/**
+ * Compatibility handle for listener registration.
+ * It is callable for the existing POC apps and promise-like for standard FDC3 apps.
+ */
+export type ListenerHandle = Unsubscribe & Listener & PromiseLike<Listener>;
+
 export interface Fdc3DesktopAgent {
   broadcast(context: Fdc3Context): Promise<void>;
   addContextListener<T extends Fdc3Context>(
+    handler: (context: T) => void,
+  ): ListenerHandle;
+  addContextListener<T extends Fdc3Context>(
     type: string | null,
     handler: (context: T) => void,
-  ): Unsubscribe;
+  ): ListenerHandle;
   raiseIntent(intent: string, context?: Fdc3Context): Promise<IntentResolution>;
+  /** FDC3 2.0 — raise an intent chosen for the given context across all handlers. */
+  raiseIntentForContext(context: Fdc3Context): Promise<IntentResolution>;
   addIntentListener(
     intent: string,
     handler: (context?: Fdc3Context, metadata?: IntentInvocationMetadata) => Promise<void> | void,
-  ): Unsubscribe;
+  ): ListenerHandle;
   completeIntent(requestId: string, result?: Fdc3Context | PrivateChannel): Promise<void>;
   closeWindow(): Promise<boolean>;
   getTheme(): Promise<ThemeName>;

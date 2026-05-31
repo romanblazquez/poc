@@ -318,6 +318,23 @@
       }
     },
     {
+      "appId": "fdc3-conformance",
+      "title": "FDC3 Conformance Console",
+      "description": "Vanilla web app (no shell dependencies) that discovers the agent via getAgent() and live-tests the standard FDC3 2.0 surface — proves any third-party FDC3 app interoperates here.",
+      "url": "file://apps/fdc3-conformance/index.html",
+      "devPort": 4015,
+      "icon": "✓",
+      "category": "Diagnostics",
+      "initialLayout": { "x": 240, "y": 120, "width": 920, "height": 680 },
+      "listensForContexts": ["fdc3.instrument", "fdc3.contact"],
+      "capabilities": {
+        "broadcasts": ["fdc3.instrument", "fdc3.contact"],
+        "listensTo": ["fdc3.instrument", "fdc3.contact"],
+        "raisesIntents": ["ViewInstrument"],
+        "handlesIntents": []
+      }
+    },
+    {
       "appId": "cloud-sample",
       "title": "Cloud App",
       "description": "Sample cloud-hosted app loaded directly from a remote URL — demonstrates embedding external web content.",

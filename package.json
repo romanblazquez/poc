@@ -6,7 +6,7 @@
   "main": "apps/desktop-shell/out/main/index.js",
   "scripts": {
     "dev": "node tools/scripts/dev.mjs",
-    "dev:apps": "concurrently -k -n \"SEARCH,PROFILE,PORTFOLIO,MARKET,PAYMENT,TICKET,BLOTTER,CHART,NEWS,RFQ,FUNDS,ORDERS,AUDIT,THEME\" -c \"cyan,magenta,yellow,green,red,bgBlue,bgMagenta,bgGreen,bgYellow,bgRed,blue,white,gray,black\" \"nx serve customer-search\" \"nx serve customer-profile\" \"nx serve portfolio-view\" \"nx serve market-watch\" \"nx serve payment-action\" \"nx serve order-ticket\" \"nx serve order-blotter\" \"nx serve chart\" \"nx serve news\" \"nx serve rfq-quote\" \"nx serve funds-allocations\" \"nx serve incoming-orders\" \"nx serve audit-log\" \"nx serve theme-toggle\"",
+    "dev:apps": "concurrently -k -n \"SEARCH,PROFILE,PORTFOLIO,MARKET,PAYMENT,TICKET,BLOTTER,CHART,NEWS,RFQ,FUNDS,ORDERS,AUDIT,THEME,CONFORM\" -c \"cyan,magenta,yellow,green,red,bgBlue,bgMagenta,bgGreen,bgYellow,bgRed,blue,white,gray,black,cyan\" \"nx serve customer-search\" \"nx serve customer-profile\" \"nx serve portfolio-view\" \"nx serve market-watch\" \"nx serve payment-action\" \"nx serve order-ticket\" \"nx serve order-blotter\" \"nx serve chart\" \"nx serve news\" \"nx serve rfq-quote\" \"nx serve funds-allocations\" \"nx serve incoming-orders\" \"nx serve audit-log\" \"nx serve theme-toggle\" \"node tools/scripts/serve-static.mjs apps/fdc3-conformance 4015\"",
     "dev:shell": "electron-vite dev --config apps/desktop-shell/electron.vite.config.ts",
     "build": "npm run build:apps && npm run build:shell",
     "build:apps": "CI=true NX_NO_CLOUD=true nx run-many -t build -p customer-search,customer-profile,portfolio-view,market-watch,payment-action,order-ticket,order-blotter,chart,news,rfq-quote,funds-allocations,incoming-orders,audit-log,theme-toggle",
@@ -71,6 +71,7 @@
     },
     "files": [
       "apps/desktop-shell/out/**/*",
+      "apps/fdc3-conformance/**/*",
       "config/**/*"
     ],
     "extraResources": [

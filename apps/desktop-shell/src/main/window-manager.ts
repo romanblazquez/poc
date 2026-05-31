@@ -14,11 +14,33 @@ const isDev = process.env.NODE_ENV === 'development';
  * In production: file:// path to the built index.html.
  */
 function resolveAppUrl(app: AppDefinition): string {
-  if (isDev) {
-    return `http://localhost:${app.devPort}`;
+  const baseUrl = isDev && app.devPort > 0
+    ? `http://localhost:${app.devPort}`
+    : app.url;
+  return appendQuery(baseUrl, `fdc3AppId=${encodeURIComponent(app.appId)}`);
+}
+
+function appendQuery(url: string, query: string): string {
+  const hashIndex = url.indexOf('#');
+  const baseUrl = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
+  const hash = hashIndex >= 0 ? url.slice(hashIndex) : '';
+  return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}${query}${hash}`;
+}
+
+export function resolveAppIdentityFromUrl(url: string, appDefs: AppDefinition[]): string | undefined {
+  try {
+    const parsed = new URL(url);
+    const appId = parsed.searchParams.get('fdc3AppId');
+    if (appId && appDefs.some((app) => app.appId === appId)) {
+      return appId;
+    }
+
+    const port = parseInt(parsed.port, 10);
+    if (!port) return undefined;
+    return appDefs.find((app) => app.devPort === port)?.appId;
+  } catch {
+    return undefined;
   }
-  // Production: apps are bundled next to the binary
-  return app.url;
 }
 
 function getShellUrl(): string {
@@ -26,10 +48,6 @@ function getShellUrl(): string {
     return 'http://localhost:5173'; // electron-vite renderer dev server
   }
   return pathToFileURL(path.join(__dirname, '../renderer/index.html')).href;
-}
-
-function appendQuery(url: string, query: string): string {
-  return `${url}${url.includes('?') ? '&' : '?'}${query}`;
 }
 
 export interface WindowEntry {

@@ -95,6 +95,15 @@ for (const app of apps.filter((a) => a.port > 0)) {
   spawnProc(app.name, 'npx', app.args, CYAN);
 }
 
+// Plain static demo apps (no framework / no nx serve) — served by a tiny static server.
+const staticApps = [
+  { name: 'CONFORM', port: 4015, root: 'apps/fdc3-conformance' },
+];
+for (const s of staticApps) {
+  spawnProc(s.name, 'node', ['tools/scripts/serve-static.mjs', s.root, String(s.port)], CYAN);
+  apps.push({ name: s.name, port: s.port });
+}
+
 // ─── 2. Wait for all Angular dev servers ─────────────────────────────────────
 
 log('DEV', 'Waiting for Angular dev servers to be ready…', YELLOW);

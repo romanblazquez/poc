@@ -87,12 +87,18 @@ const WebviewContext = createContext<WebviewContextValue>({
   markReady: () => undefined,
 });
 
+function appendQuery(url: string, query: string): string {
+  const hashIndex = url.indexOf('#');
+  const baseUrl = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
+  const hash = hashIndex >= 0 ? url.slice(hashIndex) : '';
+  return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}${query}${hash}`;
+}
+
 function resolveEmbeddedAppUrl(app: AppEntry): string {
-  if (app.devPort === 0) return app.url;
-  if (window.location.protocol.startsWith('http')) {
-    return `http://localhost:${app.devPort}`;
-  }
-  return app.url;
+  const baseUrl = app.devPort > 0 && window.location.protocol.startsWith('http')
+    ? `http://localhost:${app.devPort}`
+    : app.url;
+  return appendQuery(baseUrl, `fdc3AppId=${encodeURIComponent(app.appId)}`);
 }
 
 function syncEmbeddedApp(webview: EmbeddedWebview, channelId: string | null, theme: ThemeMode): void {

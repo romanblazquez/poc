@@ -30,6 +30,9 @@ export interface Channel {
   broadcast(context: import('./context.js').Fdc3Context): Promise<void>;
   getCurrentContext(contextType?: string): Promise<import('./context.js').Fdc3Context | null>;
   addContextListener<T extends import('./context.js').Fdc3Context>(
+    handler: (context: T) => void,
+  ): Promise<ChannelListener>;
+  addContextListener<T extends import('./context.js').Fdc3Context>(
     contextType: string | null,
     handler: (context: T) => void,
   ): Promise<ChannelListener>;
