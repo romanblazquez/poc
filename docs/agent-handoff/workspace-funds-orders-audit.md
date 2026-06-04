@@ -174,6 +174,12 @@ Build a split workspace for a funds workflow:
   - Removed `setShowAddMenu(false)` side effect from `resetLayout()` in `DockviewWorkspace.tsx` so async layout sync paths do not collapse the Add App popover.
   - Limited the auto-populate effect to run once and skip explicitly empty workspaces (`initialPanelIds: []`). This avoids unintended reset churn after the last panel is removed.
 - Hardened Add App recovery for empty-layout edge cases in `DockviewWorkspace.tsx`: when the first `api.addPanel(...)` does not create a panel, the code now runs `api.clear()` and then repopulates with only the selected app to recover from malformed/degenerate empty Dockview state.
+- Fixed packaged app icon fallback to Electron default for mac builds:
+  - Generated `config/assets/icons/build/mac.icns` from the shell brand PNG.
+  - Added electron-builder icon config in `package.json`:
+    - `build.icon: config/assets/icons/build/icon.png`
+    - `build.mac.icon: config/assets/icons/build/mac.icns`
+  - Added `config/assets/icons/build/icon.png` as the generic builder icon source.
 
 ## Implementation Phase 1 Complete (Apr 26, 2026)
 
