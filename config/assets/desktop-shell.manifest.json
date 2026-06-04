@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0",
+  "desktopShell": {
+    "appId": "desktop-shell",
+    "name": "FDC3 Desktop Shell",
+    "title": "FDC3 Desktop Shell",
+    "subtitle": "TRADER WORKSTATION",
+    "provider": "fdc3-desktop-poc",
+    "providerVersion": "0.1.0",
+    "description": "Electron-based FDC3 desktop shell for interoperability demos.",
+    "icons": {
+      "window": "icons/shell-window.png",
+      "dock": "icons/shell-dock.png"
+    },
+    "branding": {
+      "productMark": "⚡",
+      "accentColor": "#4d8dff"
+    }
+  }
+}

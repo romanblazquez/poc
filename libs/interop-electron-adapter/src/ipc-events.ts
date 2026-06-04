@@ -59,6 +59,7 @@ export const IpcEvents = {
   GET_ZOOM: 'shell:getZoom',
   SET_ZOOM: 'shell:setZoom',
   GET_WINDOW_FULLSCREEN: 'shell:getWindowFullscreen',
+  GET_SHELL_MANIFEST: 'shell:getManifest',
 
   // ─── Main → Renderer (webContents.send) ──────────────────────────────────
   CONTEXT_UPDATE: 'fdc3:contextUpdate',

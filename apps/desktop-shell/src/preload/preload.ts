@@ -472,6 +472,27 @@ contextBridge.exposeInMainWorld('shellChrome', {
     fullscreenChangeHandlers.add(handler);
     return () => fullscreenChangeHandlers.delete(handler);
   },
+  getManifest(): Promise<{
+    appId: string;
+    name: string;
+    title: string;
+    subtitle: string;
+    provider: string;
+    providerVersion: string;
+    description?: string;
+    branding?: { productMark?: string; accentColor?: string };
+  }> {
+    return ipcRenderer.invoke(IpcEvents.GET_SHELL_MANIFEST) as Promise<{
+      appId: string;
+      name: string;
+      title: string;
+      subtitle: string;
+      provider: string;
+      providerVersion: string;
+      description?: string;
+      branding?: { productMark?: string; accentColor?: string };
+    }>;
+  },
 });
 
 // ─── window.fdc3 surface ──────────────────────────────────────────────────

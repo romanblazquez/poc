@@ -1,10 +1,11 @@
-import { BrowserWindow, webContents } from 'electron';
+import { app, BrowserWindow, webContents } from 'electron';
 import type { BrowserWindowConstructorOptions, Rectangle } from 'electron';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import type { AppDefinition } from '@fdc3-poc/fdc3-core';
 import type { WindowState } from '@fdc3-poc/workspace-engine';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
+import type { ShellManifest } from './shell-assets-loader.js';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -36,11 +37,37 @@ export function resolveAppIdentityFromUrl(url: string, appDefs: AppDefinition[])
     }
 
     const port = parseInt(parsed.port, 10);
-    if (!port) return undefined;
-    return appDefs.find((app) => app.devPort === port)?.appId;
+    if (port) {
+      const byPort = appDefs.find((app) => app.devPort === port)?.appId;
+      if (byPort) return byPort;
+    }
+
+    // External apps may redirect and drop query params. Fall back to matching
+    // by origin/path against the configured app URL.
+    const normalizedPath = normalizePath(parsed.pathname);
+    for (const app of appDefs) {
+      if (!/^https?:\/\//i.test(app.url)) continue;
+      try {
+        const appUrl = new URL(app.url);
+        if (appUrl.origin !== parsed.origin) continue;
+        const appPath = normalizePath(appUrl.pathname);
+        if (normalizedPath === appPath || normalizedPath.startsWith(`${appPath}/`)) {
+          return app.appId;
+        }
+      } catch {
+        // Ignore malformed configured URLs.
+      }
+    }
+
+    return undefined;
   } catch {
     return undefined;
   }
+}
+
+function normalizePath(pathname: string): string {
+  const trimmed = pathname.replace(/\/+$/, '');
+  return trimmed.length > 0 ? trimmed : '/';
 }
 
 function getShellUrl(): string {
@@ -105,13 +132,17 @@ export class WindowManager {
   private readonly preloadPath: string;
   private isApplyingMagnetism = false;
 
-  constructor(private readonly appDefs: AppDefinition[]) {
+  constructor(
+    private readonly appDefs: AppDefinition[],
+    private readonly shellManifest: ShellManifest,
+  ) {
     this.preloadPath = path.join(__dirname, '../preload/index.js');
     // Magnetic behavior is disabled for workspace composition, but keep helpers compiled for optional app windows.
     void this.handleWindowMove;
   }
 
   createShellWindow(): BrowserWindow {
+    const shellIcon = this.shellManifest.iconWindowPath;
     const win = new BrowserWindow({
       width: 1600,
       height: 960,
@@ -125,10 +156,19 @@ export class WindowManager {
         webviewTag: true,
         sandbox: false, // required so the preload can use ipcRenderer
       },
-      title: 'FDC3 Desktop Shell',
+      title: this.shellManifest.title,
       backgroundColor: '#0f0f1a',
+      ...(shellIcon ? { icon: shellIcon } : {}),
       show: false,
     });
+
+    if (process.platform === 'darwin' && this.shellManifest.iconDockPath && app.dock) {
+      try {
+        app.dock.setIcon(this.shellManifest.iconDockPath);
+      } catch (error) {
+        console.warn(`[WindowManager] Could not apply dock icon: ${(error as Error).message}`);
+      }
+    }
 
     win.loadURL(getShellUrl()).catch(console.error);
     win.once('ready-to-show', () => win.show());

@@ -22,6 +22,7 @@ import { WindowManager } from './window-manager.js';
 import { IpcRouter } from './ipc-router.js';
 import { WorkspaceManager } from './workspace-manager.js';
 import { ThemeManager } from './theme-manager.js';
+import { ShellAssetsLoader } from './shell-assets-loader.js';
 import { ChannelManager } from '@fdc3-poc/channel-engine';
 import { IntentRegistry } from '@fdc3-poc/intent-engine';
 
@@ -41,18 +42,22 @@ async function bootstrap(): Promise<void> {
   setupSecurity();
 
   // 2. App directory
-  const configPath = isDev
-    ? path.join(__dirname, '../../../../config/app-directory.json')
-    : path.join(process.resourcesPath, 'config', 'app-directory.json');
+  const configRoot = isDev
+    ? path.join(__dirname, '../../../../config')
+    : path.join(process.resourcesPath, 'config');
+
+  const configPath = path.join(configRoot, 'app-directory.json');
+  const shellManifestPath = path.join(configRoot, 'assets', 'desktop-shell.manifest.json');
 
   const appDefs = AppRegistryLoader.load(configPath);
+  const shellManifest = ShellAssetsLoader.load(shellManifestPath, app.getVersion());
 
   // 3. Core engines
   const channelManager = new ChannelManager();
   const intentRegistry = new IntentRegistry();
 
   // 4. Window manager
-  const windowManager = new WindowManager(appDefs);
+  const windowManager = new WindowManager(appDefs, shellManifest);
 
   // 5. Workspace manager
   const workspaceManager = new WorkspaceManager(windowManager, channelManager);

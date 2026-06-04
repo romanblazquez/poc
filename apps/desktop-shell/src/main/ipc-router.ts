@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, webContents, screen } from 'electron';
 import type { WebContents } from 'electron';
 import { randomUUID } from 'crypto';
+import path from 'path';
 import type { AppIntent, AppLogEvent, AppLogLevel, AppLogOrigin, AppLogRuntime, Fdc3Context, FlowPolicy, ImplementationMetadata, IntentResolution, InteropActivityEvent, InteropActivityKind, InteropActivityStatus, InteropRouteSnapshot, InteropSnapshot, PrivateChannelMarker, RuntimeAppSnapshot, RuntimeChannelSnapshot, ThemeContext, ThemeName } from '@fdc3-poc/fdc3-core';
 import { NoAppsFoundError } from '@fdc3-poc/fdc3-core';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
@@ -16,6 +17,7 @@ import type { DetachedWorkspacePayload } from './window-manager.js';
 import type { WorkspaceManager } from './workspace-manager.js';
 import type { ThemeManager } from './theme-manager.js';
 import type { AppDefinition } from '@fdc3-poc/fdc3-core';
+import { ShellAssetsLoader } from './shell-assets-loader.js';
 
 /**
  * IpcRouter — the heart of the FDC3 main-process implementation.
@@ -300,6 +302,18 @@ export class IpcRouter {
     this.handleGetZoom();
     this.handleSetZoom();
     this.handleGetWindowFullscreen();
+    this.handleGetShellManifest();
+  }
+
+  private handleGetShellManifest(): void {
+    const isDev = process.env.NODE_ENV === 'development';
+    const manifestPath = isDev
+      ? path.join(__dirname, '../../../../config/assets/desktop-shell.manifest.json')
+      : path.join(process.resourcesPath, 'config', 'assets', 'desktop-shell.manifest.json');
+
+    ipcMain.handle(IpcEvents.GET_SHELL_MANIFEST, () => ({
+      ...ShellAssetsLoader.load(manifestPath, app.getVersion()),
+    }));
   }
 
   // ─── Global zoom (shell-chrome) ───────────────────────────────────────────

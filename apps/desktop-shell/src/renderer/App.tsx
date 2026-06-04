@@ -78,6 +78,17 @@ interface WorkspaceTab {
   panelIds: string[];
 }
 
+interface ShellManifestView {
+  appId: string;
+  name: string;
+  title: string;
+  subtitle: string;
+  provider: string;
+  providerVersion: string;
+  description?: string;
+  branding?: { productMark?: string; accentColor?: string };
+}
+
 export interface SmartWorkspaceTemplate {
   id: string;
   name: string;
@@ -214,6 +225,7 @@ export function App() {
   const [detachedWorkspaces, setDetachedWorkspaces] = useState<Partial<Record<string, DetachedWorkspacePayload>>>({});
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
   const [copilotOpen, setCopilotOpen] = useState(false);
+  const [shellManifest, setShellManifest] = useState<ShellManifestView | null>(null);
 
   const activeWorkspaceTab = workspaceTabs.find((tab) => tab.id === activeWorkspaceId) ?? workspaceTabs[0];
   const activeWorkspaceState = workspaceStates[activeWorkspaceTab.id]
@@ -277,6 +289,16 @@ export function App() {
       unsub();
       unsubTheme();
     };
+  }, []);
+
+  useEffect(() => {
+    const api = (window as unknown as {
+      shellChrome?: { getManifest?: () => Promise<ShellManifestView> };
+    }).shellChrome;
+    if (!api?.getManifest) return;
+    void api.getManifest()
+      .then((manifest) => setShellManifest(manifest))
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -588,8 +610,8 @@ export function App() {
       }}
     >
       <TopBar
-        title="FDC3 Desktop Shell"
-        subtitle="TRADER WORKSTATION"
+        title={shellManifest?.title ?? 'FDC3 Desktop Shell'}
+        subtitle={shellManifest?.subtitle ?? 'TRADER WORKSTATION'}
         actions={
           <>
           <button

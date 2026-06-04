@@ -149,6 +149,19 @@ Build a split workspace for a funds workflow:
 - Replaced the Funds-specific auto-wire preset in the Interop Flow engine with a generic FDC3 capability-driven connector generator. `connector-resolver.ts` now derives connectors programmatically from each app node's outputs and inputs: broadcast/listen context matches create context connectors, raise/handle intent matches create intent connectors, and broadcast-to-handled-intent compatibility creates context-to-intent connectors based on `acceptsContextTypes`. Toolbar copy was updated to reflect the generic `Auto-wire FDC3` behavior.
 - Fixed Interop Flow edge-label anchoring in `ConnectorEdge.tsx`. The React Flow label badge now uses absolute positioning inside `EdgeLabelRenderer`, so labels stay attached to the computed path midpoint instead of participating in normal layout flow and appearing offset from some connectors.
 - Updated detached workspace top bar controls in `apps/desktop-shell/src/renderer/App.tsx`: detached windows now include the same right-side controls as the main shell top bar for theme selection, shell-wide zoom (`ZoomControl`), and workspace save (`WorkspaceToolbar`). Save action now persists detached payload updates and triggers `window.fdc3.saveWorkspace(...)` with an inline saved status indicator.
+- Fixed external app identity resolution in `apps/desktop-shell/src/main/window-manager.ts`: `resolveAppIdentityFromUrl(...)` now falls back to origin/path matching for configured `http(s)` app URLs when query params (like `fdc3AppId`) are missing after redirects/navigation. This prevents `fdc3.getInfo().appMetadata.appId` from showing `unknown` for hosted external apps such as the FINOS FDC3 Workbench.
+- Added a centralized desktop-shell assets manifest system:
+  - New manifest file: `config/assets/desktop-shell.manifest.json` (JSON schema-like structure for shell title, subtitle, provider metadata, branding and icon paths).
+  - New loader: `apps/desktop-shell/src/main/shell-assets-loader.ts` to parse defaults, validate string fields, resolve icon paths, and tolerate missing files.
+  - `apps/desktop-shell/src/main/main.ts` now loads this manifest at bootstrap and passes it into `WindowManager`.
+  - `apps/desktop-shell/src/main/window-manager.ts` now uses manifest-driven shell window title and optional window/dock icons.
+  - Added `shell:getManifest` IPC (`GET_SHELL_MANIFEST`) and preload exposure via `window.shellChrome.getManifest()`.
+  - `apps/desktop-shell/src/renderer/App.tsx` now reads manifest metadata through `shellChrome` and uses manifest-driven top-bar title/subtitle.
+- Scaffolded concrete runtime shell assets under `config/assets/`:
+  - Added `config/assets/icons/` with placeholder valid PNGs: `shell-window.png` and `shell-dock.png`.
+  - Updated `config/assets/desktop-shell.manifest.json` icon paths to those files.
+  - Added `config/assets/README.md` documenting required runtime assets and recommended packaging/source assets.
+- Added `tools/scripts/generate-shell-icons.sh` to generate manifest runtime icon targets (`shell-window.png`, `shell-dock.png`) from a single source image (`config/assets/icons/source/shell-master.png`) using macOS `sips`.
 
 ## Implementation Phase 1 Complete (Apr 26, 2026)
 
