@@ -162,6 +162,17 @@ Build a split workspace for a funds workflow:
   - Updated `config/assets/desktop-shell.manifest.json` icon paths to those files.
   - Added `config/assets/README.md` documenting required runtime assets and recommended packaging/source assets.
 - Added `tools/scripts/generate-shell-icons.sh` to generate manifest runtime icon targets (`shell-window.png`, `shell-dock.png`) from a single source image (`config/assets/icons/source/shell-master.png`) using macOS `sips`.
+- Updated `apps/desktop-shell/src/renderer/components/DockviewWorkspace.tsx` to remove the fallback that repopulated all apps when `initialPanelIds` was an empty array. Empty workspaces now remain empty after the last panel is removed.
+- Reduced startup/teardown default icon flicker in desktop shell:
+  - `apps/desktop-shell/src/main/window-manager.ts` now applies the manifest `iconWindowPath` to shell windows, detached workspace windows, and opened app windows.
+  - `apps/desktop-shell/src/main/main.ts` now sets the macOS dock icon earlier during bootstrap (before creating the shell window) to minimize brief default Electron icon flashes.
+- Fixed `Add App` regression introduced after removing the empty-workspace fallback:
+  - `apps/desktop-shell/src/renderer/components/DockviewWorkspace.tsx` now confirms panel creation before closing the Add App menu.
+  - Added a fallback in `addPanel(...)` to explicitly seed the layout with the selected app when Dockview ignores the first add in an empty-layout edge case.
+  - Empty workspaces still remain empty after removing the last panel; Add App now reliably restores a chosen panel.
+- Follow-up fix for Add App menu blinking/closing immediately:
+  - Removed `setShowAddMenu(false)` side effect from `resetLayout()` in `DockviewWorkspace.tsx` so async layout sync paths do not collapse the Add App popover.
+  - Limited the auto-populate effect to run once and skip explicitly empty workspaces (`initialPanelIds: []`). This avoids unintended reset churn after the last panel is removed.
 
 ## Implementation Phase 1 Complete (Apr 26, 2026)
 

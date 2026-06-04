@@ -52,6 +52,15 @@ async function bootstrap(): Promise<void> {
   const appDefs = AppRegistryLoader.load(configPath);
   const shellManifest = ShellAssetsLoader.load(shellManifestPath, app.getVersion());
 
+  // Apply dock icon early to avoid a brief default Electron icon flash on macOS.
+  if (process.platform === 'darwin' && shellManifest.iconDockPath && app.dock) {
+    try {
+      app.dock.setIcon(shellManifest.iconDockPath);
+    } catch (error) {
+      console.warn(`[main] Could not set dock icon early: ${(error as Error).message}`);
+    }
+  }
+
   // 3. Core engines
   const channelManager = new ChannelManager();
   const intentRegistry = new IntentRegistry();

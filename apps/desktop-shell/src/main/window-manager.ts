@@ -132,6 +132,10 @@ export class WindowManager {
   private readonly preloadPath: string;
   private isApplyingMagnetism = false;
 
+  private getWindowIcon(): string | undefined {
+    return this.shellManifest.iconWindowPath;
+  }
+
   constructor(
     private readonly appDefs: AppDefinition[],
     private readonly shellManifest: ShellManifest,
@@ -142,7 +146,7 @@ export class WindowManager {
   }
 
   createShellWindow(): BrowserWindow {
-    const shellIcon = this.shellManifest.iconWindowPath;
+    const shellIcon = this.getWindowIcon();
     const win = new BrowserWindow({
       width: 1600,
       height: 960,
@@ -193,6 +197,7 @@ export class WindowManager {
 
   createWorkspaceWindow(payload: DetachedWorkspacePayload): BrowserWindow {
     this.detachedWorkspaces.set(payload.id, payload);
+    const shellIcon = this.getWindowIcon();
 
     const win = new BrowserWindow({
       width: 1800,
@@ -209,6 +214,7 @@ export class WindowManager {
       },
       title: payload.name,
       backgroundColor: '#090916',
+      ...(shellIcon ? { icon: shellIcon } : {}),
       show: false,
     });
 
@@ -267,6 +273,7 @@ export class WindowManager {
     }
 
     const layout = def.initialLayout ?? { width: 800, height: 600 };
+    const shellIcon = this.getWindowIcon();
     const win = new BrowserWindow({
       width: layout.width,
       height: layout.height,
@@ -282,6 +289,7 @@ export class WindowManager {
       },
       title: def.title,
       backgroundColor: '#ffffff',
+      ...(shellIcon ? { icon: shellIcon } : {}),
       show: false,
     });
 

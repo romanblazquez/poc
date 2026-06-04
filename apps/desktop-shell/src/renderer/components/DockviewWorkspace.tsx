@@ -228,6 +228,7 @@ export function DockviewWorkspace({
   const tabObserverRef = useRef<MutationObserver | null>(null);
   const webviewsRef = useRef(new Map<string, EmbeddedWebview>());
   const readyIdsRef = useRef(new Set<string>());
+  const didInitialAutoPopulateRef = useRef(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [openPanelIds, setOpenPanelIds] = useState<Set<string>>(new Set());
 
@@ -283,7 +284,7 @@ export function DockviewWorkspace({
   }, []);
 
   const resolveInitialApps = useCallback((): AppEntry[] => {
-    if (initialPanelIds && initialPanelIds.length > 0) {
+    if (Array.isArray(initialPanelIds)) {
       return initialPanelIds
         .map((id) => apps.find((app) => app.appId === id))
         .filter((app): app is AppEntry => Boolean(app));
@@ -299,7 +300,6 @@ export function DockviewWorkspace({
     api.clear();
     populatePanels(api, panelApps, preloadPath, channelId, theme);
     syncOpenPanels(api);
-    setShowAddMenu(false);
   }, [resolveInitialApps, preloadPath, channelId, theme, syncOpenPanels]);
 
   const onReady = useCallback((event: DockviewReadyEvent) => {
@@ -362,13 +362,22 @@ export function DockviewWorkspace({
   // If onReady fired before apps were available (e.g. apps loaded async after mount),
   // populate panels once the app list arrives.
   useEffect(() => {
+    if (didInitialAutoPopulateRef.current) return;
     if (apps.length === 0) return;
+
+    // If initialPanelIds is an explicit empty array, keep workspace empty.
+    if (Array.isArray(initialPanelIds) && initialPanelIds.length === 0) {
+      didInitialAutoPopulateRef.current = true;
+      return;
+    }
+
     const api = dockApiRef.current;
     if (!api) return;
     if (api.panels.length === 0) {
       resetLayout();
     }
-  }, [apps, resetLayout]);
+    didInitialAutoPopulateRef.current = true;
+  }, [apps, initialPanelIds, resetLayout]);
 
   useEffect(() => {
     for (const [appId, webview] of webviewsRef.current) {
@@ -401,8 +410,22 @@ export function DockviewWorkspace({
         theme,
       },
     });
-    syncDetachedTabTooltips();
-    setShowAddMenu(false);
+
+    // In some empty-layout states Dockview can ignore the first addPanel call.
+    // If that happens, seed layout explicitly with the chosen app.
+    if (!api.getPanel(app.appId)) {
+      populatePanels(api, [app], preloadPath, channelId, theme);
+    }
+
+    const added = api.getPanel(app.appId);
+    if (added) {
+      added.focus();
+      syncDetachedTabTooltips();
+      setShowAddMenu(false);
+      return;
+    }
+
+    console.warn('[DockviewWorkspace] Failed to add panel', app.appId);
   }, [channelId, preloadPath, syncDetachedTabTooltips, theme]);
 
   const detachToDisplay = useCallback(async (display?: DisplayInfo) => {
