@@ -1,0 +1,16 @@
+{
+  "name": "@fdc3-poc/interop-angular",
+  "version": "0.1.0",
+  "description": "Angular 21 interoperability library — wraps FDC3 discovery (Electron shell agent, FDC3 2.1 getAgent web discovery, BroadcastChannel fallback) in a Signals-first surface. Drop-in for any Angular app — local, cloud, or third-party.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "peerDependencies": {
+    "@angular/core": "^21.0.0",
+    "@angular/common": "^21.0.0",
+    "rxjs": "^7.8.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

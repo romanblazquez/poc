@@ -297,6 +297,52 @@ export class IpcRouter {
     this.handleIntentResolverGetPayload();
     this.handleIntentResolverPick();
     this.handleIntentResolverCancel();
+    this.handleGetZoom();
+    this.handleSetZoom();
+    this.handleGetWindowFullscreen();
+  }
+
+  // ─── Global zoom (shell-chrome) ───────────────────────────────────────────
+
+  /** Active zoom factor applied to every webContents. 1.0 = 100%. */
+  private zoomFactor = 1;
+  private static readonly ZOOM_MIN = 0.5;
+  private static readonly ZOOM_MAX = 2.0;
+  private static readonly ZOOM_STEP = 0.1;
+
+  private clampZoom(f: number): number {
+    if (!Number.isFinite(f)) return 1;
+    return Math.min(IpcRouter.ZOOM_MAX, Math.max(IpcRouter.ZOOM_MIN, Math.round(f * 100) / 100));
+  }
+
+  private broadcastZoom(): void {
+    // Push to every webContents — covers shell, detached app windows, AND
+    // embedded <webview> apps. `webContents.getAllWebContents()` is the
+    // electron-side global registry; webview tags create their own entries.
+    for (const wc of webContents.getAllWebContents()) {
+      if (wc.isDestroyed()) continue;
+      try { wc.send(IpcEvents.ZOOM_CHANGED, this.zoomFactor); } catch { /* defensive */ }
+    }
+  }
+
+  private handleGetZoom(): void {
+    ipcMain.handle(IpcEvents.GET_ZOOM, () => this.zoomFactor);
+  }
+
+  private handleSetZoom(): void {
+    ipcMain.handle(IpcEvents.SET_ZOOM, (_event, factor: number) => {
+      this.zoomFactor = this.clampZoom(factor);
+      this.broadcastZoom();
+      return this.zoomFactor;
+    });
+    void IpcRouter.ZOOM_STEP; // referenced by the renderer; defined here so the constant lives in one place
+  }
+
+  private handleGetWindowFullscreen(): void {
+    ipcMain.handle(IpcEvents.GET_WINDOW_FULLSCREEN, (event) => {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      return Boolean(win && !win.isDestroyed() && (win.isFullScreen() || (process.platform === 'darwin' && win.isSimpleFullScreen())));
+    });
   }
 
   // ─── Context broadcasting ─────────────────────────────────────────────────
@@ -306,6 +352,8 @@ export class IpcRouter {
       const senderId = event.sender.id;
       const senderAppId = this.getAppIdForWebContents(senderId);
       const channelId = this.channelManager.getCurrentChannelId(senderId);
+      // FDC3 2.0 OriginatingAppMetadata — delivered as the listener's 2nd arg.
+      const sourceMetadata = senderAppId ? { source: { appId: senderAppId } } : undefined;
       this.emitActivity({
         kind: 'context.broadcasted',
         status: 'ok',
@@ -322,7 +370,7 @@ export class IpcRouter {
           if (id === senderId) continue;
           const targetAppId = this.getAppIdForWebContents(id);
           if (this.isContextRouteAllowed(senderAppId, context.type, id)) {
-            this.windowManager.sendTo(id, IpcEvents.CONTEXT_UPDATE, context);
+            this.windowManager.sendTo(id, IpcEvents.CONTEXT_UPDATE, context, sourceMetadata);
             if (this.isRegisteredApp(targetAppId)) {
               this.emitActivity({
                 kind: 'context.delivered',
@@ -354,7 +402,7 @@ export class IpcRouter {
         if (targetId === senderId) continue;
         const targetAppId = this.getAppIdForWebContents(targetId);
         if (this.isContextRouteAllowed(senderAppId, context.type, targetId)) {
-          this.windowManager.sendTo(targetId, IpcEvents.CONTEXT_UPDATE, context);
+          this.windowManager.sendTo(targetId, IpcEvents.CONTEXT_UPDATE, context, sourceMetadata);
           if (this.isRegisteredApp(targetAppId)) {
             this.emitActivity({
               kind: 'context.delivered',
@@ -1195,7 +1243,8 @@ export class IpcRouter {
       const appId = this.getAppIdForWebContents(event.sender.id) ?? 'unknown';
       const def = this.appDirectory.find((a) => a.appId === appId);
       return {
-        fdc3Version: '2.0',
+        // 2.1: getAgent() discovery + addEventListener('userChannelChanged') are implemented.
+        fdc3Version: '2.1',
         provider: 'fdc3-desktop-poc',
         providerVersion: app.getVersion(),
         appMetadata: {
@@ -1207,8 +1256,8 @@ export class IpcRouter {
           icons: def?.icon ? [{ src: def.icon }] : undefined,
         },
         optionalFeatures: {
-          // We don't yet attach the originating app to broadcast/intent payloads.
-          OriginatingAppMetadata: false,
+          // Context broadcasts carry the originating app as ContextMetadata.source.
+          OriginatingAppMetadata: true,
           // join/leave/getCurrent/getUser are all implemented.
           UserChannelMembershipAPIs: true,
           // No Desktop Agent Bridging in this POC.

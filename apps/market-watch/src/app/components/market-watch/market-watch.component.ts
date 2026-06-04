@@ -2,23 +2,31 @@ import { Component, Input, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDet
 import { CommonModule } from '@angular/common';
 import { AgGridAngular } from 'ag-grid-angular';
 import type { ColDef, GetRowIdParams, GridApi, GridReadyEvent, ICellRendererParams, RowClickedEvent } from 'ag-grid-community';
-import { ButtonModule } from 'primeng/button';
-import { TagModule } from 'primeng/tag';
-import { ResolveError, THEMES } from '@fdc3-poc/fdc3-core';
+import { THEMES } from '@fdc3-poc/fdc3-core';
+import { InteropService, ResolveError } from '@fdc3-poc/interop-angular';
 import type {
   AppIntent,
   InstrumentContext,
   ThemeName,
-} from '@fdc3-poc/fdc3-core';
+} from '@fdc3-poc/interop-angular';
+import {
+  InteropChannelPickerComponent,
+  InteropStatusBadgeComponent,
+  InteropWorkstationHeaderComponent,
+} from '@fdc3-poc/interop-angular/ui';
 import { MarketDataFeed } from '../../services/market-data-feed';
 import type { MarketRow } from '../../services/market-data-feed';
-
-interface ChannelMeta { id: string; displayMetadata: { name: string; color: string } }
 
 @Component({
   selector: 'app-market-watch',
   standalone: true,
-  imports: [CommonModule, AgGridAngular, ButtonModule, TagModule],
+  imports: [
+    CommonModule,
+    AgGridAngular,
+    InteropChannelPickerComponent,
+    InteropStatusBadgeComponent,
+    InteropWorkstationHeaderComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './market-watch.component.html',
 })
@@ -29,10 +37,6 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
   rows: MarketRow[] = this.feed.getRows();
   highlighted: string | null = null;
   intentStatus = '';
-
-  channels: ChannelMeta[] = [];
-  currentChannel: ChannelMeta | null = null;
-  channelOpen = false;
 
   /** Discovered once per session, then re-used for every row's actions menu. */
   rowActions: AppIntent[] = [];
@@ -127,20 +131,23 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
   @ViewChild(AgGridAngular) grid?: AgGridAngular<MarketRow>;
   private gridApi?: GridApi<MarketRow>;
 
-  private unsubInstrumentCtx?: () => void;
-  private unsubInstrumentIntent?: () => void;
-  private unsubChannel?: () => void;
   private unsubFeed?: () => void;
 
-  constructor(private cdr: ChangeDetectorRef, private zone: NgZone) {}
+  constructor(
+    private readonly interop: InteropService,
+    private cdr: ChangeDetectorRef,
+    private zone: NgZone,
+  ) {
+    this.interop.contexts$<InstrumentContext>('fdc3.instrument').subscribe((ctx) => {
+      this.applyInstrumentBroadcast(ctx);
+    });
+
+    this.interop.intents$<InstrumentContext>('ViewInstrument').subscribe(({ context }) => {
+      if (context) this.applyInstrumentBroadcast(context);
+    });
+  }
 
   ngOnInit(): void {
-    if (!window.fdc3) {
-      // Even without the bridge, run the feed so the demo renders.
-      this.feed.start();
-      return;
-    }
-
     this.unsubFeed = this.feed.subscribe((rows) => {
       this.rows = rows;
       if (this.gridApi) this.gridApi.applyTransactionAsync({ update: rows });
@@ -148,32 +155,9 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
     });
     this.feed.start();
 
-    this.unsubInstrumentCtx = window.fdc3.addContextListener<InstrumentContext>(
-      'fdc3.instrument',
-      (ctx) => this.applyInstrumentBroadcast(ctx),
-    );
-    this.unsubInstrumentIntent = window.fdc3.addIntentListener('ViewInstrument', (raw) => {
-      const ctx = raw as InstrumentContext | undefined;
-      if (ctx) this.applyInstrumentBroadcast(ctx);
-    });
-
-    // Channel picker plumbing — unchanged from before.
-    void window.fdc3.getUserChannels().then((chs) => {
-      this.channels = chs as ChannelMeta[];
-      this.cdr.markForCheck();
-    });
-    void window.fdc3.getCurrentChannel().then((ch) => {
-      this.currentChannel = ch as ChannelMeta | null;
-      this.cdr.markForCheck();
-    });
-    this.unsubChannel = window.fdc3.onChannelChanged((ch) => {
-      this.currentChannel = ch as ChannelMeta | null;
-      this.cdr.markForCheck();
-    });
-
     // Discover actions once. AppDirectory is static so a single query suffices;
     // we exclude `ViewInstrument` (handled here — pointless self-loop).
-    void window.fdc3.findIntentsByContext({ type: 'fdc3.instrument', name: 'discovery', id: {} } as InstrumentContext)
+    void this.interop.findIntentsByContext({ type: 'fdc3.instrument', name: 'discovery', id: {} } as InstrumentContext)
       .then((intents) => {
         this.rowActions = intents.filter((i) => i.intent.name !== 'ViewInstrument');
         // Refresh the rendered cells so the new action set shows up.
@@ -186,9 +170,6 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.feed.stop();
     this.unsubFeed?.();
-    this.unsubInstrumentCtx?.();
-    this.unsubInstrumentIntent?.();
-    this.unsubChannel?.();
   }
 
   onGridReady(e: GridReadyEvent<MarketRow>): void {
@@ -201,16 +182,18 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
 
   getRowId = (params: GetRowIdParams<MarketRow>): string => params.data.ticker;
 
-  trackByChannelId(_index: number, ch: { id: string }): string { return ch.id; }
-
   // ─── Row click → broadcast instrument ─────────────────────────────────────
 
   async onGridRowClicked(event: RowClickedEvent<MarketRow>): Promise<void> {
     if (event.data) await this.broadcastInstrument(event.data);
   }
 
+  /** Click handler for the gainers/losers ribbon. */
+  pickRow(r: MarketRow): void {
+    void this.broadcastInstrument(r);
+  }
+
   private async broadcastInstrument(r: MarketRow): Promise<void> {
-    if (!window.fdc3) return;
     this.highlighted = r.ticker;
     const ctx: InstrumentContext = {
       type: 'fdc3.instrument',
@@ -219,24 +202,8 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
     };
     this.intentStatus = 'Broadcasting…';
     this.cdr.markForCheck();
-    await window.fdc3.broadcast(ctx);
+    await this.interop.broadcast(ctx);
     this.intentStatus = '';
-    this.cdr.markForCheck();
-  }
-
-  // ─── Channel picker ───────────────────────────────────────────────────────
-
-  async joinChannel(ch: ChannelMeta): Promise<void> {
-    await window.fdc3.joinUserChannel(ch.id);
-    this.currentChannel = ch;
-    this.channelOpen = false;
-    this.cdr.markForCheck();
-  }
-
-  async leaveChannel(): Promise<void> {
-    await window.fdc3.leaveCurrentChannel();
-    this.currentChannel = null;
-    this.channelOpen = false;
     this.cdr.markForCheck();
   }
 
@@ -306,7 +273,6 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
   }
 
   private async raiseRowIntent(r: MarketRow, ai: AppIntent): Promise<void> {
-    if (!window.fdc3) return;
     const ctx: InstrumentContext = {
       type: 'fdc3.instrument',
       name: r.name,
@@ -317,7 +283,7 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
       this.cdr.markForCheck();
     });
     try {
-      const res = await window.fdc3.raiseIntent(ai.intent.name, ctx);
+      const res = await this.interop.raiseIntent(ai.intent.name, ctx);
       this.zone.run(() => {
         this.intentStatus = `${ai.intent.name} → ${res.source.appId}`;
         this.cdr.markForCheck();

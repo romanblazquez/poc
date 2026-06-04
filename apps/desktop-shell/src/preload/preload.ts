@@ -17,14 +17,14 @@
  * 4. Exposes the window.fdc3 DesktopAgent surface via contextBridge
  */
 
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webFrame } from 'electron';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
-import type { AppIntent, AppLogEvent, AppLogLevel, Channel, ChannelDisplayMetadata, ChannelListener, Fdc3Context, FlowPolicy, ImplementationMetadata, IntentInvocationMetadata, IntentResolution, InteropActivityEvent, InteropSnapshot, PrivateChannel, PrivateChannelEventListener, PrivateChannelMarker, UserChannel, ThemeName } from '@fdc3-poc/fdc3-core';
+import type { AppIntent, AppLogEvent, AppLogLevel, Channel, ChannelDisplayMetadata, ChannelListener, ContextMetadata, Fdc3Context, Fdc3EventHandler, Fdc3EventType, FlowPolicy, ImplementationMetadata, IntentInvocationMetadata, IntentResolution, InteropActivityEvent, InteropSnapshot, PrivateChannel, PrivateChannelEventListener, PrivateChannelMarker, UserChannel, ThemeName } from '@fdc3-poc/fdc3-core';
 import { isPrivateChannelMarker } from '@fdc3-poc/fdc3-core';
 
 // ─── Handler registries (live in preload isolate, not renderer) ────────────
 
-type ContextHandler = (context: Fdc3Context) => void;
+type ContextHandler = (context: Fdc3Context, metadata?: ContextMetadata) => void;
 type IntentHandler = (context?: Fdc3Context, metadata?: IntentInvocationMetadata) => Promise<void> | void;
 type ChannelHandler = (channel: UserChannel | null) => void;
 
@@ -51,6 +51,8 @@ interface DisplayInfo {
 const contextHandlers = new Map<string, Set<ContextHandler>>();
 const intentHandlers = new Map<string, Set<IntentHandler>>();
 const channelChangeHandlers = new Set<ChannelHandler>();
+/** FDC3 2.1 agent-level event listeners: eventType ('*' = all) → Set<handler>. */
+const fdc3EventHandlers = new Map<string, Set<Fdc3EventHandler>>();
 /** channelId → (contextType | '*') → Set<handler> — for App Channel listeners. */
 const appChannelHandlers = new Map<string, Map<string, Set<ContextHandler>>>();
 /** channelId → (contextType | '*') → Set<handler> — for Private Channel context listeners. */
@@ -81,13 +83,13 @@ const appLogHandlers = new Set<(event: AppLogEvent) => void>();
 
 // ─── Inbound IPC listeners (main → preload) ───────────────────────────────
 
-ipcRenderer.on(IpcEvents.CONTEXT_UPDATE, (_event, context: Fdc3Context) => {
+ipcRenderer.on(IpcEvents.CONTEXT_UPDATE, (_event, context: Fdc3Context, metadata?: ContextMetadata) => {
   const typed = contextHandlers.get(context.type);
   const wildcard = contextHandlers.get('*');
   const combined = [...(typed ?? []), ...(wildcard ?? [])];
   for (const handler of combined) {
     try {
-      handler(context);
+      handler(context, metadata);
     } catch (e) {
       console.error('[fdc3 preload] Context handler threw:', e);
     }
@@ -110,8 +112,20 @@ ipcRenderer.on(
 );
 
 ipcRenderer.on(IpcEvents.CHANNEL_CHANGED, (_event, channel: UserChannel | null) => {
+  // Bespoke callback (legacy renderer code).
   for (const handler of channelChangeHandlers) {
     handler(channel);
+  }
+  // FDC3 2.1 standard event — `userChannelChanged`.
+  const event = { type: 'userChannelChanged' as const, details: { currentChannelId: channel?.id ?? null } };
+  const targeted = fdc3EventHandlers.get('userChannelChanged');
+  const wildcard = fdc3EventHandlers.get('*');
+  for (const handler of [...(targeted ?? []), ...(wildcard ?? [])]) {
+    try {
+      handler(event);
+    } catch (e) {
+      console.error('[fdc3 preload] Event handler threw:', e);
+    }
   }
 });
 
@@ -126,6 +140,36 @@ ipcRenderer.on(IpcEvents.THEME_CHANGED, (_event, theme: ThemeName) => {
     handler(theme);
   }
 });
+
+// ─── Shell-wide zoom ──────────────────────────────────────────────────────
+// Applies the shell's current zoom factor to THIS webContents via webFrame.
+// Every preload-injected window (shell, detached app, embedded webview) does
+// the same, so the zoom feels global without main tracking webContents IDs.
+const zoomChangeHandlers = new Set<(factor: number) => void>();
+const fullscreenChangeHandlers = new Set<(fullscreen: boolean) => void>();
+
+function applyZoomFactor(factor: number): void {
+  try { webFrame.setZoomFactor(factor); } catch { /* SSR / context not ready */ }
+  for (const handler of zoomChangeHandlers) {
+    try { handler(factor); } catch (e) { console.error('[preload zoom] handler threw', e); }
+  }
+}
+
+ipcRenderer.on(IpcEvents.ZOOM_CHANGED, (_event, factor: number) => {
+  applyZoomFactor(factor);
+});
+
+ipcRenderer.on(IpcEvents.WINDOW_FULLSCREEN_CHANGED, (_event, fullscreen: boolean) => {
+  for (const handler of fullscreenChangeHandlers) {
+    try { handler(Boolean(fullscreen)); } catch (e) { console.error('[preload fullscreen] handler threw', e); }
+  }
+});
+
+// Fetch the current zoom on boot so late-joining windows (newly detached
+// workspaces, newly opened webviews) catch up to the shell-wide value.
+void ipcRenderer.invoke(IpcEvents.GET_ZOOM).then((factor: number) => {
+  if (typeof factor === 'number' && factor > 0) applyZoomFactor(factor);
+}).catch(() => undefined);
 
 ipcRenderer.on(IpcEvents.INTEROP_ACTIVITY, (_event, activity: InteropActivityEvent) => {
   for (const handler of interopActivityHandlers) {
@@ -405,6 +449,31 @@ contextBridge.exposeInMainWorld('platformLogs', {
   },
 });
 
+// ─── window.shellChrome surface ──────────────────────────────────────────────
+// Shell-level UX controls that are NOT FDC3 (zoom, future hotkeys, etc).
+// Exposed separately so the shell renderer can drive them without crowding
+// window.fdc3 with non-interop methods.
+
+contextBridge.exposeInMainWorld('shellChrome', {
+  getZoom(): Promise<number> {
+    return ipcRenderer.invoke(IpcEvents.GET_ZOOM) as Promise<number>;
+  },
+  setZoom(factor: number): Promise<number> {
+    return ipcRenderer.invoke(IpcEvents.SET_ZOOM, factor) as Promise<number>;
+  },
+  onZoomChanged(handler: (factor: number) => void): () => void {
+    zoomChangeHandlers.add(handler);
+    return () => zoomChangeHandlers.delete(handler);
+  },
+  getFullscreenState(): Promise<boolean> {
+    return ipcRenderer.invoke(IpcEvents.GET_WINDOW_FULLSCREEN) as Promise<boolean>;
+  },
+  onFullscreenChanged(handler: (fullscreen: boolean) => void): () => void {
+    fullscreenChangeHandlers.add(handler);
+    return () => fullscreenChangeHandlers.delete(handler);
+  },
+});
+
 // ─── window.fdc3 surface ──────────────────────────────────────────────────
 
 contextBridge.exposeInMainWorld('fdc3', {
@@ -531,6 +600,28 @@ contextBridge.exposeInMainWorld('fdc3', {
       if (set?.size === 0) {
         intentHandlers.delete(intent);
         void ipcRenderer.invoke(IpcEvents.REMOVE_INTENT_LISTENER, intent);
+      }
+    });
+  },
+
+  /**
+   * FDC3 2.1 — `addEventListener(type, handler)`. Listen for agent-level events
+   * (currently `userChannelChanged`). Pass `null` to receive every event type.
+   * Returns the same hybrid handle as the context/intent listeners, so it works
+   * as a bare unsubscribe, an awaited Listener, or a Promise.
+   */
+  addEventListener(type: Fdc3EventType | null, handler: Fdc3EventHandler): ListenerHandle {
+    const key = type ?? '*';
+    if (!fdc3EventHandlers.has(key)) {
+      fdc3EventHandlers.set(key, new Set());
+    }
+    fdc3EventHandlers.get(key)!.add(handler);
+
+    return makeListenerHandle(() => {
+      const set = fdc3EventHandlers.get(key);
+      set?.delete(handler);
+      if (set?.size === 0) {
+        fdc3EventHandlers.delete(key);
       }
     });
   },

@@ -82,17 +82,17 @@ export function validateAppDirectory(file: unknown): ValidationResult {
           );
         }
       } else {
-        if (!isFile) {
-          errors.push(
-            `${id}: devPort=${devPort} means "local Angular app" — url must be the production file:// path (got ${JSON.stringify(url)})`,
-          );
-        }
         if (isHttp) {
           try {
             const parsed = new URL(url);
             if (parsed.hostname === 'localhost' && !parsed.port) {
               errors.push(
-                `${id}.url: ${url} has no port. For a local app set url to file://… and devPort=${devPort}.`,
+                `${id}.url: ${url} has no port. Use file://… for packaged apps or http(s)://host:${devPort}/ for served apps.`,
+              );
+            }
+            if (parsed.port && Number(parsed.port) !== devPort) {
+              errors.push(
+                `${id}.url: ${url} uses port ${parsed.port}, but devPort is ${devPort}. Keep them aligned for app identity resolution.`,
               );
             }
           } catch {

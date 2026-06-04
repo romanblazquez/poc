@@ -3,14 +3,16 @@ import { StandardIntents } from '@fdc3-poc/fdc3-core';
 
 /**
  * In-memory sample app directory used as fallback if app-directory.json is not found.
- * This mirrors the config/app-directory.json file exactly.
+ * This is a compact fallback for development when config/app-directory.json is
+ * unavailable. Dev-port apps are HTTP-first so the shell can host local or
+ * cloud-served apps through the same path.
  */
 export const SAMPLE_APP_DIRECTORY: AppDefinition[] = [
   {
     appId: 'customer-search',
     title: 'Customer Search',
     description: 'Search and browse customers by name, ID, or segment.',
-    url: 'file://apps/customer-search/dist/index.html',
+    url: 'http://localhost:4001',
     devPort: 4001,
     icon: '🔍',
     category: 'CRM',
@@ -21,7 +23,7 @@ export const SAMPLE_APP_DIRECTORY: AppDefinition[] = [
     appId: 'customer-profile',
     title: 'Customer Profile',
     description: 'Full customer profile including KYC, accounts, and recent activity.',
-    url: 'file://apps/customer-profile/dist/index.html',
+    url: 'http://localhost:4002',
     devPort: 4002,
     icon: '👤',
     category: 'CRM',
@@ -40,7 +42,7 @@ export const SAMPLE_APP_DIRECTORY: AppDefinition[] = [
     appId: 'portfolio-view',
     title: 'Portfolio View',
     description: 'Real-time portfolio positions, P&L, and allocation.',
-    url: 'file://apps/portfolio-view/dist/index.html',
+    url: 'http://localhost:4003',
     devPort: 4003,
     icon: '📊',
     category: 'Investments',
@@ -59,7 +61,7 @@ export const SAMPLE_APP_DIRECTORY: AppDefinition[] = [
     appId: 'market-watch',
     title: 'Market Watch',
     description: 'Live instrument prices, news, and market data.',
-    url: 'file://apps/market-watch/dist/index.html',
+    url: 'http://localhost:4004',
     devPort: 4004,
     icon: '📈',
     category: 'Markets',
@@ -78,12 +80,12 @@ export const SAMPLE_APP_DIRECTORY: AppDefinition[] = [
     appId: 'payment-action',
     title: 'Payment Action',
     description: 'Initiate and authorise customer payment instructions.',
-    url: 'file://apps/payment-action/dist/index.html',
+    url: 'http://localhost:4005',
     devPort: 4005,
     icon: '💳',
     category: 'Payments',
     initialLayout: { x: 780, y: 680, width: 500, height: 460 },
-    listensForContexts: ['com.demo.paymentRequest'],
+    listensForContexts: [],
     intents: [
       {
         intent: StandardIntents.START_PAYMENT,

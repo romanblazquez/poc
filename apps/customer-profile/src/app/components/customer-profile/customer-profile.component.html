@@ -1,19 +1,21 @@
 <div class="workstation-app">
-  <div class="ws-header">
-    <div class="ws-title">
-      <span class="ws-title-mark">CP</span>
-      <span class="ws-title-text">Customer Profile</span>
+  <interop-workstation-header mark="CP" title="Customer Profile">
+    <div style="display:flex;align-items:center;gap:8px">
+      <interop-status-badge
+        *ngIf="customer"
+        [label]="customer.relationship"
+        [severity]="customer.relationship === 'Active' ? 'success' : 'muted'"
+      />
+      <interop-channel-picker />
     </div>
-    <p-tag *ngIf="customer" [value]="customer.relationship" [severity]="customer.relationship === 'Active' ? 'success' : 'secondary'"></p-tag>
-  </div>
+  </interop-workstation-header>
 
-  <div *ngIf="!customer" class="ws-empty">
-    <div class="ws-empty-icon">CP</div>
-    <div style="font-weight:800">No customer selected</div>
-    <div style="font-size:13px;max-width:300px;line-height:1.5">
-      Join a channel, then click a customer in Customer Search to see the profile.
-    </div>
-  </div>
+  <interop-empty-state
+    *ngIf="!customer"
+    mark="CP"
+    title="No customer selected"
+    message="Join a channel, then click a customer in Customer Search to see the profile."
+  />
 
   <div *ngIf="customer" class="ws-content">
     <div class="ws-card" style="margin-bottom:12px">
@@ -26,7 +28,10 @@
             {{ customer.customerId }} · {{ customer.segment }}
           </div>
         </div>
-        <button pButton type="button" label="Start Payment" (click)="handleStartPayment()"></button>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          <button pButton type="button" label="View Portfolio" severity="secondary" (click)="handleViewPortfolio()"></button>
+          <button pButton type="button" label="Start Payment" (click)="handleStartPayment()"></button>
+        </div>
       </div>
 
       <div class="ws-kpis" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:10px">
@@ -41,7 +46,7 @@
           <div style="font-size:13px;font-weight:700;color:var(--ws-text);margin-top:2px">{{ field.value }}</div>
         </div>
       </div>
-      <p-tag *ngIf="intentStatus" [value]="intentStatus" [severity]="intentSeverity"></p-tag>
+      <interop-status-badge *ngIf="intentStatus" [label]="intentStatus" [severity]="intentSeverity" />
     </div>
 
     <div *ngIf="accounts.length > 0" class="ws-card" style="margin-bottom:12px">

@@ -1,11 +1,16 @@
-import { Component, Input, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
-import { TagModule } from 'primeng/tag';
-import type { IntentInvocationMetadata, PaymentRequestContext, PaymentResultContext } from '@fdc3-poc/fdc3-core';
-import type { ThemeName } from '@fdc3-poc/fdc3-core';
+import { InteropService } from '@fdc3-poc/interop-angular';
+import type { PaymentRequestContext, PaymentResultContext, ThemeName } from '@fdc3-poc/interop-angular';
+import {
+  InteropChannelPickerComponent,
+  InteropEmptyStateComponent,
+  InteropStatusBadgeComponent,
+  InteropWorkstationHeaderComponent,
+} from '@fdc3-poc/interop-angular/ui';
 import { getCustomerById } from '@fdc3-poc/shared-domain';
 
 interface PaymentForm {
@@ -35,28 +40,34 @@ const EMPTY_FORM: PaymentForm = {
 @Component({
   selector: 'app-payment-action',
   standalone: true,
-  imports: [CommonModule, FormsModule, ButtonModule, InputTextModule, TagModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ButtonModule,
+    InputTextModule,
+    InteropChannelPickerComponent,
+    InteropEmptyStateComponent,
+    InteropStatusBadgeComponent,
+    InteropWorkstationHeaderComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './payment-action.component.html',
 })
-export class PaymentActionComponent implements OnInit, OnDestroy {
+export class PaymentActionComponent implements OnDestroy {
   @Input() theme: ThemeName = 'dark-financial';
 
   form: PaymentForm = { ...EMPTY_FORM };
   status: PaymentStatus = 'idle';
   fromIntent = false;
 
-  private unsub?: () => void;
   private statusTimeout?: ReturnType<typeof setTimeout>;
   private currentRequestId?: string;
 
-  constructor(private cdr: ChangeDetectorRef) {}
-
-  ngOnInit(): void {
-    if (!window.fdc3) return;
-
-    this.unsub = window.fdc3.addIntentListener('StartPayment', (raw, metadata?: IntentInvocationMetadata) => {
-      const ctx = raw as PaymentRequestContext | undefined;
+  constructor(
+    private readonly interop: InteropService,
+    private readonly cdr: ChangeDetectorRef,
+  ) {
+    this.interop.intents$<PaymentRequestContext>('StartPayment').subscribe(({ context: ctx, meta }) => {
       if (!ctx) return;
       const customer = ctx.customerId ? getCustomerById(ctx.customerId) : null;
       this.form = {
@@ -69,7 +80,7 @@ export class PaymentActionComponent implements OnInit, OnDestroy {
         recipientName: customer?.name ?? '',
         recipientIban: '',
       };
-      this.currentRequestId = metadata?.requestId;
+      this.currentRequestId = meta?.requestId;
       this.fromIntent = true;
       this.status = 'pending';
       this.cdr.markForCheck();
@@ -77,7 +88,6 @@ export class PaymentActionComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.unsub?.();
     if (this.statusTimeout) clearTimeout(this.statusTimeout);
   }
 
@@ -104,8 +114,8 @@ export class PaymentActionComponent implements OnInit, OnDestroy {
     if (this.fromIntent && requestId) {
       this.status = status;
       this.cdr.markForCheck();
-      await window.fdc3.completeIntent(requestId, result);
-      await window.fdc3.closeWindow();
+      await this.interop.completeIntent(requestId, result);
+      await this.interop.closeWindow();
       return;
     }
 

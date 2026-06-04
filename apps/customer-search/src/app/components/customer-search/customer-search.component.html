@@ -1,9 +1,5 @@
 <div class="workstation-app">
-  <div class="ws-header">
-    <div class="ws-title">
-      <span class="ws-title-mark">CS</span>
-      <span class="ws-title-text">Customer Search</span>
-    </div>
+  <interop-workstation-header mark="CS" title="Customer Search">
     <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0">
       <input
         pInputText
@@ -12,10 +8,11 @@
         [(ngModel)]="query"
         style="width:min(34vw,320px);min-width:180px"
       />
-      <p-tag *ngIf="lastBroadcast" [value]="'Sent: ' + lastBroadcast" severity="success"></p-tag>
-      <p-tag [value]="filtered.length + ' matches'" severity="info"></p-tag>
+      <interop-status-badge *ngIf="lastBroadcast" [label]="lastBroadcast" severity="success" />
+      <interop-status-badge [label]="filtered.length + ' matches'" severity="info" />
+      <interop-channel-picker />
     </div>
-  </div>
+  </interop-workstation-header>
 
   <div [class]="agGridTheme" class="ws-grid">
     <ag-grid-angular
@@ -25,6 +22,7 @@
       [getRowId]="getRowId"
       rowSelection="single"
       [animateRows]="true"
+      (gridReady)="onGridReady($event)"
       (rowClicked)="onGridRowClicked($event)"
       style="width:100%;height:100%"
     ></ag-grid-angular>

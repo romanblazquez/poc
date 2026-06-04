@@ -3,6 +3,8 @@ import type { AppIntent, IntentResolution } from '../types/intent.js';
 import type { Channel, PrivateChannel, UserChannel } from '../types/channel.js';
 import type { ThemeName } from '../types/context.js';
 import type { ImplementationMetadata } from '../types/app.js';
+import type { Fdc3EventType, Fdc3EventHandler } from '../types/event.js';
+import type { ContextMetadata } from '../types/context-metadata.js';
 
 /**
  * Unsubscribe function returned by listener registration.
@@ -38,7 +40,7 @@ export interface InteropAdapter {
    */
   addContextListener<T extends Fdc3Context>(
     type: string | null,
-    handler: (context: T) => void,
+    handler: (context: T, metadata?: ContextMetadata) => void,
   ): Unsubscribe;
 
   // ─── Intent routing ───────────────────────────────────────────────────────
@@ -104,7 +106,7 @@ export interface Fdc3DesktopAgent {
   ): ListenerHandle;
   addContextListener<T extends Fdc3Context>(
     type: string | null,
-    handler: (context: T) => void,
+    handler: (context: T, metadata?: ContextMetadata) => void,
   ): ListenerHandle;
   raiseIntent(intent: string, context?: Fdc3Context): Promise<IntentResolution>;
   /** FDC3 2.0 — raise an intent chosen for the given context across all handlers. */
@@ -113,6 +115,11 @@ export interface Fdc3DesktopAgent {
     intent: string,
     handler: (context?: Fdc3Context, metadata?: IntentInvocationMetadata) => Promise<void> | void,
   ): ListenerHandle;
+  /**
+   * FDC3 2.1 — listen for agent-level events. Pass `null` for the type to
+   * receive every event. The first supported event is `userChannelChanged`.
+   */
+  addEventListener(type: Fdc3EventType | null, handler: Fdc3EventHandler): ListenerHandle;
   completeIntent(requestId: string, result?: Fdc3Context | PrivateChannel): Promise<void>;
   closeWindow(): Promise<boolean>;
   getTheme(): Promise<ThemeName>;

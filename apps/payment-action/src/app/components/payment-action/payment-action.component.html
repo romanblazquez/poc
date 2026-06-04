@@ -1,24 +1,21 @@
 <div class="workstation-app">
-  <div class="ws-header">
-    <div class="ws-title">
-      <span class="ws-title-mark">PA</span>
-      <span class="ws-title-text">Payment Action</span>
-    </div>
+  <interop-workstation-header mark="PA" title="Payment Action">
     <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0">
-      <p-tag *ngIf="status === 'approved'" [value]="'Approved ' + form.reference" severity="success"></p-tag>
-      <p-tag *ngIf="status === 'rejected'" value="Rejected" severity="danger"></p-tag>
-      <p-tag *ngIf="fromIntent" value="Via intent" severity="success"></p-tag>
+      <interop-status-badge *ngIf="status === 'approved'" [label]="'Approved ' + form.reference" severity="success" />
+      <interop-status-badge *ngIf="status === 'rejected'" label="Rejected" severity="danger" />
+      <interop-status-badge *ngIf="fromIntent" label="Via intent" severity="success" />
+      <interop-channel-picker />
     </div>
-  </div>
+  </interop-workstation-header>
 
-  <div *ngIf="status === 'idle'" class="ws-empty">
-    <div class="ws-empty-icon">PA</div>
-    <div style="font-weight:800">No payment in progress</div>
-    <div style="font-size:13px;max-width:300px;line-height:1.5">
-      Waiting for a StartPayment intent from Customer Profile.
-    </div>
+  <interop-empty-state
+    *ngIf="status === 'idle'"
+    mark="PA"
+    title="No payment in progress"
+    message="Waiting for a StartPayment intent from Customer Profile."
+  >
     <button pButton type="button" label="New Payment" (click)="handleNew()"></button>
-  </div>
+  </interop-empty-state>
 
   <div *ngIf="status === 'pending'" class="ws-content">
     <div class="ws-card">
@@ -27,7 +24,7 @@
           <div style="font-size:16px;font-weight:850">New Payment Instruction</div>
           <div style="font-size:12px;color:var(--ws-muted);margin-top:2px">{{ form.reference }}</div>
         </div>
-        <p-tag value="Pending Review" severity="warn"></p-tag>
+        <interop-status-badge label="Pending Review" severity="warn" />
       </div>
 
       <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px">

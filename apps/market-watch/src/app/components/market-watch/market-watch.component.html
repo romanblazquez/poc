@@ -1,38 +1,29 @@
 <div class="workstation-app">
-  <div class="ws-header">
-    <div class="ws-title">
-      <span class="ws-title-mark">MW</span>
-      <span class="ws-title-text">Market Watch</span>
-      <p-tag value="Live Sim" severity="success"></p-tag>
-    </div>
+  <interop-workstation-header mark="MW" title="Market Watch">
+    <interop-status-badge slot="title-after" label="Live Sim" severity="success" />
     <div style="display:flex;align-items:center;gap:8px">
-      <p-tag *ngIf="intentStatus" [value]="intentStatus" severity="info"></p-tag>
-      <button
-        pButton
-        type="button"
-        severity="secondary"
-        [outlined]="true"
-        (click)="channelOpen = !channelOpen"
-        [label]="currentChannel?.displayMetadata?.name ?? 'No Channel'"
-      ></button>
+      <interop-status-badge *ngIf="intentStatus" [label]="intentStatus" severity="info" />
+      <interop-channel-picker />
     </div>
-  </div>
+  </interop-workstation-header>
 
-  <div
-    *ngIf="channelOpen"
-    style="position:absolute;top:48px;right:12px;z-index:20;display:flex;align-items:center;gap:8px;padding:8px;background:var(--ws-panel);border:1px solid var(--ws-border-soft);border-radius:8px;box-shadow:var(--ws-shadow)"
-  >
-    <button
-      *ngFor="let ch of channels; trackBy: trackByChannelId"
-      pButton
-      type="button"
-      size="small"
-      [label]="ch.displayMetadata.name"
-      [severity]="currentChannel?.id === ch.id ? 'info' : 'secondary'"
-      [outlined]="currentChannel?.id !== ch.id"
-      (click)="joinChannel(ch)"
-    ></button>
-    <button *ngIf="currentChannel" pButton type="button" size="small" label="Leave" severity="secondary" [text]="true" (click)="leaveChannel()"></button>
+  <!-- Top gainers / losers ribbon -->
+  <div class="ws-ribbon"
+       style="display:flex;gap:8px;padding:8px 12px;background:var(--ws-panel);border-bottom:1px solid var(--ws-border-soft);font-size:11px;flex-wrap:wrap;align-items:center">
+    <span style="color:var(--ws-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700">Gainers</span>
+    <div *ngFor="let r of topGainers; trackBy: trackByRow"
+         (click)="pickRow(r)"
+         style="display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;background:rgba(64,192,128,.12);cursor:pointer">
+      <strong>{{ r.ticker }}</strong>
+      <span style="color:var(--ws-positive);font-weight:700">+{{ r.changePct | number:'1.2-2' }}%</span>
+    </div>
+    <span style="color:var(--ws-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-left:12px">Losers</span>
+    <div *ngFor="let r of topLosers; trackBy: trackByRow"
+         (click)="pickRow(r)"
+         style="display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;background:rgba(232,64,64,.12);cursor:pointer">
+      <strong>{{ r.ticker }}</strong>
+      <span style="color:var(--ws-negative);font-weight:700">{{ r.changePct | number:'1.2-2' }}%</span>
+    </div>
   </div>
 
   <div [class]="agGridTheme" class="ws-grid">
@@ -43,12 +34,14 @@
       [getRowId]="getRowId"
       rowSelection="single"
       [animateRows]="true"
+      (gridReady)="onGridReady($event)"
       (rowClicked)="onGridRowClicked($event)"
       style="width:100%;height:100%"
     ></ag-grid-angular>
   </div>
 
   <div class="ws-statusbar" style="height:26px;padding:0 12px;font-size:11px;color:var(--ws-subtle);background:var(--ws-panel)">
-    Prices simulated. Tick every 2s. Click a row to broadcast fdc3.instrument context.
+    Prices simulated by <code>MarketDataFeed</code>. Click a row to broadcast <code>fdc3.instrument</code>; row actions are
+    discovered live via <code>findIntentsByContext</code>.
   </div>
 </div>

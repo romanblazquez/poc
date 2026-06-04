@@ -89,6 +89,7 @@ const apps = [
   { name: 'ORDERS',    port: 4012, args: ['nx', 'serve', 'incoming-orders',    '--port=4012', '--no-open'] },
   { name: 'AUDIT',     port: 4013, args: ['nx', 'serve', 'audit-log',          '--port=4013', '--no-open'] },
   { name: 'THEME',     port: 4014, args: ['nx', 'serve', 'theme-toggle',       '--port=4014', '--no-open'] },
+  { name: 'CLOUD',     port: 4016, args: ['nx', 'serve', 'cloud-trader',       '--port=4016', '--no-open'] },
 ];
 
 for (const app of apps.filter((a) => a.port > 0)) {

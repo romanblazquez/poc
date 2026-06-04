@@ -98,6 +98,8 @@ export interface AppDefinition {
   category?: string;
   /** FDC3 capability declarations (broadcasts, listensTo, raisesIntents, handlesIntents) */
   capabilities?: {
+    /** When false, Interop Flow shows the app as a node but does not auto-generate connectors for it. */
+    autoWire?: boolean;
     broadcasts?: string[];
     listensTo?: string[];
     raisesIntents?: string[];

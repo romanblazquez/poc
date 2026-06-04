@@ -13,6 +13,7 @@ export interface InteropAppNode {
   label: string;
   icon?: string;
   kind: 'app';
+  autoWire: boolean;
   capabilities: InteropAppCapabilities;
   position: {
     x: number;

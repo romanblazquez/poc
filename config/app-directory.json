@@ -5,7 +5,7 @@
       "appId": "customer-search",
       "title": "Customer Search",
       "description": "Search and browse customers by name, ID, or segment.",
-      "url": "file://apps/customer-search/dist/browser/index.html",
+      "url": "http://localhost:4001",
       "devPort": 4001,
       "icon": "🔍",
       "category": "CRM",
@@ -14,7 +14,7 @@
       "capabilities": {
         "broadcasts": ["fdc3.contact"],
         "listensTo": [],
-        "raisesIntents": [],
+        "raisesIntents": ["ViewContact", "ViewPortfolio"],
         "handlesIntents": []
       }
     },
@@ -22,7 +22,7 @@
       "appId": "customer-profile",
       "title": "Customer Profile",
       "description": "Full customer profile including KYC, accounts, and recent activity.",
-      "url": "file://apps/customer-profile/dist/browser/index.html",
+      "url": "http://localhost:4002",
       "devPort": 4002,
       "icon": "👤",
       "category": "CRM",
@@ -37,17 +37,17 @@
         }
       ],
       "capabilities": {
-        "broadcasts": ["fdc3.contact", "com.demo.paymentRequest"],
+        "broadcasts": [],
         "listensTo": ["fdc3.contact", "com.demo.theme"],
-        "raisesIntents": ["StartPayment"],
+        "raisesIntents": ["StartPayment", "ViewPortfolio"],
         "handlesIntents": ["ViewContact"]
       }
     },
     {
       "appId": "portfolio-view",
       "title": "Portfolio View",
-      "description": "Real-time portfolio positions, P&L, and allocation.",
-      "url": "file://apps/portfolio-view/dist/browser/index.html",
+      "description": "Live re-marked portfolio positions, P&L, exposure, and discovered instrument actions.",
+      "url": "http://localhost:4003",
       "devPort": 4003,
       "icon": "📊",
       "category": "Investments",
@@ -62,17 +62,17 @@
         }
       ],
       "capabilities": {
-        "broadcasts": ["fdc3.portfolio"],
+        "broadcasts": ["fdc3.instrument", "fdc3.portfolio"],
         "listensTo": ["fdc3.contact", "fdc3.portfolio", "com.demo.theme"],
-        "raisesIntents": ["ViewPortfolio"],
+        "raisesIntents": ["ViewChart", "CreateOrder", "ViewNews", "ViewInstrument", "Allocate"],
         "handlesIntents": ["ViewPortfolio"]
       }
     },
     {
       "appId": "market-watch",
       "title": "Market Watch",
-      "description": "Live instrument prices, news, and market data.",
-      "url": "file://apps/market-watch/dist/browser/index.html",
+      "description": "Live instrument prices with bid/ask, sparklines, flashing cells, and discovered instrument actions.",
+      "url": "http://localhost:4004",
       "devPort": 4004,
       "icon": "📈",
       "category": "Markets",
@@ -89,7 +89,7 @@
       "capabilities": {
         "broadcasts": ["fdc3.instrument"],
         "listensTo": ["fdc3.instrument", "com.demo.theme"],
-        "raisesIntents": ["ViewInstrument"],
+        "raisesIntents": ["ViewChart", "CreateOrder", "ViewNews", "ViewOrders"],
         "handlesIntents": ["ViewInstrument"]
       }
     },
@@ -97,12 +97,12 @@
       "appId": "payment-action",
       "title": "Payment Action",
       "description": "Initiate and authorise customer payment instructions.",
-      "url": "file://apps/payment-action/dist/browser/index.html",
+      "url": "http://localhost:4005",
       "devPort": 4005,
       "icon": "💳",
       "category": "Payments",
       "initialLayout": { "x": 780, "y": 680, "width": 500, "height": 460 },
-      "listensForContexts": ["com.demo.paymentRequest"],
+      "listensForContexts": [],
       "intents": [
         {
           "intent": "StartPayment",
@@ -113,7 +113,7 @@
       ],
       "capabilities": {
         "broadcasts": [],
-        "listensTo": ["com.demo.paymentRequest", "com.demo.theme"],
+        "listensTo": ["com.demo.theme"],
         "raisesIntents": [],
         "handlesIntents": ["StartPayment"]
       }
@@ -122,7 +122,7 @@
       "appId": "order-ticket",
       "title": "Order Ticket",
       "description": "Equity order ticket — buy/sell, qty, limit/market, TIF, venue. Streams fills via PrivateChannel.",
-      "url": "file://apps/order-ticket/dist/browser/index.html",
+      "url": "http://localhost:4006",
       "devPort": 4006,
       "icon": "🧾",
       "category": "Trading",
@@ -153,7 +153,7 @@
       "appId": "order-blotter",
       "title": "Order Blotter",
       "description": "AG Grid blotter that listens for trader orders and fills, with cancel and view actions.",
-      "url": "file://apps/order-blotter/dist/browser/index.html",
+      "url": "http://localhost:4007",
       "devPort": 4007,
       "icon": "🗒",
       "category": "Trading",
@@ -178,7 +178,7 @@
       "appId": "chart",
       "title": "Chart",
       "description": "Live SVG price chart that listens to fdc3.instrument and handles ViewChart. Trade-this raises CreateOrder.",
-      "url": "file://apps/chart/dist/browser/index.html",
+      "url": "http://localhost:4008",
       "devPort": 4008,
       "icon": "📉",
       "category": "Markets",
@@ -203,7 +203,7 @@
       "appId": "news",
       "title": "News",
       "description": "Instrument-driven news feed. Per-headline actions are discovered live via findIntentsByContext.",
-      "url": "file://apps/news/dist/browser/index.html",
+      "url": "http://localhost:4009",
       "devPort": 4009,
       "icon": "📰",
       "category": "Markets",
@@ -228,7 +228,7 @@
       "appId": "rfq-quote",
       "title": "RFQ Quote",
       "description": "Request quotes from N venues over a PrivateChannel. Accept routes a TraderOrder to the blotter.",
-      "url": "file://apps/rfq-quote/dist/browser/index.html",
+      "url": "http://localhost:4010",
       "devPort": 4010,
       "icon": "💱",
       "category": "Trading",
@@ -242,10 +242,28 @@
       }
     },
     {
+      "appId": "cloud-trader",
+      "title": "Cloud Trader",
+      "description": "Proof-of-life Angular app built on @fdc3-poc/interop-angular. Same source runs inside the shell, in an FDC3 web host, or as a plain browser tab via BroadcastChannel fallback.",
+      "url": "http://localhost:4016",
+      "devPort": 4016,
+      "icon": "☁️",
+      "category": "Trading",
+      "initialLayout": { "x": 200, "y": 80, "width": 980, "height": 720 },
+      "listensForContexts": ["fdc3.instrument", "com.demo.traderOrder", "com.demo.theme"],
+      "capabilities": {
+        "autoWire": false,
+        "broadcasts": ["fdc3.instrument", "com.demo.traderOrder"],
+        "listensTo": ["fdc3.instrument", "com.demo.traderOrder", "com.demo.theme"],
+        "raisesIntents": ["CreateOrder", "ViewChart", "ViewNews", "ViewPortfolio"],
+        "handlesIntents": []
+      }
+    },
+    {
       "appId": "funds-allocations",
       "title": "Funds Allocations",
       "description": "AG Grid allocation monitor for fund weights, drift, risk, and manager ownership.",
-      "url": "file://apps/funds-allocations/dist/browser/index.html",
+      "url": "http://localhost:4011",
       "devPort": 4011,
       "icon": "▦",
       "category": "Funds",
@@ -270,7 +288,7 @@
       "appId": "incoming-orders",
       "title": "Incoming Orders",
       "description": "AG Grid blotter for incoming fund orders, filtered by selected fund context.",
-      "url": "file://apps/incoming-orders/dist/browser/index.html",
+      "url": "http://localhost:4012",
       "devPort": 4012,
       "icon": "≡",
       "category": "Funds",
@@ -287,7 +305,7 @@
       "appId": "audit-log",
       "title": "Audit",
       "description": "AG Grid audit trail that listens to fund and order context.",
-      "url": "file://apps/audit-log/dist/browser/index.html",
+      "url": "http://localhost:4013",
       "devPort": 4013,
       "icon": "!",
       "category": "Funds",
@@ -304,7 +322,7 @@
       "appId": "theme-toggle",
       "title": "Theme Toggle",
       "description": "Broadcasts workspace theme context so participating apps switch light or dark mode together.",
-      "url": "file://apps/theme-toggle/dist/browser/index.html",
+      "url": "http://localhost:4014",
       "devPort": 4014,
       "icon": "◐",
       "category": "Workspace",
@@ -321,7 +339,7 @@
       "appId": "fdc3-conformance",
       "title": "FDC3 Conformance Console",
       "description": "Vanilla web app (no shell dependencies) that discovers the agent via getAgent() and live-tests the standard FDC3 2.0 surface — proves any third-party FDC3 app interoperates here.",
-      "url": "file://apps/fdc3-conformance/index.html",
+      "url": "http://localhost:4015",
       "devPort": 4015,
       "icon": "✓",
       "category": "Diagnostics",
@@ -331,6 +349,23 @@
         "broadcasts": ["fdc3.instrument", "fdc3.contact"],
         "listensTo": ["fdc3.instrument", "fdc3.contact"],
         "raisesIntents": ["ViewInstrument"],
+        "handlesIntents": []
+      }
+    },
+    {
+      "appId": "external-app",
+      "title": "External FDC3 App (slot)",
+      "description": "Drop-in slot for testing ANY external FDC3 app. Swap the url for the app you want to evaluate; if it speaks FDC3 it interoperates with the fleet with no code changes. Default points at the FINOS FDC3 Workbench — a real third-party FDC3 app you can broadcast to / receive from.",
+      "url": "https://fdc3.finos.org/toolbox/fdc3-workbench/",
+      "devPort": 0,
+      "icon": "🌐",
+      "category": "External",
+      "initialLayout": { "x": 220, "y": 140, "width": 1180, "height": 820 },
+      "listensForContexts": ["fdc3.instrument", "fdc3.contact"],
+      "capabilities": {
+        "broadcasts": ["fdc3.instrument", "fdc3.contact"],
+        "listensTo": ["fdc3.instrument", "fdc3.contact"],
+        "raisesIntents": [],
         "handlesIntents": []
       }
     },

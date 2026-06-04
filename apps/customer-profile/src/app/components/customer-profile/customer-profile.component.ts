@@ -1,9 +1,14 @@
-import { Component, Input, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ButtonModule } from 'primeng/button';
-import { TagModule } from 'primeng/tag';
-import type { ContactContext, PaymentRequestContext, PaymentResultContext } from '@fdc3-poc/fdc3-core';
-import type { ThemeName } from '@fdc3-poc/fdc3-core';
+import { InteropService, ResolveError } from '@fdc3-poc/interop-angular';
+import type { ContactContext, PaymentRequestContext, PaymentResultContext, ThemeName } from '@fdc3-poc/interop-angular';
+import {
+  InteropChannelPickerComponent,
+  InteropEmptyStateComponent,
+  InteropStatusBadgeComponent,
+  InteropWorkstationHeaderComponent,
+} from '@fdc3-poc/interop-angular/ui';
 import {
   getCustomerById,
   getAccountsByCustomer,
@@ -14,11 +19,18 @@ import type { Customer, Account, Transaction } from '@fdc3-poc/shared-domain';
 @Component({
   selector: 'app-customer-profile',
   standalone: true,
-  imports: [CommonModule, ButtonModule, TagModule],
+  imports: [
+    CommonModule,
+    ButtonModule,
+    InteropChannelPickerComponent,
+    InteropEmptyStateComponent,
+    InteropStatusBadgeComponent,
+    InteropWorkstationHeaderComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './customer-profile.component.html',
 })
-export class CustomerProfileComponent implements OnInit, OnDestroy {
+export class CustomerProfileComponent implements OnDestroy {
   @Input() theme: ThemeName = 'dark-financial';
 
   customer: Customer | null = null;
@@ -27,43 +39,24 @@ export class CustomerProfileComponent implements OnInit, OnDestroy {
   intentStatus = '';
   intentSeverity: 'success' | 'warn' | 'danger' | 'info' = 'info';
 
-  private unsub1?: () => void;
-  private unsub2?: () => void;
   private intentTimeout?: ReturnType<typeof setTimeout>;
 
-  constructor(private cdr: ChangeDetectorRef) {}
-
-  ngOnInit(): void {
-    if (!window.fdc3) return;
-
-    this.unsub1 = window.fdc3.addContextListener('fdc3.contact', (ctx: ContactContext) => {
+  constructor(
+    private readonly interop: InteropService,
+    private readonly cdr: ChangeDetectorRef,
+  ) {
+    this.interop.contexts$<ContactContext>('fdc3.contact').subscribe((ctx) => {
       const id = ctx.id?.customerId;
       if (!id) return;
-      const found = getCustomerById(id);
-      if (found) {
-        this.customer = found;
-        this.accounts = getAccountsByCustomer(id);
-        this.transactions = getTransactionsByCustomer(id);
-        this.cdr.markForCheck();
-      }
+      this.loadCustomer(id);
     });
 
-    this.unsub2 = window.fdc3.addIntentListener('ViewContact', (raw) => {
-      const ctx = raw as ContactContext | undefined;
-      if (!ctx?.id?.customerId) return;
-      const found = getCustomerById(ctx.id.customerId);
-      if (found) {
-        this.customer = found;
-        this.accounts = getAccountsByCustomer(found.customerId);
-        this.transactions = getTransactionsByCustomer(found.customerId);
-        this.cdr.markForCheck();
-      }
+    this.interop.intents$<ContactContext>('ViewContact').subscribe(({ context }) => {
+      if (context?.id?.customerId) this.loadCustomer(context.id.customerId);
     });
   }
 
   ngOnDestroy(): void {
-    this.unsub1?.();
-    this.unsub2?.();
     if (this.intentTimeout) clearTimeout(this.intentTimeout);
   }
 
@@ -81,7 +74,7 @@ export class CustomerProfileComponent implements OnInit, OnDestroy {
     this.intentSeverity = 'info';
     this.cdr.markForCheck();
     try {
-      const resolution = await window.fdc3.raiseIntent('StartPayment', ctx);
+      const resolution = await this.interop.raiseIntent('StartPayment', ctx);
       const result = resolution.result as PaymentResultContext | undefined;
       if (result?.type === 'com.demo.paymentResult') {
         this.intentStatus =
@@ -93,15 +86,29 @@ export class CustomerProfileComponent implements OnInit, OnDestroy {
         this.intentStatus = 'Payment completed';
         this.intentSeverity = 'success';
       }
-    } catch {
-      this.intentStatus = 'No handler for StartPayment';
+    } catch (err) {
+      this.intentStatus = this.intentErrorMessage(err, 'StartPayment');
       this.intentSeverity = 'danger';
     }
     this.cdr.markForCheck();
-    this.intentTimeout = setTimeout(() => {
-      this.intentStatus = '';
-      this.cdr.markForCheck();
-    }, 3000);
+    this.clearIntentStatusLater();
+  }
+
+  async handleViewPortfolio(): Promise<void> {
+    if (!this.customer) return;
+    this.intentStatus = 'Routing portfolio...';
+    this.intentSeverity = 'info';
+    this.cdr.markForCheck();
+    try {
+      const resolution = await this.interop.raiseIntent('ViewPortfolio', this.toContactContext());
+      this.intentStatus = `Portfolio -> ${resolution.source.appId}`;
+      this.intentSeverity = 'success';
+    } catch (err) {
+      this.intentStatus = this.intentErrorMessage(err, 'ViewPortfolio');
+      this.intentSeverity = 'danger';
+    }
+    this.cdr.markForCheck();
+    this.clearIntentStatusLater();
   }
 
   trackByAccountId(_index: number, acc: Account): string {
@@ -110,5 +117,41 @@ export class CustomerProfileComponent implements OnInit, OnDestroy {
 
   trackByTxId(_index: number, tx: Transaction): string {
     return tx.txId;
+  }
+
+  private loadCustomer(customerId: string): void {
+    const found = getCustomerById(customerId);
+    if (!found) return;
+    this.customer = found;
+    this.accounts = getAccountsByCustomer(customerId);
+    this.transactions = getTransactionsByCustomer(customerId);
+    this.cdr.markForCheck();
+  }
+
+  private toContactContext(): ContactContext {
+    if (!this.customer) throw new Error('No customer selected');
+    return {
+      type: 'fdc3.contact',
+      name: this.customer.name,
+      id: {
+        customerId: this.customer.customerId,
+        email: this.customer.email,
+      },
+    };
+  }
+
+  private intentErrorMessage(err: unknown, intent: string): string {
+    const code = (err as Error)?.message ?? String(err);
+    if (code === ResolveError.NoAppsFound) return `No handler for ${intent}`;
+    if (code === ResolveError.UserCancelled) return 'Resolver cancelled';
+    return `Error: ${code}`;
+  }
+
+  private clearIntentStatusLater(): void {
+    if (this.intentTimeout) clearTimeout(this.intentTimeout);
+    this.intentTimeout = setTimeout(() => {
+      this.intentStatus = '';
+      this.cdr.markForCheck();
+    }, 3000);
   }
 }

@@ -1,0 +1,27 @@
+{
+  "name": "cloud-trader",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/cloud-trader/src",
+  "targets": {
+    "serve": {
+      "executor": "@nx/angular:dev-server",
+      "options": {
+        "buildTarget": "cloud-trader:build",
+        "port": 4016,
+        "open": false
+      }
+    },
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "apps/cloud-trader/dist",
+        "index": "apps/cloud-trader/src/index.html",
+        "browser": "apps/cloud-trader/src/main.ts",
+        "tsConfig": "apps/cloud-trader/tsconfig.app.json",
+        "styles": ["apps/cloud-trader/src/styles.scss"],
+        "assets": []
+      }
+    }
+  }
+}

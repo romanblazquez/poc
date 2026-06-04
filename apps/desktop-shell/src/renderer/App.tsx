@@ -2,9 +2,12 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { AppLauncher } from './components/AppLauncher.js';
 import { ChannelBar } from './components/ChannelBar.js';
 import { WorkspaceToolbar } from './components/WorkspaceToolbar.js';
+import { ZoomControl } from './components/ZoomControl.js';
+import { TopBar } from './components/TopBar.js';
 import { DockviewWorkspace } from './components/DockviewWorkspace.js';
 import type { DetachedWorkspacePayload, DisplayInfo } from './components/DockviewWorkspace.js';
 import { CommandCenter } from './components/CommandCenter.js';
+import { InteropCopilot } from './copilot/InteropCopilot.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
 import type { Fdc3Context, UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
@@ -40,6 +43,7 @@ declare global {
 }
 
 export interface AppCapabilityConfig {
+  autoWire?: boolean;
   broadcasts?: string[];
   listensTo?: string[];
   raisesIntents?: string[];
@@ -209,6 +213,7 @@ export function App() {
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
   const [detachedWorkspaces, setDetachedWorkspaces] = useState<Partial<Record<string, DetachedWorkspacePayload>>>({});
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
+  const [copilotOpen, setCopilotOpen] = useState(false);
 
   const activeWorkspaceTab = workspaceTabs.find((tab) => tab.id === activeWorkspaceId) ?? workspaceTabs[0];
   const activeWorkspaceState = workspaceStates[activeWorkspaceTab.id]
@@ -278,6 +283,18 @@ export function App() {
     document.documentElement.dataset.theme = THEMES[theme].dataTheme;
     window.localStorage.setItem('fdc3.desktop.theme', theme);
   }, [theme]);
+
+  // Cmd/Ctrl-K opens the Interop Copilot command bar.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setCopilotOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({
@@ -570,46 +587,23 @@ export function App() {
         fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 14px',
-          height: 30,
-          background: 'var(--shell-panel)',
-          borderBottom: '1px solid var(--shell-border)',
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div
+      <TopBar
+        title="FDC3 Desktop Shell"
+        subtitle="TRADER WORKSTATION"
+        actions={
+          <>
+          <button
+            onClick={() => setCopilotOpen(true)}
+            title="Ask the Desktop (⌘K) — natural-language FDC3 orchestration"
             style={{
-              width: 18,
-              height: 18,
-              borderRadius: 4,
-              background: 'var(--shell-accent-soft)',
-              border: '1px solid var(--shell-accent-border)',
-              color: 'var(--shell-accent-text)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 10,
+              display: 'flex', alignItems: 'center', gap: 6, height: 22, padding: '0 10px',
+              background: 'var(--shell-accent-soft)', border: '1px solid var(--shell-accent-border)',
+              borderRadius: 6, color: 'var(--shell-accent-text)', cursor: 'pointer', fontSize: 11, fontWeight: 800,
             }}
           >
-            ⚡
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <div style={{ fontWeight: 800, fontSize: 12, color: 'var(--shell-text)', letterSpacing: 0 }}>
-              FDC3 Desktop Shell
-            </div>
-            <div style={{ fontSize: 10, color: 'var(--shell-muted)', letterSpacing: 0 }}>
-              TRADER WORKSTATION
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>✦</span>Ask
+            <span style={{ opacity: 0.7, fontSize: 10, fontWeight: 700 }}>⌘K</span>
+          </button>
           <select
             value={theme}
             onChange={(e) => void handleThemeChange(e.target.value as ThemeName)}
@@ -629,13 +623,15 @@ export function App() {
               <option key={key} value={key}>{cfg.label}</option>
             ))}
           </select>
+          <ZoomControl />
           <WorkspaceToolbar onSave={handleSave} saveStatus={saveStatus} />
           <ChannelBar
             currentChannel={currentChannel}
             onChannelChange={handleChannelChange}
           />
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px 0', flexShrink: 0 }}>
         {activeMode !== 'launcher' ? (
@@ -788,6 +784,13 @@ export function App() {
         <StatusItem label="Bus" value="Electron / FDC3" color="var(--shell-accent)" />
         <StatusItem label="Panels" value={String(openPanelIds.length)} color="var(--shell-positive)" />
       </div>
+
+      <InteropCopilot
+        apps={apps}
+        open={copilotOpen}
+        onClose={() => setCopilotOpen(false)}
+        currentChannelId={currentChannel?.id ?? null}
+      />
     </div>
   );
 }
@@ -804,6 +807,7 @@ function DetachedWorkspaceShell({
   const [payload, setPayload] = useState<DetachedWorkspacePayload | null>(null);
   const [currentChannel, setCurrentChannel] = useState<UserChannel | null>(null);
   const [editLayout, setEditLayout] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('');
 
   useEffect(() => {
     if (!window.fdc3) return;
@@ -856,66 +860,125 @@ function DetachedWorkspaceShell({
     });
   }, []);
 
-  if (!payload || apps.length === 0 || !preloadPath) {
-    return (
-      <div style={{
-        alignItems: 'center',
-        background: 'var(--shell-bg)',
-        color: 'var(--shell-muted)',
-        display: 'flex',
-        fontSize: 12,
-        fontWeight: 800,
-        height: '100vh',
-        justifyContent: 'center',
-      }}>
-        Loading detached workspace...
-      </div>
-    );
-  }
+  const handleDetachedThemeChange = useCallback(async (nextTheme: ThemeName) => {
+    const appliedTheme = await window.fdc3.setTheme(nextTheme);
+    document.documentElement.dataset.theme = THEMES[appliedTheme].dataTheme;
+    setPayload((current) => {
+      if (!current) return current;
+      const next = { ...current, theme: appliedTheme };
+      void window.fdc3.updateWorkspaceWindowPayload(next);
+      return next;
+    });
+    await window.fdc3.broadcast({
+      type: 'com.demo.theme',
+      name: THEMES[appliedTheme].label,
+      theme: appliedTheme,
+    });
+  }, []);
+
+  const handleDetachedSave = useCallback(async () => {
+    if (!payload) return;
+    await window.fdc3.updateWorkspaceWindowPayload(payload);
+    await window.fdc3.saveWorkspace(payload.name);
+    setSaveStatus('Workspace saved');
+    window.setTimeout(() => setSaveStatus(''), 2000);
+  }, [payload]);
 
   return (
     <div style={{ background: 'var(--shell-bg)', color: 'var(--shell-text)', display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <div style={{
-        alignItems: 'center',
-        background: 'var(--shell-panel)',
-        borderBottom: '1px solid var(--shell-border)',
-        display: 'flex',
-        flexShrink: 0,
-        gap: 6,
-        height: 34,
-        padding: '0 8px',
-      }}>
-        <button
-          onClick={() => void window.fdc3.recallWorkspaceWindow(workspaceId)}
-          title="Pull back to main shell"
-          style={detachedShellButtonStyle}
-        >
-          ← Pull Back
-        </button>
-        <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--shell-border)', margin: '6px 2px' }} />
-        <span style={{ color: 'var(--shell-text)', fontSize: 12, fontWeight: 900, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {payload.name}
-        </span>
-        <button
-          onClick={() => setEditLayout((v) => !v)}
-          title={editLayout ? 'Lock layout — hide panel headers' : 'Edit layout — show panel headers to drag and rearrange panels'}
-          style={{ ...detachedShellButtonStyle, background: editLayout ? 'var(--shell-accent-soft)' : 'var(--shell-panel-2)', color: editLayout ? 'var(--shell-accent-text)' : 'var(--shell-muted)' }}
-        >
-          {editLayout ? '✓ Done' : '✎ Edit Layout'}
-        </button>
-      </div>
-      <DockviewWorkspace
-        apps={apps}
-        currentChannel={currentChannel}
-        preloadPath={preloadPath}
-        initialPanelIds={payload.panelIds}
-        initialLayout={payload.layout}
-        onLayoutChange={handleDetachedLayoutChange}
-        workspaceName={payload.name}
-        theme={payload.theme}
-        detached
-        headersVisible={editLayout}
+      <TopBar
+        title={payload?.name ?? 'Detached Workspace'}
+        subtitle="DETACHED WORKSPACE"
+        mark={
+          <div
+            style={{
+              alignItems: 'center',
+              background: 'var(--shell-accent-soft)',
+              border: '1px solid var(--shell-accent-border)',
+              borderRadius: 4,
+              color: 'var(--shell-accent-text)',
+              display: 'flex',
+              fontSize: 9,
+              fontWeight: 900,
+              height: 18,
+              justifyContent: 'center',
+              width: 22,
+            }}
+          >
+            WS
+          </div>
+        }
+        leftActions={
+          <>
+            <button
+              onClick={() => setEditLayout((v) => !v)}
+              title={editLayout ? 'Lock layout — hide panel headers' : 'Edit layout — show panel headers to drag and rearrange panels'}
+              style={{ ...detachedShellButtonStyle, background: editLayout ? 'var(--shell-accent-soft)' : 'var(--shell-panel-2)', color: editLayout ? 'var(--shell-accent-text)' : 'var(--shell-muted)' }}
+            >
+              {editLayout ? '✓ Done' : '✎ Edit Layout'}
+            </button>
+            <button
+              onClick={() => void window.fdc3.recallWorkspaceWindow(workspaceId)}
+              title="Pull back to main shell"
+              style={detachedShellButtonStyle}
+            >
+              ← Pull Back
+            </button>
+          </>
+        }
+        actions={
+          <>
+            <select
+              value={payload?.theme ?? 'dark-financial'}
+              onChange={(event) => void handleDetachedThemeChange(event.target.value as ThemeName)}
+              style={{
+                background: 'var(--shell-panel-2)',
+                border: '1px solid var(--shell-border)',
+                borderRadius: 6,
+                color: 'var(--shell-text)',
+                cursor: 'pointer',
+                fontSize: 11,
+                fontWeight: 700,
+                height: 22,
+                padding: '0 6px',
+              }}
+            >
+              {Object.entries(THEMES).map(([key, cfg]) => (
+                <option key={key} value={key}>{cfg.label}</option>
+              ))}
+            </select>
+            <ZoomControl />
+            <WorkspaceToolbar onSave={handleDetachedSave} saveStatus={saveStatus} />
+          </>
+        }
       />
+      {!payload || apps.length === 0 || !preloadPath ? (
+        <div style={{
+          alignItems: 'center',
+          color: 'var(--shell-muted)',
+          display: 'flex',
+          flex: 1,
+          fontSize: 12,
+          fontWeight: 800,
+          justifyContent: 'center',
+          minHeight: 0,
+        }}>
+          Loading detached workspace...
+        </div>
+      ) : (
+        <DockviewWorkspace
+          apps={apps}
+          currentChannel={currentChannel}
+          preloadPath={preloadPath}
+          initialPanelIds={payload.panelIds}
+          initialLayout={payload.layout}
+          onLayoutChange={handleDetachedLayoutChange}
+          workspaceName={payload.name}
+          theme={payload.theme}
+          detached
+          headersVisible={editLayout}
+        />
+      )}
     </div>
   );
 }

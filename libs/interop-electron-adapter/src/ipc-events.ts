@@ -56,6 +56,9 @@ export const IpcEvents = {
   INTENT_RESOLVER_GET_PAYLOAD: 'fdc3:intentResolverGetPayload',
   INTENT_RESOLVER_PICK: 'fdc3:intentResolverPick',
   INTENT_RESOLVER_CANCEL: 'fdc3:intentResolverCancel',
+  GET_ZOOM: 'shell:getZoom',
+  SET_ZOOM: 'shell:setZoom',
+  GET_WINDOW_FULLSCREEN: 'shell:getWindowFullscreen',
 
   // ─── Main → Renderer (webContents.send) ──────────────────────────────────
   CONTEXT_UPDATE: 'fdc3:contextUpdate',
@@ -71,6 +74,8 @@ export const IpcEvents = {
   PRIVATE_CHANNEL_DISCONNECTED: 'fdc3:privateChannelDisconnected',
   INTEROP_ACTIVITY: 'fdc3:interopActivity',
   APP_LOG: 'platform:appLog',
+  ZOOM_CHANGED: 'shell:zoomChanged',
+  WINDOW_FULLSCREEN_CHANGED: 'shell:windowFullscreenChanged',
 } as const;
 
 export type IpcEventKey = keyof typeof IpcEvents;

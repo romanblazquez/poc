@@ -1,5 +1,5 @@
 import { BrowserWindow, webContents } from 'electron';
-import type { Rectangle } from 'electron';
+import type { BrowserWindowConstructorOptions, Rectangle } from 'electron';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import type { AppDefinition } from '@fdc3-poc/fdc3-core';
@@ -11,7 +11,7 @@ const isDev = process.env.NODE_ENV === 'development';
 /**
  * Returns the correct URL for an app window.
  * In dev: Vite dev server on the app's configured port.
- * In production: file:// path to the built index.html.
+ * In production: the app-directory URL, which may be file:// or http(s)://.
  */
 function resolveAppUrl(app: AppDefinition): string {
   const baseUrl = isDev && app.devPort > 0
@@ -70,6 +70,22 @@ export interface DetachedWorkspacePayload {
 const SNAP_THRESHOLD = 18;
 const ATTACH_THRESHOLD = 6;
 const SNAP_DEBOUNCE_MS = 120;
+const CUSTOM_TITLE_BAR_HEIGHT = 30;
+
+function customTitleBarOptions(backgroundColor: string): Partial<BrowserWindowConstructorOptions> {
+  return {
+    titleBarStyle: 'hidden',
+    ...(process.platform === 'darwin'
+      ? { trafficLightPosition: { x: 12, y: 8 } }
+      : {
+          titleBarOverlay: {
+            color: backgroundColor,
+            symbolColor: '#b8c4e8',
+            height: CUSTOM_TITLE_BAR_HEIGHT,
+          },
+        }),
+  };
+}
 
 /**
  * WindowManager — owns all BrowserWindow lifecycles.
@@ -101,6 +117,7 @@ export class WindowManager {
       height: 960,
       minWidth: 900,
       minHeight: 600,
+      ...customTitleBarOptions('#0f0f1a'),
       webPreferences: {
         preload: this.preloadPath,
         contextIsolation: true,
@@ -142,6 +159,7 @@ export class WindowManager {
       height: 1040,
       minWidth: 1100,
       minHeight: 700,
+      ...customTitleBarOptions('#090916'),
       webPreferences: {
         preload: this.preloadPath,
         contextIsolation: true,
@@ -249,6 +267,22 @@ export class WindowManager {
       this.lastBounds.delete(id);
       this.snapTimers.delete(id);
     });
+
+    const sendFullscreenState = () => this.sendWindowFullscreenState(win);
+    win.webContents.once('did-finish-load', sendFullscreenState);
+    win.on('enter-full-screen', sendFullscreenState);
+    win.on('leave-full-screen', sendFullscreenState);
+    win.on('enter-html-full-screen', sendFullscreenState);
+    win.on('leave-html-full-screen', sendFullscreenState);
+  }
+
+  private sendWindowFullscreenState(win: BrowserWindow): void {
+    if (win.isDestroyed() || win.webContents.isDestroyed()) return;
+    win.webContents.send(IpcEvents.WINDOW_FULLSCREEN_CHANGED, this.isFullscreen(win));
+  }
+
+  private isFullscreen(win: BrowserWindow): boolean {
+    return win.isFullScreen() || (process.platform === 'darwin' && win.isSimpleFullScreen());
   }
 
   findByAppId(appId: string): BrowserWindow | null {

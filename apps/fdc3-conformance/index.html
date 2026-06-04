@@ -131,11 +131,14 @@
     ['getinfo', 'getInfo() returns ImplementationMetadata'],
     ['appidentity', 'getInfo() resolves this app identity'],
     ['ctxlistener', 'addContextListener() supports function, await and .then()'],
+    ['sourcemeta', 'OriginatingAppMetadata — context source provenance (FDC3 2.0)'],
     ['broadcast', 'broadcast() resolves'],
     ['channels', 'getUserChannels() / joinUserChannel()'],
+    ['events', 'addEventListener("userChannelChanged") (FDC3 2.1)'],
     ['findctx', 'findIntentsByContext() returns AppIntent[]'],
     ['appchannel', 'getOrCreateChannel() (App Channel) round-trips'],
     ['privchannel', 'createPrivateChannel()'],
+    ['platform', 'window.platformLogs observability (platform value-add)'],
   ].forEach(([id, name]) => addCheck(id, name));
 
   let fdc3 = null;
@@ -149,9 +152,14 @@
       document.getElementById('a-appid').textContent = info?.appMetadata?.appId ?? info?.appId ?? '(no identity)';
       setCheck('getinfo', !!info && !!info.fdc3Version, info?.provider ?? '');
       setCheck('appidentity', info?.appMetadata?.appId === 'fdc3-conformance', info?.appMetadata?.appId ?? 'missing');
+      // OriginatingAppMetadata is advertised here; the live source value is proven
+      // in the event log when another app broadcasts to a shared channel (see below).
+      const advertised = info?.optionalFeatures?.OriginatingAppMetadata === true;
+      setCheck('sourcemeta', advertised, advertised ? 'advertised · source shown live in log' : 'not advertised');
     } catch (e) {
       setCheck('getinfo', false, String(e));
       setCheck('appidentity', false, String(e));
+      setCheck('sourcemeta', false, String(e));
     }
 
     // addContextListener compatibility:
@@ -171,8 +179,13 @@
       const listener = await listenerHandle;
       const ok = legacyOk && thenStyleOk && listener && typeof listener.unsubscribe === 'function';
       setCheck('ctxlistener', ok, ok ? 'callable + Promise<Listener>' : 'listener contract mismatch');
-      // Standard wildcard overload to surface everything in the log.
-      await fdc3.addContextListener((ctx) => log('◀ context (' + (ctx?.type) + ')', ctx?.id ?? ctx?.name ?? ''));
+      // Standard wildcard overload to surface everything in the log. The 2nd arg is
+      // FDC3 ContextMetadata — its `source` proves which app originated the context.
+      await fdc3.addContextListener((ctx, meta) => {
+        const from = meta?.source?.appId;
+        log('◀ context (' + (ctx?.type) + ')' + (from ? ' from ' + from : ''), ctx?.id ?? ctx?.name ?? '');
+        if (from) setCheck('sourcemeta', true, 'live source: ' + from);
+      });
     } catch (e) { setCheck('ctxlistener', false, String(e)); }
 
     // broadcast
@@ -182,11 +195,42 @@
     } catch (e) { setCheck('broadcast', false, String(e)); }
 
     // channels
+    let firstChannelId = null; let otherChannelId = null;
     try {
       const list = await fdc3.getUserChannels();
       renderChannels(list);
+      firstChannelId = list?.[0]?.id ?? null;
+      otherChannelId = list?.[1]?.id ?? null;
       setCheck('channels', Array.isArray(list) && list.length > 0, (list?.length ?? 0) + ' channels');
     } catch (e) { setCheck('channels', false, String(e)); }
+
+    // FDC3 2.1 addEventListener — userChannelChanged. Register, briefly switch
+    // channel to fire it, then RESTORE the prior membership. Restoring matters:
+    // when embedded in a workspace the shell auto-joins this app to the workspace
+    // channel, and leaving it would silently desync the console from the fleet.
+    try {
+      let firedChannelId; let fireCount = 0;
+      const evtListener = await fdc3.addEventListener('userChannelChanged', (e) => {
+        fireCount++; firedChannelId = e?.details?.currentChannelId ?? null;
+        log('◀ event userChannelChanged', e?.details ?? e);
+      });
+      const contractOk = evtListener && typeof evtListener.unsubscribe === 'function';
+      const before = await fdc3.getCurrentChannel();
+      let functionalOk = !firstChannelId; // contract-only pass if there are no channels
+      if (firstChannelId) {
+        // Join a channel different from the current one so the change actually fires.
+        const probeId = (before?.id === firstChannelId && otherChannelId) ? otherChannelId : firstChannelId;
+        await fdc3.joinUserChannel(probeId);
+        await new Promise((r) => setTimeout(r, 80));
+        functionalOk = firedChannelId === probeId;
+        // Restore prior membership so we stay in sync with the workspace.
+        if (before?.id) await fdc3.joinUserChannel(before.id);
+        else await fdc3.leaveCurrentChannel();
+      }
+      evtListener.unsubscribe();
+      setCheck('events', contractOk && functionalOk,
+        contractOk ? (firstChannelId ? 'fired ' + fireCount + '× · restored ' + (before?.id ?? 'none') : 'Listener ok') : 'no .unsubscribe');
+    } catch (e) { setCheck('events', false, String(e)); }
 
     // findIntentsByContext
     try {
@@ -210,6 +254,16 @@
       const pc = await fdc3.createPrivateChannel();
       setCheck('privchannel', pc && typeof pc.broadcast === 'function', pc?.id ?? '');
     } catch (e) { setCheck('privchannel', false, String(e)); }
+
+    // Platform observability — beyond the FDC3 standard. An unmodified app gets a
+    // structured logging API for free, and its activity surfaces in the Command Center.
+    try {
+      const pl = window.platformLogs;
+      const info = pl?.getInfo?.();
+      const wrote = await pl?.info?.('FDC3 conformance console online', { ts: Date.now() }, 'conformance');
+      const ok = !!pl && !!info?.provider && wrote === true;
+      setCheck('platform', ok, ok ? info.provider + ' · ' + (info.capabilities?.length ?? 0) + ' caps' : 'platformLogs missing');
+    } catch (e) { setCheck('platform', false, String(e)); }
   }
 
   function renderChannels(list) {
@@ -242,7 +296,12 @@
           const r = await fdc3.raiseIntentForContext({ type: 'fdc3.contact', id: { email: 'maria.garcia@example.com' }, name: 'Maria Garcia' });
           log('▶ raiseIntentForContext →', r?.source ?? r);
         }
-      } catch (e) { log('✖ ' + act + ' failed', String(e)); }
+        // Surface this app's activity in the platform Command Center.
+        window.platformLogs?.info('conformance action: ' + act, null, 'conformance');
+      } catch (e) {
+        log('✖ ' + act + ' failed', String(e));
+        window.platformLogs?.error('conformance action failed: ' + act, String(e), 'conformance');
+      }
     });
   });
 

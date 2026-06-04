@@ -21,6 +21,7 @@
 | Multi-monitor | Detach the workspace into any connected display |
 | Theming | 4 themes (`dark-financial`, `light-financial`, `high-contrast`, `luxury-neutral`) broadcast as `com.demo.theme` |
 | Interop Flow designer | React Flow editor for visualising and gating context/intent routes between apps |
+| AI Interop Copilot | **⌘K "Ask the Desktop"** — plain English → reviewable FDC3 action plan → executed live across the fleet (deterministic core, Claude-ready) |
 | Interop Command Center | Live activity timeline, channel visualizer, route matrix, and executive demo controls |
 | Platform logging | Automatic console/error capture plus `window.platformLogs` structured logging for hosted apps |
 | Cloud apps | Apps with `devPort: 0` are embedded directly from an external URL |
@@ -42,6 +43,9 @@ Custom Electron Shell (this POC)          io.Connect / Interop.io
 ✅ Multi-monitor detach                    ✅ Multi-monitor, tabbed groups
 ✅ PrivateChannel + AppChannel            ✅ Full FDC3 2.0 channel model
 ✅ getAgent() Desktop Agent Discovery     ✅ getAgent() (FDC3 for the Web)
+✅ FDC3 2.1 addEventListener() events      ✅ FDC3 2.1 events
+✅ OriginatingAppMetadata (context source) ✅ OriginatingAppMetadata
+✅ AI Interop Copilot (NL → FDC3 plan)     ❌ No natural-language orchestration
 ✅ Built-in conformance console           ⚠️  No in-shell self-test harness
 ✅ Live Command Center                    ✅ io.Insights / telemetry products
 ✅ Platform logging API                   ✅ Central logging / diagnostics products
@@ -64,9 +68,12 @@ code. Two things make that true:
 
 The **FDC3 Conformance Console** app (`apps/fdc3-conformance`, port 4015) is a dependency-free
 vanilla web app that discovers the agent via `getAgent()` and runs live PASS/FAIL checks against
-`getInfo`, context listeners, broadcast, user channels, `findIntentsByContext`, App Channels and
-Private Channels, plus standalone and embedded app identity — then drives the real fleet by broadcasting standard contexts. Open it from the
-launcher to prove interop end to end.
+`getInfo`, context listeners, broadcast, context **source provenance**
+(`OriginatingAppMetadata`), user channels, FDC3 2.1
+`addEventListener('userChannelChanged')`, `findIntentsByContext`, App Channels and
+Private Channels, plus standalone and embedded app identity and the `window.platformLogs`
+observability value-add — then drives the real fleet by broadcasting standard contexts (its
+activity also streams into the Command Center). Open it from the launcher to prove interop end to end.
 
 The **adapter pattern** ensures apps written for this POC run on io.Connect with a
 one-file bootstrap swap. See [`docs/interop-vs-custom-shell.md`](docs/interop-vs-custom-shell.md).
@@ -157,6 +164,7 @@ declared in `config/app-directory.json` and **validated at shell startup** — a
 | `audit-log` | 4013 | Buy-side — fund/order audit trail | — | `com.demo.order`, `com.demo.fund` | handles `OpenAudit`, `ViewFund` |
 | `theme-toggle` | 4014 | Workspace — broadcasts theme | `com.demo.theme` | `com.demo.theme` | handles `ApplyTheme` |
 | `fdc3-conformance` | 4015 | Diagnostics — vanilla web app, `getAgent()` discovery + live FDC3 2.0 conformance self-test | `fdc3.instrument`, `fdc3.contact` | `fdc3.instrument`, `fdc3.contact` | raises `ViewInstrument` |
+| `external-app` | — | External — drop-in slot to test **any** external FDC3 app (default: FINOS FDC3 Workbench). See [`docs/external-apps.md`](docs/external-apps.md) | `fdc3.instrument`, `fdc3.contact` | `fdc3.instrument`, `fdc3.contact` | — |
 | `cloud-sample` | — | Demo — externally-hosted URL via `devPort: 0` | — | — | — |
 
 ### App directory convention
@@ -167,6 +175,10 @@ declared in `config/app-directory.json` and **validated at shell startup** — a
 
 The validator in `libs/app-registry` enforces this and refuses to load misconfigurations
 (missing port, mismatched protocol, duplicate ports, etc.).
+
+> **Testing your own external app?** Point the `external-app` slot's `url` at it (or copy the
+> entry for more slots) and follow [`docs/external-apps.md`](docs/external-apps.md) — a 4-step
+> guide to confirming the agent is injected and proving interop via the Command Center.
 
 ---
 
@@ -207,6 +219,7 @@ fdc3-desktop-poc/
 │  ├─ architecture.md             Full architecture diagram + data flow
 │  ├─ fdc3-model.md               FDC3 concepts explained
 │  ├─ interop-vs-custom-shell.md  Comparison with io.Connect
+│  ├─ external-apps.md            How to host & test any external FDC3 app
 │  └─ demo-script.md              Client-facing 15-minute walkthrough
 │
 └─ tools/scripts/dev.mjs          Dev orchestration script

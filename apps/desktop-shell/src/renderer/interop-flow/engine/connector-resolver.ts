@@ -15,7 +15,7 @@ const DEFAULT_POSITIONS: Record<string, { x: number; y: number }> = {
   'market-watch': { x: 80, y: 370 },
 };
 
-const FALLBACK_CAPABILITIES: Record<string, Required<AppCapabilityConfig>> = {
+const FALLBACK_CAPABILITIES: Record<string, AppCapabilityConfig> = {
   'incoming-orders': {
     broadcasts: ['com.demo.order', 'com.demo.fund'],
     listensTo: ['com.demo.fund', 'com.demo.theme'],
@@ -41,9 +41,9 @@ const FALLBACK_CAPABILITIES: Record<string, Required<AppCapabilityConfig>> = {
     handlesIntents: ['ApplyTheme'],
   },
   'customer-profile': {
-    broadcasts: ['fdc3.contact', 'com.demo.paymentRequest'],
+    broadcasts: [],
     listensTo: ['fdc3.contact', 'com.demo.theme'],
-    raisesIntents: ['StartPayment'],
+    raisesIntents: ['StartPayment', 'ViewPortfolio'],
     handlesIntents: ['ViewContact'],
   },
   'payment-action': {
@@ -57,19 +57,21 @@ const FALLBACK_CAPABILITIES: Record<string, Required<AppCapabilityConfig>> = {
 export function createInteropNodes(apps: AppEntry[], appIds: string[]): InteropAppNode[] {
   const appById = new Map(apps.map((app) => [app.appId, app]));
   return appIds
-    .map((appId, index) => {
+    .map((appId, index): InteropAppNode | null => {
       const app = appById.get(appId);
       if (!app) return null;
       const capabilities = resolveCapabilities(app);
-      return {
+      const node: InteropAppNode = {
         id: app.appId,
         appId: app.appId,
         label: app.title,
-        icon: app.icon,
         kind: 'app' as const,
+        autoWire: app.capabilities?.autoWire !== false,
         capabilities,
         position: DEFAULT_POSITIONS[app.appId] ?? { x: 80 + (index % 3) * 330, y: 100 + Math.floor(index / 3) * 230 },
       };
+      if (app.icon) node.icon = app.icon;
+      return node;
     })
     .filter((node): node is InteropAppNode => Boolean(node));
 }
@@ -89,7 +91,13 @@ export function mergeFlowWithWorkspaceApps(flow: InteropFlowDefinition | undefin
   return {
     enabled: flow.enabled,
     nodes: nodes.map((node) => ({ ...node, position: previousPositions.get(node.appId) ?? node.position })),
-    connectors: flow.connectors.filter((connector) => nodeIds.has(connector.sourceAppId) && nodeIds.has(connector.targetAppId)),
+    connectors: flow.connectors.filter((connector) => {
+      if (!nodeIds.has(connector.sourceAppId) || !nodeIds.has(connector.targetAppId)) return false;
+      const source = nodes.find((node) => node.appId === connector.sourceAppId);
+      const target = nodes.find((node) => node.appId === connector.targetAppId);
+      if (isAutoConnector(connector) && (source?.autoWire === false || target?.autoWire === false)) return false;
+      return true;
+    }),
   };
 }
 
@@ -131,8 +139,10 @@ function buildAutoConnectors(nodes: InteropAppNode[]): InteropConnector[] {
   const seenIds = new Set<string>();
 
   for (const source of nodes) {
+    if (!source.autoWire) continue;
     for (const target of nodes) {
       if (source.appId === target.appId) continue;
+      if (!target.autoWire) continue;
 
       for (const broadcast of source.capabilities.broadcasts) {
         if (target.capabilities.listensTo.some((schema) => schema.type === broadcast.type)) {
@@ -160,6 +170,16 @@ function buildAutoConnectors(nodes: InteropAppNode[]): InteropConnector[] {
   }
 
   return connectors;
+}
+
+function isAutoConnector(connector: InteropConnector): boolean {
+  return (
+    connector.id.startsWith('context:') ||
+    connector.id.startsWith('theme:') ||
+    connector.id.startsWith('audit:') ||
+    connector.id.startsWith('intent:') ||
+    connector.id.startsWith('context-to-intent:')
+  );
 }
 
 function pushConnector(connectors: InteropConnector[], seenIds: Set<string>, connector: InteropConnector): void {

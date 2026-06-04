@@ -276,12 +276,12 @@ export function CommandCenter({ apps, currentChannel, onOpen, onComposeWorkspace
       </section>
 
       <div style={{ display: 'grid', gap: 12, gridTemplateRows: 'minmax(190px, 0.55fr) minmax(230px, 0.75fr) minmax(260px, 1fr)', minHeight: 0 }}>
-        <section style={PANEL}>
+        <section style={{ ...PANEL, display: 'flex', flexDirection: 'column' }}>
           <div style={PANEL_HEADER}>
             <span>Channel Visualizer</span>
             <span>{runningApps.length} live apps</span>
           </div>
-          <div style={{ display: 'grid', gap: 8, padding: 12 }}>
+          <div style={{ display: 'grid', gap: 8, padding: 12, overflow: 'auto', flex: 1, minHeight: 0 }}>
             {(snapshot?.channels ?? []).map((channel) => (
               <div key={channel.id} style={{ border: `1px solid ${channel.color}55`, borderRadius: 10, padding: 10, background: `${channel.color}12` }}>
                 <div style={{ alignItems: 'center', display: 'flex', gap: 8 }}>

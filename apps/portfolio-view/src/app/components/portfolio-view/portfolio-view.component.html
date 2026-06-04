@@ -1,32 +1,74 @@
 <div class="workstation-app">
-  <div class="ws-header">
-    <div class="ws-title">
-      <span class="ws-title-mark">PV</span>
-      <span class="ws-title-text">Portfolio View</span>
-    </div>
+  <interop-workstation-header mark="PV" title="Portfolio View">
     <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:0">
       <ng-container *ngIf="positions.length > 0">
         <span style="min-width:0;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ws-muted);font-size:12px;font-weight:800">
           {{ customerName }}
         </span>
-        <span style="color:var(--ws-muted);font-size:12px;font-weight:800">USD {{ totalValue | number:'1.0-0' }}</span>
-        <span style="font-size:12px;font-weight:850" [class.positive]="totalPnL >= 0" [class.negative]="totalPnL < 0">
-          {{ totalPnL >= 0 ? '+' : '' }}{{ totalPnL | number:'1.0-0' }}
-        </span>
+        <interop-status-badge [label]="positions.length + ' positions'" severity="info" />
+        <interop-status-badge *ngIf="banner" [label]="banner" severity="warn" />
+        <button
+          type="button"
+          class="p-button p-button-sm p-button-text"
+          style="padding:4px 9px"
+          (click)="raiseAllocate()"
+        >
+          Allocate
+        </button>
       </ng-container>
-      <p-tag [value]="positions.length + ' positions'" severity="info"></p-tag>
+      <interop-channel-picker />
     </div>
-  </div>
+  </interop-workstation-header>
 
-  <div *ngIf="positions.length === 0" class="ws-empty">
-    <div class="ws-empty-icon">PV</div>
-    <div style="font-weight:800">No portfolio loaded</div>
-    <div style="font-size:13px;max-width:280px;line-height:1.5">
-      Join a channel, then select a customer in Customer Search to load their portfolio.
-    </div>
-  </div>
+  <interop-empty-state
+    *ngIf="positions.length === 0"
+    mark="PV"
+    title="No portfolio loaded"
+    message="Join a channel, then select a customer in Customer Search to load and re-mark their portfolio."
+  />
 
   <ng-container *ngIf="positions.length > 0">
+    <div
+      class="ws-ribbon"
+      style="display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:8px;padding:8px 12px;background:var(--ws-panel);border-bottom:1px solid var(--ws-border-soft);font-size:11px"
+    >
+      <div>
+        <div style="color:var(--ws-muted);text-transform:uppercase;font-weight:800;letter-spacing:.06em">Gross Exposure</div>
+        <div style="font-size:15px;font-weight:900">USD {{ grossExposure | number:'1.0-0' }}</div>
+      </div>
+      <div>
+        <div style="color:var(--ws-muted);text-transform:uppercase;font-weight:800;letter-spacing:.06em">Net Exposure</div>
+        <div style="font-size:15px;font-weight:900">USD {{ netExposure | number:'1.0-0' }}</div>
+      </div>
+      <div>
+        <div style="color:var(--ws-muted);text-transform:uppercase;font-weight:800;letter-spacing:.06em">Day P&L</div>
+        <div style="font-size:15px;font-weight:900" [class.positive]="dayPnL >= 0" [class.negative]="dayPnL < 0">
+          {{ dayPnL >= 0 ? '+' : '' }}{{ dayPnL | number:'1.0-0' }}
+        </div>
+      </div>
+      <div>
+        <div style="color:var(--ws-muted);text-transform:uppercase;font-weight:800;letter-spacing:.06em">Total P&L</div>
+        <div style="font-size:15px;font-weight:900" [class.positive]="totalPnL >= 0" [class.negative]="totalPnL < 0">
+          {{ totalPnL >= 0 ? '+' : '' }}{{ totalPnL | number:'1.0-0' }}
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="ws-ribbon"
+      style="display:flex;gap:8px;padding:8px 12px;background:var(--ws-panel);border-bottom:1px solid var(--ws-border-soft);font-size:11px;flex-wrap:wrap;align-items:center"
+    >
+      <span style="color:var(--ws-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700">Largest Positions</span>
+      <div
+        *ngFor="let pos of positions | slice:0:5; trackBy: trackByTicker"
+        (click)="pickRow(pos)"
+        style="display:flex;align-items:center;gap:5px;padding:2px 8px;border-radius:6px;background:rgba(64,128,232,.12);cursor:pointer"
+      >
+        <strong>{{ pos.ticker }}</strong>
+        <span style="color:var(--ws-muted)">USD {{ pos.marketValue | number:'1.0-0' }}</span>
+      </div>
+    </div>
+
     <div [class]="agGridTheme" class="ws-grid">
       <ag-grid-angular
         [rowData]="positions"
@@ -35,9 +77,15 @@
         [getRowId]="getRowId"
         rowSelection="single"
         [animateRows]="true"
+        (gridReady)="onGridReady($event)"
         (rowClicked)="onGridRowClicked($event)"
         style="width:100%;height:100%"
       ></ag-grid-angular>
+    </div>
+
+    <div class="ws-statusbar" style="height:26px;padding:0 12px;font-size:11px;color:var(--ws-subtle);background:var(--ws-panel)">
+      Portfolio re-marked by <code>PortfolioMarketFeed</code>. Click a row to broadcast <code>fdc3.instrument</code>;
+      row actions are discovered via <code>findIntentsByContext</code>.
     </div>
   </ng-container>
 </div>
