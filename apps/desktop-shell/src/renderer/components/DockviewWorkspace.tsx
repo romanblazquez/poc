@@ -412,8 +412,9 @@ export function DockviewWorkspace({
     });
 
     // In some empty-layout states Dockview can ignore the first addPanel call.
-    // If that happens, seed layout explicitly with the chosen app.
+    // If that happens, clear state and seed layout explicitly with the chosen app.
     if (!api.getPanel(app.appId)) {
+      api.clear();
       populatePanels(api, [app], preloadPath, channelId, theme);
     }
 
