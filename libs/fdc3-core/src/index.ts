@@ -7,6 +7,7 @@ export * from './types/theme-config.js';
 export * from './types/interop-telemetry.js';
 export * from './types/event.js';
 export * from './types/context-metadata.js';
+export * from './types/manager.js';
 
 // Contracts
 export * from './contracts/interop-adapter.js';

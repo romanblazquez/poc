@@ -1,13 +1,16 @@
-import { Component, Input, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import type { ColDef, RowClickedEvent, GetRowIdParams } from 'ag-grid-community';
 import { THEMES } from '@fdc3-poc/fdc3-core';
-import type { FundContext, OrderContext, ThemeName } from '@fdc3-poc/fdc3-core';
+import { InteropService } from '@fdc3-poc/interop-angular';
+import type { Channel, FundContext, OrderContext, ThemeName } from '@fdc3-poc/interop-angular';
 import { getFundById, INCOMING_ORDERS } from '@fdc3-poc/shared-domain';
 import type { FundAllocation, IncomingOrder } from '@fdc3-poc/shared-domain';
+
+const FUNDOPS_CHANNEL_ID = 'com.demo.fundops';
 
 @Component({
   selector: 'app-incoming-orders',
@@ -16,7 +19,7 @@ import type { FundAllocation, IncomingOrder } from '@fdc3-poc/shared-domain';
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './incoming-orders.component.html',
 })
-export class IncomingOrdersComponent implements OnInit, OnDestroy {
+export class IncomingOrdersComponent implements OnDestroy {
   @Input() theme: ThemeName = 'dark-financial';
 
   fundId: string | null = null;
@@ -57,23 +60,38 @@ export class IncomingOrdersComponent implements OnInit, OnDestroy {
     resizable: true,
   };
 
-  private unsubTheme?: () => void;
-  private unsubFund?: () => void;
+  private fundOpsChannel?: Channel;
+  private fundOpsUnsub?: () => void;
 
-  constructor(private cdr: ChangeDetectorRef) {}
-
-  ngOnInit(): void {
-    if (!window.fdc3) return;
-
-    this.unsubFund = window.fdc3.addContextListener<FundContext>('com.demo.fund', (ctx) => {
-      this.fundId = ctx.id.fundId;
-      this.cdr.markForCheck();
-    });
+  constructor(
+    private readonly interop: InteropService,
+    private readonly cdr: ChangeDetectorRef,
+  ) {
+    void this.bootstrapChannel();
   }
 
   ngOnDestroy(): void {
-    this.unsubTheme?.();
-    this.unsubFund?.();
+    this.fundOpsUnsub?.();
+  }
+
+  private async bootstrapChannel(): Promise<void> {
+    try {
+      this.fundOpsChannel = await this.interop.getOrCreateChannel(FUNDOPS_CHANNEL_ID);
+      const handle = await this.fundOpsChannel.addContextListener<FundContext>('com.demo.fund', (ctx) => {
+        this.fundId = ctx.id.fundId;
+        this.cdr.markForCheck();
+      });
+      this.fundOpsUnsub = (): void => handle.unsubscribe();
+
+      // Late-join sync — adopt whatever fund the trio is currently focused on.
+      const last = await this.fundOpsChannel.getCurrentContext('com.demo.fund');
+      if (last && (last as FundContext).id?.fundId) {
+        this.fundId = (last as FundContext).id.fundId;
+        this.cdr.markForCheck();
+      }
+    } catch (err) {
+      console.warn('[incoming-orders] AppChannel unavailable; staying offline', err);
+    }
   }
 
   get agGridTheme(): string {
@@ -96,7 +114,7 @@ export class IncomingOrdersComponent implements OnInit, OnDestroy {
   }
 
   async onRowClicked(event: RowClickedEvent<IncomingOrder>): Promise<void> {
-    if (!event.data || !window.fdc3) return;
+    if (!event.data || !this.fundOpsChannel) return;
     const order = event.data;
     this.selectedOrderId = order.orderId;
     this.cdr.markForCheck();
@@ -112,11 +130,11 @@ export class IncomingOrdersComponent implements OnInit, OnDestroy {
       currency: order.currency,
       status: order.status,
     };
-    await window.fdc3.broadcast(orderContext);
+    await this.fundOpsChannel.broadcast(orderContext);
 
     const fund = getFundById(order.fundId);
     if (fund) {
-      await window.fdc3.broadcast({
+      await this.fundOpsChannel.broadcast({
         type: 'com.demo.fund',
         name: fund.name,
         id: { fundId: fund.fundId, ticker: fund.ticker, ISIN: fund.isin },

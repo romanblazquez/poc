@@ -1,9 +1,10 @@
 <div class="workstation-app">
   <interop-workstation-header mark="PA" title="Payment Action">
     <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0">
-      <interop-status-badge *ngIf="status === 'approved'" [label]="'Approved ' + form.reference" severity="success" />
+      <interop-status-badge *ngIf="status === 'streaming'" label="Streaming status" severity="warn" />
+      <interop-status-badge *ngIf="status === 'approved'" [label]="'Settled ' + form.reference" severity="success" />
       <interop-status-badge *ngIf="status === 'rejected'" label="Rejected" severity="danger" />
-      <interop-status-badge *ngIf="fromIntent" label="Via intent" severity="success" />
+      <interop-status-badge *ngIf="fromIntent && status !== 'idle'" label="Via intent" severity="info" />
       <interop-channel-picker />
     </div>
   </interop-workstation-header>
@@ -17,14 +18,16 @@
     <button pButton type="button" label="New Payment" (click)="handleNew()"></button>
   </interop-empty-state>
 
-  <div *ngIf="status === 'pending'" class="ws-content">
+  <div *ngIf="status !== 'idle'" class="ws-content">
     <div class="ws-card">
       <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:16px">
         <div>
           <div style="font-size:16px;font-weight:850">New Payment Instruction</div>
           <div style="font-size:12px;color:var(--ws-muted);margin-top:2px">{{ form.reference }}</div>
         </div>
-        <interop-status-badge label="Pending Review" severity="warn" />
+        <interop-status-badge
+          [label]="status === 'streaming' ? 'In progress' : (status === 'approved' ? 'Settled' : (status === 'rejected' ? 'Rejected' : 'Pending Review'))"
+          [severity]="status === 'approved' ? 'success' : (status === 'rejected' ? 'danger' : 'warn')" />
       </div>
 
       <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px">
@@ -38,23 +41,23 @@
         </label>
         <label>
           <span class="ws-label">Amount</span>
-          <input pInputText type="number" [(ngModel)]="form.amount" style="width:100%;margin-top:4px" />
+          <input pInputText type="number" [(ngModel)]="form.amount" [readOnly]="status === 'streaming'" style="width:100%;margin-top:4px" />
         </label>
         <label>
           <span class="ws-label">Currency</span>
-          <input pInputText type="text" [(ngModel)]="form.currency" style="width:100%;margin-top:4px" />
+          <input pInputText type="text" [(ngModel)]="form.currency" [readOnly]="status === 'streaming'" style="width:100%;margin-top:4px" />
         </label>
         <label>
           <span class="ws-label">Recipient Name</span>
-          <input pInputText type="text" [(ngModel)]="form.recipientName" style="width:100%;margin-top:4px" />
+          <input pInputText type="text" [(ngModel)]="form.recipientName" [readOnly]="status === 'streaming'" style="width:100%;margin-top:4px" />
         </label>
         <label>
           <span class="ws-label">Recipient IBAN</span>
-          <input pInputText type="text" [(ngModel)]="form.recipientIban" style="width:100%;margin-top:4px" />
+          <input pInputText type="text" [(ngModel)]="form.recipientIban" [readOnly]="status === 'streaming'" style="width:100%;margin-top:4px" />
         </label>
         <label style="grid-column:1 / -1">
           <span class="ws-label">Description</span>
-          <input pInputText type="text" [(ngModel)]="form.description" style="width:100%;margin-top:4px" />
+          <input pInputText type="text" [(ngModel)]="form.description" [readOnly]="status === 'streaming'" style="width:100%;margin-top:4px" />
         </label>
       </div>
 
@@ -63,9 +66,52 @@
         <span style="font-size:22px;font-weight:900">{{ form.currency }} {{ paymentTotal | number:'1.2-2' }}</span>
       </div>
 
-      <div style="display:flex;gap:10px">
-        <button pButton type="button" label="Approve Payment" severity="success" style="flex:1" (click)="handleApprove()"></button>
-        <button pButton type="button" label="Reject" severity="danger" [outlined]="true" (click)="handleReject()"></button>
+      <!-- Stage timeline — visible whenever a streaming payment is in flight -->
+      <div *ngIf="status === 'streaming' || status === 'approved' || status === 'rejected'" class="ws-card" style="box-shadow:none;margin-bottom:16px">
+        <div class="ws-label" style="margin-bottom:8px">Lifecycle</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div *ngFor="let stage of screenStages"
+               style="display:grid;grid-template-columns:24px 1fr 90px;gap:10px;align-items:center;font-size:12px">
+            <span [style.color]="stageReached(stage) ? 'var(--ws-positive)' : 'var(--ws-muted)'">
+              {{ stageReached(stage) ? '✓' : '○' }}
+            </span>
+            <span [style.fontWeight]="currentStage === stage ? 800 : 500"
+                  [style.color]="stageReached(stage) ? 'var(--ws-text)' : 'var(--ws-muted)'">
+              {{ stageLabels[stage] }}
+            </span>
+            <span style="color:var(--ws-muted);font-variant-numeric:tabular-nums;text-align:right;font-size:11px">
+              <ng-container *ngIf="stageReached(stage)">{{ getStageTs(stage) }}</ng-container>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4-eyes approval panel — visible during the streaming-pending stages -->
+      <div *ngIf="awaitingApproval" class="ws-card" style="box-shadow:none;margin-bottom:16px;background:rgba(232,192,64,0.06)">
+        <div class="ws-label" style="margin-bottom:8px">Four-eyes approval</div>
+        <div style="display:flex;gap:10px">
+          <button pButton type="button"
+                  [label]="approverA ? '✓ Approver A signed' : 'Approve as A'"
+                  [disabled]="!canApproveA && approverA"
+                  [outlined]="approverA"
+                  severity="success"
+                  style="flex:1"
+                  (click)="handleApproverA()"></button>
+          <button pButton type="button"
+                  [label]="approverB ? '✓ Approver B signed' : 'Approve as B'"
+                  [disabled]="!canApproveB && !approverB"
+                  [outlined]="approverB"
+                  severity="success"
+                  style="flex:1"
+                  (click)="handleApproverB()"></button>
+        </div>
+        <div style="margin-top:6px;font-size:11px;color:var(--ws-muted)">
+          Both approvers must sign — dual-control eliminates single-actor risk.
+        </div>
+      </div>
+
+      <div *ngIf="status === 'streaming' || status === 'pending'" style="display:flex;gap:10px">
+        <button pButton type="button" label="Reject" severity="danger" [outlined]="true" style="flex:0 0 auto" (click)="handleReject()"></button>
       </div>
     </div>
   </div>

@@ -12,6 +12,8 @@ import type { IntentRegistry } from '@fdc3-poc/intent-engine';
 import { IntentResolver } from '@fdc3-poc/intent-engine';
 import { AppRegistry } from '@fdc3-poc/app-registry';
 import { IntentResolverWindowManager } from './intent-resolver-window.js';
+import type { ManagerService } from './manager-service.js';
+import type { ManagerSettings } from '@fdc3-poc/fdc3-core';
 import { resolveAppIdentityFromUrl, type WindowManager } from './window-manager.js';
 import type { DetachedWorkspacePayload } from './window-manager.js';
 import type { WorkspaceManager } from './workspace-manager.js';
@@ -65,9 +67,20 @@ export class IpcRouter {
     private readonly workspaceManager: WorkspaceManager,
     private readonly themeManager: ThemeManager,
     private readonly appDirectory: AppDefinition[],
+    private readonly managerService?: ManagerService,
   ) {
     this.intentResolver = new IntentResolver();
     this.appRegistry = new AppRegistry(appDirectory);
+    // Push Manager status changes out to every webContents so the renderer
+    // can react without polling. Same pattern as the zoom broadcast.
+    if (this.managerService) {
+      this.managerService.subscribe((status) => {
+        for (const wc of webContents.getAllWebContents()) {
+          if (wc.isDestroyed()) continue;
+          try { wc.send(IpcEvents.MANAGER_STATUS_CHANGED, status); } catch { /* defensive */ }
+        }
+      });
+    }
   }
 
   private emitActivity(input: {
@@ -303,6 +316,52 @@ export class IpcRouter {
     this.handleSetZoom();
     this.handleGetWindowFullscreen();
     this.handleGetShellManifest();
+    this.handleManagerGetStatus();
+    this.handleManagerCheckUpdates();
+    this.handleManagerApplyUpdate();
+    this.handleManagerDismissUpdate();
+    this.handleManagerUpdateSettings();
+  }
+
+  // ─── Manager Console (io.Manager-class central distribution) ─────────────
+
+  private handleManagerGetStatus(): void {
+    ipcMain.handle(IpcEvents.MANAGER_GET_STATUS, () => {
+      return this.managerService?.getStatus() ?? null;
+    });
+  }
+
+  private handleManagerCheckUpdates(): void {
+    ipcMain.handle(IpcEvents.MANAGER_CHECK_UPDATES, async () => {
+      if (!this.managerService) return { ok: false, error: 'Manager not initialised', fetchedAt: Date.now() };
+      const res = await this.managerService.checkForUpdates();
+      // Drop the parsed file blob from success responses — the renderer reads
+      // it via getStatus() if needed. Keeps the IPC payload small.
+      return res.ok
+        ? { ok: true, etag: res.etag, fetchedAt: res.fetchedAt, appCount: res.file.applications.length }
+        : { ok: false, error: res.error, fetchedAt: res.fetchedAt };
+    });
+  }
+
+  private handleManagerApplyUpdate(): void {
+    ipcMain.handle(IpcEvents.MANAGER_APPLY_UPDATE, () => {
+      if (!this.managerService) return { applied: false, reason: 'Manager not initialised' };
+      return this.managerService.applyAvailable();
+    });
+  }
+
+  private handleManagerDismissUpdate(): void {
+    ipcMain.handle(IpcEvents.MANAGER_DISMISS_UPDATE, () => {
+      this.managerService?.dismissAvailable();
+      return true;
+    });
+  }
+
+  private handleManagerUpdateSettings(): void {
+    ipcMain.handle(IpcEvents.MANAGER_UPDATE_SETTINGS, (_event, patch: Partial<ManagerSettings>) => {
+      if (!this.managerService) return null;
+      return this.managerService.updateSettings(patch ?? {});
+    });
   }
 
   private handleGetShellManifest(): void {

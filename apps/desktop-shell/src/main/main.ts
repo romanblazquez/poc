@@ -14,6 +14,7 @@
  */
 
 import { app, BrowserWindow } from 'electron';
+import fs from 'fs';
 import path from 'path';
 
 import { setupSecurity } from './security.js';
@@ -23,8 +24,10 @@ import { IpcRouter } from './ipc-router.js';
 import { WorkspaceManager } from './workspace-manager.js';
 import { ThemeManager } from './theme-manager.js';
 import { ShellAssetsLoader } from './shell-assets-loader.js';
+import { ManagerService } from './manager-service.js';
 import { ChannelManager } from '@fdc3-poc/channel-engine';
 import { IntentRegistry } from '@fdc3-poc/intent-engine';
+import type { AppDirectoryFile } from '@fdc3-poc/app-registry';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -51,6 +54,29 @@ async function bootstrap(): Promise<void> {
 
   const appDefs = AppRegistryLoader.load(configPath);
   const shellManifest = ShellAssetsLoader.load(shellManifestPath, app.getVersion());
+
+  // Build the full AppDirectoryFile shape ManagerService needs so it can read
+  // optional directoryVersion / directoryLabel; falls back to a minimal
+  // wrapper around the applications array when the file is unreadable
+  // (e.g. AppRegistryLoader already produced the embedded sample fallback).
+  const initialDirectoryFile: AppDirectoryFile = (() => {
+    try {
+      const raw = fs.readFileSync(configPath, 'utf-8');
+      const parsed = JSON.parse(raw) as Partial<AppDirectoryFile>;
+      if (parsed && parsed.version === '1.0' && Array.isArray(parsed.applications)) {
+        return {
+          version: '1.0',
+          directoryVersion: parsed.directoryVersion,
+          directoryLabel: parsed.directoryLabel,
+          applications: appDefs,
+        };
+      }
+    } catch {
+      // fall through
+    }
+    return { version: '1.0', applications: appDefs };
+  })();
+  const managerService = new ManagerService(initialDirectoryFile, 'local');
 
   // Apply dock icon early to avoid a brief default Electron icon flash on macOS.
   if (process.platform === 'darwin' && shellManifest.iconDockPath && app.dock) {
@@ -82,8 +108,16 @@ async function bootstrap(): Promise<void> {
     workspaceManager,
     themeManager,
     appDefs,
+    managerService,
   );
   ipcRouter.register();
+
+  // If a remote directory URL is configured in the persisted settings,
+  // kick off an opportunistic check on boot — surfaces the "Update available"
+  // banner as soon as the renderer connects without blocking startup.
+  if (managerService.getSettings().directoryUrl) {
+    void managerService.checkForUpdates();
+  }
 
   // Clean up engine state when a window closes
   app.on('web-contents-created', (_, wc) => {

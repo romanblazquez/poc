@@ -1,0 +1,27 @@
+{
+  "name": "compliance-check",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/compliance-check/src",
+  "targets": {
+    "serve": {
+      "executor": "@nx/angular:dev-server",
+      "options": {
+        "buildTarget": "compliance-check:build",
+        "port": 4017,
+        "open": false
+      }
+    },
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "apps/compliance-check/dist",
+        "index": "apps/compliance-check/src/index.html",
+        "browser": "apps/compliance-check/src/main.ts",
+        "tsConfig": "apps/compliance-check/tsconfig.app.json",
+        "styles": ["apps/compliance-check/src/styles.scss"],
+        "assets": []
+      }
+    }
+  }
+}

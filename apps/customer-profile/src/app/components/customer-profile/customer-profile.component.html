@@ -49,6 +49,34 @@
       <interop-status-badge *ngIf="intentStatus" [label]="intentStatus" [severity]="intentSeverity" />
     </div>
 
+    <!-- Live payment stream — visible whenever Payment Action returns a PrivateChannel -->
+    <div *ngIf="paymentStream.length > 0" class="ws-card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="ws-label">Payment lifecycle</div>
+        <div style="font-size:11px;color:var(--ws-muted);font-variant-numeric:tabular-nums">
+          {{ paymentReference }}
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div *ngFor="let stage of screenStages"
+             style="display:grid;grid-template-columns:24px 1fr 90px;gap:10px;align-items:center;font-size:12px">
+          <span [style.color]="stageReached(stage) ? 'var(--ws-positive)' : 'var(--ws-muted)'">
+            {{ stageReached(stage) ? '✓' : '○' }}
+          </span>
+          <span [style.fontWeight]="paymentCurrentStage === stage ? 800 : 500"
+                [style.color]="stageReached(stage) ? 'var(--ws-text)' : 'var(--ws-muted)'">
+            {{ stageLabels[stage] }}
+          </span>
+          <span style="color:var(--ws-muted);font-variant-numeric:tabular-nums;text-align:right;font-size:11px">
+            {{ stageTs(stage) }}
+          </span>
+        </div>
+      </div>
+      <div *ngIf="!paymentTerminal" style="margin-top:8px;font-size:11px;color:var(--ws-muted)">
+        Streamed live over PrivateChannel from Payment Action.
+      </div>
+    </div>
+
     <div *ngIf="accounts.length > 0" class="ws-card" style="margin-bottom:12px">
       <div class="ws-label" style="margin-bottom:8px">Accounts</div>
       <div *ngFor="let acc of accounts; trackBy: trackByAccountId" style="display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--ws-border-soft)">

@@ -7,6 +7,7 @@ import { TopBar } from './components/TopBar.js';
 import { DockviewWorkspace } from './components/DockviewWorkspace.js';
 import type { DetachedWorkspacePayload, DisplayInfo } from './components/DockviewWorkspace.js';
 import { CommandCenter } from './components/CommandCenter.js';
+import { Insights } from './components/Insights.js';
 import { InteropCopilot } from './copilot/InteropCopilot.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
 import type { Fdc3Context, UserChannel } from '@fdc3-poc/fdc3-core';
@@ -64,7 +65,7 @@ export interface AppEntry {
 }
 
 type ThemeMode = ThemeName;
-type WorkspaceMode = 'launcher' | 'workspace' | 'interop-flow' | 'command-center';
+type WorkspaceMode = 'launcher' | 'workspace' | 'interop-flow' | 'command-center' | 'insights';
 
 interface WorkspaceState {
   channelId: string | null;
@@ -717,6 +718,9 @@ export function App() {
           <TabButton active={activeMode === 'command-center'} grouped onClick={() => setActiveMode('command-center')}>
             Command Center
           </TabButton>
+          <TabButton active={activeMode === 'insights'} grouped onClick={() => setActiveMode('insights')}>
+            Insights
+          </TabButton>
           <TabButton active={activeMode === 'launcher'} grouped onClick={() => setActiveMode('launcher')}>
             App Launcher
           </TabButton>
@@ -769,6 +773,8 @@ export function App() {
             onOpen={handleOpen}
             onComposeWorkspace={handleComposeWorkspace}
           />
+        ) : activeMode === 'insights' ? (
+          <Insights apps={apps} />
         ) : (
           <div style={{ flex: 1, overflow: 'auto' }}>
             <div style={{ marginBottom: 20 }}>

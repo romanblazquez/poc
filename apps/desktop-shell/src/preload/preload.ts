@@ -147,6 +147,7 @@ ipcRenderer.on(IpcEvents.THEME_CHANGED, (_event, theme: ThemeName) => {
 // the same, so the zoom feels global without main tracking webContents IDs.
 const zoomChangeHandlers = new Set<(factor: number) => void>();
 const fullscreenChangeHandlers = new Set<(fullscreen: boolean) => void>();
+const managerStatusHandlers = new Set<(status: unknown) => void>();
 
 function applyZoomFactor(factor: number): void {
   try { webFrame.setZoomFactor(factor); } catch { /* SSR / context not ready */ }
@@ -162,6 +163,12 @@ ipcRenderer.on(IpcEvents.ZOOM_CHANGED, (_event, factor: number) => {
 ipcRenderer.on(IpcEvents.WINDOW_FULLSCREEN_CHANGED, (_event, fullscreen: boolean) => {
   for (const handler of fullscreenChangeHandlers) {
     try { handler(Boolean(fullscreen)); } catch (e) { console.error('[preload fullscreen] handler threw', e); }
+  }
+});
+
+ipcRenderer.on(IpcEvents.MANAGER_STATUS_CHANGED, (_event, status: unknown) => {
+  for (const handler of managerStatusHandlers) {
+    try { handler(status); } catch (e) { console.error('[preload manager] handler threw', e); }
   }
 });
 
@@ -492,6 +499,36 @@ contextBridge.exposeInMainWorld('shellChrome', {
       description?: string;
       branding?: { productMark?: string; accentColor?: string };
     }>;
+  },
+  /**
+   * Manager Console namespace — io.Manager-class central distribution.
+   * Renderer reads status, drives the manual "Check for updates", applies or
+   * dismisses pending updates, and saves admin settings (directory URL,
+   * refresh interval, current role, telemetry endpoint). Status pushes arrive
+   * via `onStatusChanged` so a Manager UI never needs to poll.
+   */
+  manager: {
+    getStatus(): Promise<unknown | null> {
+      return ipcRenderer.invoke(IpcEvents.MANAGER_GET_STATUS) as Promise<unknown | null>;
+    },
+    checkUpdates(): Promise<{ ok: boolean; etag?: string | null; fetchedAt: number; appCount?: number; error?: string }> {
+      return ipcRenderer.invoke(IpcEvents.MANAGER_CHECK_UPDATES) as Promise<{
+        ok: boolean; etag?: string | null; fetchedAt: number; appCount?: number; error?: string;
+      }>;
+    },
+    applyUpdate(): Promise<{ applied: boolean; reason?: string }> {
+      return ipcRenderer.invoke(IpcEvents.MANAGER_APPLY_UPDATE) as Promise<{ applied: boolean; reason?: string }>;
+    },
+    dismissUpdate(): Promise<boolean> {
+      return ipcRenderer.invoke(IpcEvents.MANAGER_DISMISS_UPDATE) as Promise<boolean>;
+    },
+    updateSettings(patch: Record<string, unknown>): Promise<unknown | null> {
+      return ipcRenderer.invoke(IpcEvents.MANAGER_UPDATE_SETTINGS, patch ?? {}) as Promise<unknown | null>;
+    },
+    onStatusChanged(handler: (status: unknown) => void): () => void {
+      managerStatusHandlers.add(handler);
+      return () => managerStatusHandlers.delete(handler);
+    },
   },
 });
 

@@ -67,6 +67,35 @@ export interface PaymentResultContext extends Fdc3Context {
   message: string;
 }
 
+/**
+ * Streaming update pushed by Payment Action over the PrivateChannel it returns
+ * from `completeIntent`. Lets the raiser render a live status timeline rather
+ * than a one-shot result. Terminal stages (`approved` / `rejected` / `settled`
+ * / `reversed`) signal the end of the stream.
+ */
+export type PaymentStage =
+  | 'received'
+  | 'validating'
+  | 'pending-approver-a'
+  | 'pending-approver-b'
+  | 'approved'
+  | 'rejected'
+  | 'settled'
+  | 'reversed';
+
+export interface PaymentStatusContext extends Fdc3Context {
+  type: 'com.demo.paymentStatus';
+  reference: string;
+  customerId: string;
+  amount: number;
+  currency: string;
+  stage: PaymentStage;
+  message?: string;
+  ts: string;
+  /** When the stage is terminal (approved / rejected / settled / reversed). */
+  terminal?: boolean;
+}
+
 export interface AccountContext extends Fdc3Context {
   type: 'com.demo.account';
   accountId: string;
@@ -97,6 +126,32 @@ export interface OrderContext extends Fdc3Context {
   notional: number;
   currency: string;
   status: string;
+}
+
+/**
+ * Per-rule outcome from the compliance gate.
+ * `approved` — rule passed.
+ * `review`   — manual review required; the order can proceed but is flagged.
+ * `blocked`  — order rejected by policy.
+ */
+export type ComplianceVerdict = 'approved' | 'review' | 'blocked';
+
+/**
+ * Result the compliance-check app returns from a `ValidateOrder` intent (or
+ * pushes onto the user channel after passively scoring an order).
+ * `verdict` is the most severe outcome across all triggered rules.
+ */
+export interface ComplianceVerdictContext extends Fdc3Context {
+  type: 'com.demo.complianceVerdict';
+  orderId: string;
+  ticker: string;
+  side: 'Buy' | 'Sell';
+  quantity: number;
+  notional: number;
+  currency: string;
+  verdict: ComplianceVerdict;
+  reasons: string[];
+  ts: string;
 }
 
 export interface TraderOrderContext extends Fdc3Context {

@@ -105,4 +105,12 @@ export interface AppDefinition {
     raisesIntents?: string[];
     handlesIntents?: string[];
   };
+  /**
+   * Optional role gating — when present, this app is only shown in the
+   * launcher to users whose `currentRole` is in the list. Empty / absent
+   * means visible to everyone (the default). Honoured by the Manager Console
+   * pillar and the AppLauncher; FDC3 routing is NOT affected — entitlements
+   * are a UI surface, not an interop boundary.
+   */
+  roles?: string[];
 }

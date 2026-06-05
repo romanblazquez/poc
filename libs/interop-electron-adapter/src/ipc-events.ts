@@ -58,6 +58,11 @@ export const IpcEvents = {
   INTENT_RESOLVER_CANCEL: 'fdc3:intentResolverCancel',
   GET_ZOOM: 'shell:getZoom',
   SET_ZOOM: 'shell:setZoom',
+  MANAGER_GET_STATUS: 'manager:getStatus',
+  MANAGER_CHECK_UPDATES: 'manager:checkUpdates',
+  MANAGER_APPLY_UPDATE: 'manager:applyUpdate',
+  MANAGER_DISMISS_UPDATE: 'manager:dismissUpdate',
+  MANAGER_UPDATE_SETTINGS: 'manager:updateSettings',
   GET_WINDOW_FULLSCREEN: 'shell:getWindowFullscreen',
   GET_SHELL_MANIFEST: 'shell:getManifest',
 
@@ -76,6 +81,7 @@ export const IpcEvents = {
   INTEROP_ACTIVITY: 'fdc3:interopActivity',
   APP_LOG: 'platform:appLog',
   ZOOM_CHANGED: 'shell:zoomChanged',
+  MANAGER_STATUS_CHANGED: 'manager:statusChanged',
   WINDOW_FULLSCREEN_CHANGED: 'shell:windowFullscreenChanged',
 } as const;
 
