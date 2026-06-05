@@ -231,7 +231,7 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
     setBusy(null);
     setActionMessage(
       result.applied
-        ? { text: 'Update applied. Windows opened from here on use the new directory.', kind: 'ok' }
+        ? { text: 'Update applied. Runtime app directory refreshed live.', kind: 'ok' }
         : { text: result.reason ?? 'No update to apply', kind: 'error' },
     );
   }, [api]);

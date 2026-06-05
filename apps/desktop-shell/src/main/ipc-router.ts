@@ -13,7 +13,9 @@ import { IntentResolver } from '@fdc3-poc/intent-engine';
 import { AppRegistry } from '@fdc3-poc/app-registry';
 import { IntentResolverWindowManager } from './intent-resolver-window.js';
 import type { ManagerService } from './manager-service.js';
-import type { ManagerSettings } from '@fdc3-poc/fdc3-core';
+import type { BridgeSettings, ManagerSettings, NotificationRaiseInput } from '@fdc3-poc/fdc3-core';
+import type { BridgeService } from './bridge-service.js';
+import { NotificationStore } from './notification-store.js';
 import { resolveAppIdentityFromUrl, type WindowManager } from './window-manager.js';
 import type { DetachedWorkspacePayload } from './window-manager.js';
 import type { WorkspaceManager } from './workspace-manager.js';
@@ -68,6 +70,7 @@ export class IpcRouter {
     private readonly themeManager: ThemeManager,
     private readonly appDirectory: AppDefinition[],
     private readonly managerService?: ManagerService,
+    private readonly bridgeService?: BridgeService,
   ) {
     this.intentResolver = new IntentResolver();
     this.appRegistry = new AppRegistry(appDirectory);
@@ -81,7 +84,26 @@ export class IpcRouter {
         }
       });
     }
+    // Notification snapshots broadcast on every change so the shell renderer
+    // (or any other webContents) stays in sync without polling.
+    this.notifications.subscribe((snapshot) => {
+      for (const wc of webContents.getAllWebContents()) {
+        if (wc.isDestroyed()) continue;
+        try { wc.send(IpcEvents.NOTIFICATIONS_CHANGED, snapshot); } catch { /* defensive */ }
+      }
+    });
+    if (this.bridgeService) {
+      this.bridgeService.subscribe((status) => {
+        for (const wc of webContents.getAllWebContents()) {
+          if (wc.isDestroyed()) continue;
+          try { wc.send(IpcEvents.BRIDGE_STATUS_CHANGED, status); } catch { /* defensive */ }
+        }
+      });
+    }
   }
+
+  /** Shell notification store — exposed via window.notifications. */
+  private readonly notifications = new NotificationStore();
 
   private emitActivity(input: {
     kind: InteropActivityKind;
@@ -249,6 +271,21 @@ export class IpcRouter {
     return !!appId && this.appDirectory.some((entry) => entry.appId === appId);
   }
 
+  private replaceRuntimeAppDirectory(apps: AppDefinition[]): void {
+    this.appDirectory.splice(0, this.appDirectory.length, ...apps);
+    this.appRegistry.replaceAll(this.appDirectory);
+    for (const wc of webContents.getAllWebContents()) {
+      if (wc.isDestroyed()) continue;
+      try { wc.send(IpcEvents.APP_LIST_CHANGED); } catch { /* defensive */ }
+    }
+    this.emitActivity({
+      kind: 'directory.updated',
+      status: 'ok',
+      message: `Runtime app directory updated (${apps.length} apps)`,
+      payload: { appCount: apps.length },
+    });
+  }
+
   private routeKey(sourceAppId: string, signal: string, targetAppId: string): string {
     return `${sourceAppId}:${signal}:${targetAppId}`;
   }
@@ -321,6 +358,77 @@ export class IpcRouter {
     this.handleManagerApplyUpdate();
     this.handleManagerDismissUpdate();
     this.handleManagerUpdateSettings();
+    this.handleNotificationsRaise();
+    this.handleNotificationsList();
+    this.handleNotificationsMarkRead();
+    this.handleNotificationsMarkAllRead();
+    this.handleNotificationsDismiss();
+    this.handleNotificationsClearAll();
+    this.handleNotificationsUnreadCount();
+    this.handleBridgeGetStatus();
+    this.handleBridgeScan();
+    this.handleBridgeUpdateSettings();
+    this.handleGetAppLifecycle();
+    this.handleRestartApp();
+  }
+
+  // ─── FINOS bridge readiness (non-experimental Backplane discovery) ───────
+
+  private handleBridgeGetStatus(): void {
+    ipcMain.handle(IpcEvents.BRIDGE_GET_STATUS, () => this.bridgeService?.getStatus() ?? null);
+  }
+
+  private handleBridgeScan(): void {
+    ipcMain.handle(IpcEvents.BRIDGE_SCAN, async () => {
+      if (!this.bridgeService) return null;
+      return this.bridgeService.scan();
+    });
+  }
+
+  private handleBridgeUpdateSettings(): void {
+    ipcMain.handle(IpcEvents.BRIDGE_UPDATE_SETTINGS, (_event, patch: Partial<BridgeSettings>) => {
+      if (!this.bridgeService) return null;
+      return this.bridgeService.updateSettings(patch ?? {});
+    });
+  }
+
+  // ─── Notifications (platform service — io.Connect-class toast/drawer) ────
+
+  private handleNotificationsRaise(): void {
+    ipcMain.handle(IpcEvents.NOTIFICATIONS_RAISE, (event, input: NotificationRaiseInput) => {
+      const senderAppId = this.getAppIdForWebContents(event.sender.id);
+      const def = senderAppId ? this.appDirectory.find((a) => a.appId === senderAppId) : undefined;
+      const result = this.notifications.raise(input ?? { title: '' }, { appId: senderAppId, title: def?.title });
+      return result.id;
+    });
+  }
+  private handleNotificationsList(): void {
+    ipcMain.handle(IpcEvents.NOTIFICATIONS_LIST, (_event, limit?: number) => this.notifications.list(limit));
+  }
+  private handleNotificationsMarkRead(): void {
+    ipcMain.handle(IpcEvents.NOTIFICATIONS_MARK_READ, (_event, id: string) => this.notifications.markRead(id));
+  }
+  private handleNotificationsMarkAllRead(): void {
+    ipcMain.handle(IpcEvents.NOTIFICATIONS_MARK_ALL_READ, () => { this.notifications.markAllRead(); return true; });
+  }
+  private handleNotificationsDismiss(): void {
+    ipcMain.handle(IpcEvents.NOTIFICATIONS_DISMISS, (_event, id: string) => this.notifications.dismiss(id));
+  }
+  private handleNotificationsClearAll(): void {
+    ipcMain.handle(IpcEvents.NOTIFICATIONS_CLEAR_ALL, () => { this.notifications.clearAll(); return true; });
+  }
+  private handleNotificationsUnreadCount(): void {
+    ipcMain.handle(IpcEvents.NOTIFICATIONS_UNREAD_COUNT, () => this.notifications.unreadCount());
+  }
+
+  // ─── App lifecycle (launcher product UX) ─────────────────────────────────
+
+  private handleGetAppLifecycle(): void {
+    ipcMain.handle(IpcEvents.GET_APP_LIFECYCLE, () => this.windowManager.getAppLifecycle());
+  }
+
+  private handleRestartApp(): void {
+    ipcMain.handle(IpcEvents.RESTART_APP, (_event, appId: string) => this.windowManager.restartApp(appId));
   }
 
   // ─── Manager Console (io.Manager-class central distribution) ─────────────
@@ -346,7 +454,11 @@ export class IpcRouter {
   private handleManagerApplyUpdate(): void {
     ipcMain.handle(IpcEvents.MANAGER_APPLY_UPDATE, () => {
       if (!this.managerService) return { applied: false, reason: 'Manager not initialised' };
-      return this.managerService.applyAvailable();
+      const result = this.managerService.applyAvailable();
+      if (result.applied) {
+        this.replaceRuntimeAppDirectory(this.managerService.getAppliedApps());
+      }
+      return result;
     });
   }
 

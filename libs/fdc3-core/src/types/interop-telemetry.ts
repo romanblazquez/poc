@@ -18,6 +18,7 @@ export type InteropActivityKind =
   | 'privateChannel.created'
   | 'privateChannel.connected'
   | 'privateChannel.broadcasted'
+  | 'directory.updated'
   | 'policy.updated';
 
 export type InteropActivityStatus = 'ok' | 'blocked' | 'error' | 'info';

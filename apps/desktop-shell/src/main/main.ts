@@ -25,6 +25,7 @@ import { WorkspaceManager } from './workspace-manager.js';
 import { ThemeManager } from './theme-manager.js';
 import { ShellAssetsLoader } from './shell-assets-loader.js';
 import { ManagerService } from './manager-service.js';
+import { BridgeService } from './bridge-service.js';
 import { ChannelManager } from '@fdc3-poc/channel-engine';
 import { IntentRegistry } from '@fdc3-poc/intent-engine';
 import type { AppDirectoryFile } from '@fdc3-poc/app-registry';
@@ -77,6 +78,7 @@ async function bootstrap(): Promise<void> {
     return { version: '1.0', applications: appDefs };
   })();
   const managerService = new ManagerService(initialDirectoryFile, 'local');
+  const bridgeService = new BridgeService();
 
   // Apply dock icon early to avoid a brief default Electron icon flash on macOS.
   if (process.platform === 'darwin' && shellManifest.iconDockPath && app.dock) {
@@ -109,6 +111,7 @@ async function bootstrap(): Promise<void> {
     themeManager,
     appDefs,
     managerService,
+    bridgeService,
   );
   ipcRouter.register();
 
@@ -117,6 +120,9 @@ async function bootstrap(): Promise<void> {
   // banner as soon as the renderer connects without blocking startup.
   if (managerService.getSettings().directoryUrl) {
     void managerService.checkForUpdates();
+  }
+  if (bridgeService.getSettings().enabled) {
+    void bridgeService.scan();
   }
 
   // Clean up engine state when a window closes

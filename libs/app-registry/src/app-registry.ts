@@ -33,6 +33,13 @@ export class AppRegistry {
     }
   }
 
+  replaceAll(apps: AppDefinition[]): void {
+    this.apps.clear();
+    for (const app of apps) {
+      this.apps.set(app.appId, app);
+    }
+  }
+
   getAll(): AppDefinition[] {
     return [...this.apps.values()];
   }

@@ -19,7 +19,7 @@
 
 import { contextBridge, ipcRenderer, webFrame } from 'electron';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
-import type { AppIntent, AppLogEvent, AppLogLevel, Channel, ChannelDisplayMetadata, ChannelListener, ContextMetadata, Fdc3Context, Fdc3EventHandler, Fdc3EventType, FlowPolicy, ImplementationMetadata, IntentInvocationMetadata, IntentResolution, InteropActivityEvent, InteropSnapshot, PrivateChannel, PrivateChannelEventListener, PrivateChannelMarker, UserChannel, ThemeName } from '@fdc3-poc/fdc3-core';
+import type { AppIntent, AppLogEvent, AppLogLevel, BridgeSettings, BridgeStatus, Channel, ChannelDisplayMetadata, ChannelListener, ContextMetadata, Fdc3Context, Fdc3EventHandler, Fdc3EventType, FlowPolicy, ImplementationMetadata, IntentInvocationMetadata, IntentResolution, InteropActivityEvent, InteropSnapshot, NotificationRaiseInput, ShellNotification, PrivateChannel, PrivateChannelEventListener, PrivateChannelMarker, UserChannel, ThemeName } from '@fdc3-poc/fdc3-core';
 import { isPrivateChannelMarker } from '@fdc3-poc/fdc3-core';
 
 // ─── Handler registries (live in preload isolate, not renderer) ────────────
@@ -51,6 +51,7 @@ interface DisplayInfo {
 const contextHandlers = new Map<string, Set<ContextHandler>>();
 const intentHandlers = new Map<string, Set<IntentHandler>>();
 const channelChangeHandlers = new Set<ChannelHandler>();
+const appListChangeHandlers = new Set<() => void>();
 /** FDC3 2.1 agent-level event listeners: eventType ('*' = all) → Set<handler>. */
 const fdc3EventHandlers = new Map<string, Set<Fdc3EventHandler>>();
 /** channelId → (contextType | '*') → Set<handler> — for App Channel listeners. */
@@ -80,6 +81,7 @@ const workspaceWindowClosedHandlers = new Set<(payload: DetachedWorkspacePayload
 const themeChangeHandlers = new Set<(theme: ThemeName) => void>();
 const interopActivityHandlers = new Set<(event: InteropActivityEvent) => void>();
 const appLogHandlers = new Set<(event: AppLogEvent) => void>();
+const notificationHandlers = new Set<(snapshot: ShellNotification[]) => void>();
 
 // ─── Inbound IPC listeners (main → preload) ───────────────────────────────
 
@@ -129,6 +131,16 @@ ipcRenderer.on(IpcEvents.CHANNEL_CHANGED, (_event, channel: UserChannel | null) 
   }
 });
 
+ipcRenderer.on(IpcEvents.APP_LIST_CHANGED, () => {
+  for (const handler of appListChangeHandlers) {
+    try {
+      handler();
+    } catch (e) {
+      console.error('[fdc3 preload] App-list handler threw:', e);
+    }
+  }
+});
+
 ipcRenderer.on(IpcEvents.WORKSPACE_WINDOW_CLOSED, (_event, payload: DetachedWorkspacePayload) => {
   for (const handler of workspaceWindowClosedHandlers) {
     handler(payload);
@@ -148,6 +160,7 @@ ipcRenderer.on(IpcEvents.THEME_CHANGED, (_event, theme: ThemeName) => {
 const zoomChangeHandlers = new Set<(factor: number) => void>();
 const fullscreenChangeHandlers = new Set<(fullscreen: boolean) => void>();
 const managerStatusHandlers = new Set<(status: unknown) => void>();
+const bridgeStatusHandlers = new Set<(status: BridgeStatus) => void>();
 
 function applyZoomFactor(factor: number): void {
   try { webFrame.setZoomFactor(factor); } catch { /* SSR / context not ready */ }
@@ -169,6 +182,12 @@ ipcRenderer.on(IpcEvents.WINDOW_FULLSCREEN_CHANGED, (_event, fullscreen: boolean
 ipcRenderer.on(IpcEvents.MANAGER_STATUS_CHANGED, (_event, status: unknown) => {
   for (const handler of managerStatusHandlers) {
     try { handler(status); } catch (e) { console.error('[preload manager] handler threw', e); }
+  }
+});
+
+ipcRenderer.on(IpcEvents.BRIDGE_STATUS_CHANGED, (_event, status: BridgeStatus) => {
+  for (const handler of bridgeStatusHandlers) {
+    try { handler(status); } catch (e) { console.error('[preload bridge] handler threw', e); }
   }
 });
 
@@ -194,6 +213,16 @@ ipcRenderer.on(IpcEvents.APP_LOG, (_event, log: AppLogEvent) => {
       handler(log);
     } catch (e) {
       console.error('[fdc3 preload] App log handler threw:', e);
+    }
+  }
+});
+
+ipcRenderer.on(IpcEvents.NOTIFICATIONS_CHANGED, (_event, snapshot: ShellNotification[]) => {
+  for (const handler of notificationHandlers) {
+    try {
+      handler(snapshot);
+    } catch (e) {
+      console.error('[preload notifications] handler threw:', e);
     }
   }
 });
@@ -456,6 +485,36 @@ contextBridge.exposeInMainWorld('platformLogs', {
   },
 });
 
+// ─── window.notifications surface ───────────────────────────────────────────
+
+contextBridge.exposeInMainWorld('notifications', {
+  raise(input: NotificationRaiseInput): Promise<string> {
+    return ipcRenderer.invoke(IpcEvents.NOTIFICATIONS_RAISE, input) as Promise<string>;
+  },
+  list(limit?: number): Promise<ShellNotification[]> {
+    return ipcRenderer.invoke(IpcEvents.NOTIFICATIONS_LIST, limit) as Promise<ShellNotification[]>;
+  },
+  markRead(id: string): Promise<void> {
+    return ipcRenderer.invoke(IpcEvents.NOTIFICATIONS_MARK_READ, id) as Promise<void>;
+  },
+  markAllRead(): Promise<void> {
+    return ipcRenderer.invoke(IpcEvents.NOTIFICATIONS_MARK_ALL_READ) as Promise<void>;
+  },
+  dismiss(id: string): Promise<void> {
+    return ipcRenderer.invoke(IpcEvents.NOTIFICATIONS_DISMISS, id) as Promise<void>;
+  },
+  clearAll(): Promise<void> {
+    return ipcRenderer.invoke(IpcEvents.NOTIFICATIONS_CLEAR_ALL) as Promise<void>;
+  },
+  unreadCount(): Promise<number> {
+    return ipcRenderer.invoke(IpcEvents.NOTIFICATIONS_UNREAD_COUNT) as Promise<number>;
+  },
+  onChanged(handler: (snapshot: ShellNotification[]) => void): () => void {
+    notificationHandlers.add(handler);
+    return () => notificationHandlers.delete(handler);
+  },
+});
+
 // ─── window.shellChrome surface ──────────────────────────────────────────────
 // Shell-level UX controls that are NOT FDC3 (zoom, future hotkeys, etc).
 // Exposed separately so the shell renderer can drive them without crowding
@@ -528,6 +587,34 @@ contextBridge.exposeInMainWorld('shellChrome', {
     onStatusChanged(handler: (status: unknown) => void): () => void {
       managerStatusHandlers.add(handler);
       return () => managerStatusHandlers.delete(handler);
+    },
+  },
+  bridge: {
+    getStatus(): Promise<BridgeStatus | null> {
+      return ipcRenderer.invoke(IpcEvents.BRIDGE_GET_STATUS) as Promise<BridgeStatus | null>;
+    },
+    scan(): Promise<BridgeStatus | null> {
+      return ipcRenderer.invoke(IpcEvents.BRIDGE_SCAN) as Promise<BridgeStatus | null>;
+    },
+    updateSettings(patch: Partial<BridgeSettings>): Promise<BridgeStatus | null> {
+      return ipcRenderer.invoke(IpcEvents.BRIDGE_UPDATE_SETTINGS, patch ?? {}) as Promise<BridgeStatus | null>;
+    },
+    onStatusChanged(handler: (status: BridgeStatus) => void): () => void {
+      bridgeStatusHandlers.add(handler);
+      return () => bridgeStatusHandlers.delete(handler);
+    },
+  },
+  apps: {
+    getLifecycle(): Promise<Array<{ appId: string; running: boolean; isMinimized: boolean; webContentsId: number | null }>> {
+      return ipcRenderer.invoke(IpcEvents.GET_APP_LIFECYCLE) as Promise<Array<{
+        appId: string;
+        running: boolean;
+        isMinimized: boolean;
+        webContentsId: number | null;
+      }>>;
+    },
+    restart(appId: string): Promise<boolean> {
+      return ipcRenderer.invoke(IpcEvents.RESTART_APP, appId) as Promise<boolean>;
     },
   },
 });
@@ -842,6 +929,12 @@ contextBridge.exposeInMainWorld('fdc3', {
   /** Get the list of registered applications from the app directory. */
   getAppList(): Promise<Array<{ appId: string; title: string; description?: string; icon?: string; category?: string; url: string; devPort: number; capabilities?: { broadcasts?: string[]; listensTo?: string[]; raisesIntents?: string[]; handlesIntents?: string[] }; listensForContexts?: string[]; intents?: Array<{ intent: string; contextTypes: string[] | null; appId: string; displayName?: string }> }>> {
     return ipcRenderer.invoke(IpcEvents.GET_APP_LIST) as Promise<Array<{ appId: string; title: string; description?: string; icon?: string; category?: string; url: string; devPort: number; capabilities?: { broadcasts?: string[]; listensTo?: string[]; raisesIntents?: string[]; handlesIntents?: string[] }; listensForContexts?: string[]; intents?: Array<{ intent: string; contextTypes: string[] | null; appId: string; displayName?: string }> }>>;
+  },
+
+  /** Subscribe to app-directory updates applied by the Manager Console. */
+  onAppListChanged(handler: () => void): () => void {
+    appListChangeHandlers.add(handler);
+    return () => appListChangeHandlers.delete(handler);
   },
 
   /** Get the preload path used by embedded app webviews. */

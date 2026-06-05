@@ -82,6 +82,13 @@ export interface WindowEntry {
   appId: string;
 }
 
+export interface AppLifecycleSnapshot {
+  appId: string;
+  running: boolean;
+  isMinimized: boolean;
+  webContentsId: number | null;
+}
+
 export interface DetachedWorkspacePayload {
   id: string;
   name: string;
@@ -303,6 +310,22 @@ export class WindowManager {
     return win;
   }
 
+  restartApp(appId: string): boolean {
+    const exists = this.appDefs.some((appDef) => appDef.appId === appId);
+    if (!exists) return false;
+
+    const existing = this.findByAppId(appId);
+    if (!existing || existing.isDestroyed()) {
+      return !!this.openApp(appId);
+    }
+
+    existing.once('closed', () => {
+      this.openApp(appId);
+    });
+    existing.close();
+    return true;
+  }
+
   private register(win: BrowserWindow, appId: string): void {
     const id = win.webContents.id;
     this.windows.set(id, { window: win, appId });
@@ -340,6 +363,18 @@ export class WindowManager {
       }
     }
     return null;
+  }
+
+  getAppLifecycle(): AppLifecycleSnapshot[] {
+    return this.appDefs.map((appDef) => {
+      const win = this.findByAppId(appDef.appId);
+      return {
+        appId: appDef.appId,
+        running: !!win,
+        isMinimized: !!win?.isMinimized(),
+        webContentsId: win && !win.isDestroyed() ? win.webContents.id : null,
+      };
+    });
   }
 
   closeAppsNotIn(appIds: Set<string>): void {

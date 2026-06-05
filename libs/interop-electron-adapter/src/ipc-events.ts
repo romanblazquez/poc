@@ -63,6 +63,18 @@ export const IpcEvents = {
   MANAGER_APPLY_UPDATE: 'manager:applyUpdate',
   MANAGER_DISMISS_UPDATE: 'manager:dismissUpdate',
   MANAGER_UPDATE_SETTINGS: 'manager:updateSettings',
+  NOTIFICATIONS_RAISE: 'notifications:raise',
+  NOTIFICATIONS_LIST: 'notifications:list',
+  NOTIFICATIONS_MARK_READ: 'notifications:markRead',
+  NOTIFICATIONS_MARK_ALL_READ: 'notifications:markAllRead',
+  NOTIFICATIONS_DISMISS: 'notifications:dismiss',
+  NOTIFICATIONS_CLEAR_ALL: 'notifications:clearAll',
+  NOTIFICATIONS_UNREAD_COUNT: 'notifications:unreadCount',
+  BRIDGE_GET_STATUS: 'bridge:getStatus',
+  BRIDGE_SCAN: 'bridge:scan',
+  BRIDGE_UPDATE_SETTINGS: 'bridge:updateSettings',
+  GET_APP_LIFECYCLE: 'shell:getAppLifecycle',
+  RESTART_APP: 'shell:restartApp',
   GET_WINDOW_FULLSCREEN: 'shell:getWindowFullscreen',
   GET_SHELL_MANIFEST: 'shell:getManifest',
 
@@ -82,6 +94,8 @@ export const IpcEvents = {
   APP_LOG: 'platform:appLog',
   ZOOM_CHANGED: 'shell:zoomChanged',
   MANAGER_STATUS_CHANGED: 'manager:statusChanged',
+  NOTIFICATIONS_CHANGED: 'notifications:changed',
+  BRIDGE_STATUS_CHANGED: 'bridge:statusChanged',
   WINDOW_FULLSCREEN_CHANGED: 'shell:windowFullscreenChanged',
 } as const;
 

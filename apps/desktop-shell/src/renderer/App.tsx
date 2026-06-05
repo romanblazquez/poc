@@ -4,11 +4,14 @@ import { ChannelBar } from './components/ChannelBar.js';
 import { WorkspaceToolbar } from './components/WorkspaceToolbar.js';
 import { ZoomControl } from './components/ZoomControl.js';
 import { TopBar } from './components/TopBar.js';
+import { NotificationsCenter } from './components/NotificationsCenter.js';
+import { HotkeyHelp } from './components/HotkeyHelp.js';
 import { DockviewWorkspace } from './components/DockviewWorkspace.js';
 import type { DetachedWorkspacePayload, DisplayInfo } from './components/DockviewWorkspace.js';
 import { CommandCenter } from './components/CommandCenter.js';
 import { Insights } from './components/Insights.js';
 import { Manager } from './components/Manager.js';
+import { Bridge } from './components/Bridge.js';
 import { InteropCopilot } from './copilot/InteropCopilot.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
 import type { Fdc3Context, UserChannel } from '@fdc3-poc/fdc3-core';
@@ -66,7 +69,7 @@ export interface AppEntry {
 }
 
 type ThemeMode = ThemeName;
-type WorkspaceMode = 'launcher' | 'workspace' | 'interop-flow' | 'command-center' | 'insights' | 'manager';
+type WorkspaceMode = 'launcher' | 'workspace' | 'interop-flow' | 'command-center' | 'insights' | 'manager' | 'bridge';
 
 interface WorkspaceState {
   channelId: string | null;
@@ -227,6 +230,8 @@ export function App() {
   const [detachedWorkspaces, setDetachedWorkspaces] = useState<Partial<Record<string, DetachedWorkspacePayload>>>({});
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
   const [copilotOpen, setCopilotOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [hotkeysOpen, setHotkeysOpen] = useState(false);
   const [shellManifest, setShellManifest] = useState<ShellManifestView | null>(null);
 
   const activeWorkspaceTab = workspaceTabs.find((tab) => tab.id === activeWorkspaceId) ?? workspaceTabs[0];
@@ -257,7 +262,10 @@ export function App() {
 
   useEffect(() => {
     if (!window.fdc3) return;
-    void window.fdc3.getAppList().then(setApps);
+    const refreshApps = (): void => {
+      void window.fdc3.getAppList().then(setApps);
+    };
+    refreshApps();
     void window.fdc3.getPreloadPath().then(setPreloadPath);
     void window.fdc3.getCurrentChannel().then(setCurrentChannel);
     void window.fdc3.getDisplays().then(setDisplays);
@@ -267,6 +275,10 @@ export function App() {
       window.localStorage.setItem('fdc3.desktop.theme', nextTheme);
     });
     const unsub = window.fdc3.onChannelChanged(setCurrentChannel);
+    const shellFdc3 = window.fdc3 as typeof window.fdc3 & {
+      onAppListChanged?: (handler: () => void) => () => void;
+    };
+    const unsubAppList = shellFdc3.onAppListChanged?.(refreshApps) ?? (() => undefined);
     const unsubTheme = window.fdc3.onThemeChanged((nextTheme) => {
       setGlobalTheme(nextTheme);
       document.documentElement.dataset.theme = THEMES[nextTheme].dataTheme;
@@ -289,6 +301,7 @@ export function App() {
     });
     return () => {
       unsub();
+      unsubAppList();
       unsubTheme();
     };
   }, []);
@@ -308,12 +321,40 @@ export function App() {
     window.localStorage.setItem('fdc3.desktop.theme', theme);
   }, [theme]);
 
-  // Cmd/Ctrl-K opens the Interop Copilot command bar.
+  // Shell-level hotkeys. Renderer-scoped by design: this handles shell
+  // navigation and overlays without registering OS-global shortcuts.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      if (event.defaultPrevented || !(event.metaKey || event.ctrlKey)) return;
+      const key = event.key.toLowerCase();
+      const modeByKey: Partial<Record<string, WorkspaceMode>> = {
+        '1': 'workspace',
+        '2': 'interop-flow',
+        '3': 'command-center',
+        '4': 'insights',
+        '5': 'manager',
+        '6': 'bridge',
+        '0': 'launcher',
+      };
+      const mode = modeByKey[key];
+      if (mode) {
+        event.preventDefault();
+        setActiveMode(mode);
+        return;
+      }
+      if (key === 'k') {
         event.preventDefault();
         setCopilotOpen((prev) => !prev);
+        return;
+      }
+      if (key === 'b') {
+        event.preventDefault();
+        setNotificationsOpen((prev) => !prev);
+        return;
+      }
+      if (key === '/' || event.code === 'Slash') {
+        event.preventDefault();
+        setHotkeysOpen((prev) => !prev);
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -648,6 +689,19 @@ export function App() {
             ))}
           </select>
           <ZoomControl />
+          <NotificationsCenter open={notificationsOpen} onOpenChange={setNotificationsOpen} />
+          <button
+            type="button"
+            onClick={() => setHotkeysOpen(true)}
+            title="Keyboard shortcuts (Cmd/Ctrl+/)"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, height: 22, padding: '0 9px',
+              background: 'var(--shell-panel-2)', border: '1px solid var(--shell-border)',
+              borderRadius: 6, color: 'var(--shell-text)', cursor: 'pointer', fontSize: 11, fontWeight: 800,
+            }}
+          >
+            Keys
+          </button>
           <WorkspaceToolbar onSave={handleSave} saveStatus={saveStatus} />
           <ChannelBar
             currentChannel={currentChannel}
@@ -725,6 +779,9 @@ export function App() {
           <TabButton active={activeMode === 'manager'} grouped onClick={() => setActiveMode('manager')}>
             Manager
           </TabButton>
+          <TabButton active={activeMode === 'bridge'} grouped onClick={() => setActiveMode('bridge')}>
+            Bridge
+          </TabButton>
           <TabButton active={activeMode === 'launcher'} grouped onClick={() => setActiveMode('launcher')}>
             App Launcher
           </TabButton>
@@ -781,6 +838,8 @@ export function App() {
           <Insights apps={apps} />
         ) : activeMode === 'manager' ? (
           <Manager apps={apps} />
+        ) : activeMode === 'bridge' ? (
+          <Bridge />
         ) : (
           <div style={{ flex: 1, overflow: 'auto' }}>
             <div style={{ marginBottom: 20 }}>
@@ -825,6 +884,7 @@ export function App() {
         onClose={() => setCopilotOpen(false)}
         currentChannelId={currentChannel?.id ?? null}
       />
+      <HotkeyHelp open={hotkeysOpen} onClose={() => setHotkeysOpen(false)} />
     </div>
   );
 }
