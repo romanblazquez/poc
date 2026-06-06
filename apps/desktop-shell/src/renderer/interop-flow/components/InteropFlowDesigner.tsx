@@ -15,16 +15,16 @@ import {
 import '@xyflow/react/dist/style.css';
 import type { AppEntry } from '../../App.js';
 import { validateConnector, validateFlow } from '../engine/flow-validator.js';
-import { createInteropNodes } from '../engine/connector-resolver.js';
 import { parsePort } from '../model/connector-types.js';
 import { contextLabel, intentLabel } from '../model/fdc3-schema.js';
-import type { InteropConnector, InteropFlowDefinition } from '../model/interop-flow-types.js';
-import { contextOutPort, intentInPort, intentOutPort } from '../model/connector-types.js';
+import type { InteropAppNode, InteropConnector, InteropFlowDefinition } from '../model/interop-flow-types.js';
 import { AppNode } from './AppNode.js';
 import { ConnectorEdge } from './ConnectorEdge.js';
 import { FlowToolbar } from './FlowToolbar.js';
 import { ConnectorConfigPanel } from './ConnectorConfigPanel.js';
 import { useInteropFlow } from '../hooks/useInteropFlow.js';
+import { Badge } from '../../components/ui/badge.js';
+import { Card, CardContent } from '../../components/ui/card.js';
 import '../styles/interop-flow.css';
 
 interface InteropFlowDesignerProps {
@@ -36,13 +36,18 @@ interface InteropFlowDesignerProps {
   onFlowChange?: (flow: InteropFlowDefinition) => void;
 }
 
+type FlowNodeData = InteropAppNode & Record<string, unknown>;
+type FlowEdgeData = InteropConnector & { valid: boolean; label: string } & Record<string, unknown>;
+type FlowNode = Node<FlowNodeData, 'app'>;
+type FlowEdge = Edge<FlowEdgeData, 'connector'>;
+
 const nodeTypes = { app: AppNode };
 const edgeTypes = { connector: ConnectorEdge };
 
 export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme, appIds, onFlowChange }: InteropFlowDesignerProps) {
   const { flow, commitFlow, autoWireFlow, updateConnector } = useInteropFlow(workspaceTabId, apps, appIds);
-  const [nodes, setNodes, onNodesChangeInternal] = useNodesState([]);
-  const [edges, setEdges, onEdgesChangeInternal] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChangeInternal] = useNodesState<FlowNode>([]);
+  const [edges, setEdges, onEdgesChangeInternal] = useEdgesState<FlowEdge>([]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const validations = useMemo(() => validateFlow(flow), [flow]);
   const validationMap = useMemo(() => new Map(validations.map((v) => [v.connectorId, v])), [validations]);
@@ -58,7 +63,7 @@ export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme
     setNodes(
       flow.nodes.map((node) => ({
         id: node.appId,
-        data: node,
+        data: node as FlowNodeData,
         position: node.position,
         type: 'app' as const,
         draggable: true,
@@ -81,7 +86,7 @@ export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme
           sourceHandle: connector.sourcePortId,
           targetHandle: connector.targetPortId,
           type: 'connector',
-          data: { ...connector, valid: validation?.valid ?? false, label: connectorDisplayLabel(connector) },
+          data: { ...connector, valid: validation?.valid ?? false, label: connectorDisplayLabel(connector) } as FlowEdgeData,
           animated: connector.enabled,
           deletable: true,
         };
@@ -90,22 +95,24 @@ export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme
   }, [flow.connectors, validationMap, setEdges]);
 
   // Let React Flow own all node changes for smooth drag; only persist final position back to model.
-  const onNodesChange = useCallback((changes: NodeChange[]) => {
+  const onNodesChange = useCallback((changes: NodeChange<FlowNode>[]) => {
     onNodesChangeInternal(changes);
-    const dragEnds = changes.filter((c) => c.type === 'position' && (c as { dragging?: boolean }).dragging === false);
+    const dragEnds = changes.filter((c): c is Extract<NodeChange<FlowNode>, { type: 'position' }> =>
+      c.type === 'position' && (c as { dragging?: boolean }).dragging === false,
+    );
     if (dragEnds.length === 0) return;
     const current = flowRef.current;
     const updatedNodes = current.nodes.map((n) => {
-      const change = dragEnds.find((c) => c.id === n.appId && c.type === 'position') as { position?: { x: number; y: number } } | undefined;
+      const change = dragEnds.find((c) => c.id === n.appId);
       return change?.position ? { ...n, position: change.position } : n;
     });
     commitFlow({ ...current, nodes: updatedNodes });
   }, [onNodesChangeInternal, commitFlow]);
 
   // Let React Flow own edge selection; only persist removals back to model.
-  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+  const onEdgesChange = useCallback((changes: EdgeChange<FlowEdge>[]) => {
     onEdgesChangeInternal(changes);
-    const removes = changes.filter((c) => c.type === 'remove');
+    const removes = changes.filter((c): c is Extract<EdgeChange<FlowEdge>, { type: 'remove' }> => c.type === 'remove');
     if (removes.length === 0) return;
     const ids = new Set(removes.map((c) => c.id));
     commitFlow({ ...flowRef.current, connectors: flowRef.current.connectors.filter((c) => !ids.has(c.id)) });
@@ -169,15 +176,17 @@ export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme
 
   if (appIds.length === 0) {
     return (
-      <div className="interop-flow-shell" data-theme={theme}>
-        <div className="interop-flow-empty-state">
-          <div className="interop-flow-empty-badge">IF</div>
-          <h3>Empty Workspace</h3>
-          <p>
+      <div className="interop-flow-shell flex items-center justify-center p-6" data-theme={theme}>
+        <Card className="max-w-xl text-center">
+          <CardContent className="flex flex-col items-center gap-3 p-8">
+            <Badge variant="outline" className="h-12 w-12 justify-center rounded-lg px-0 text-sm font-black">IF</Badge>
+            <h3 className="text-base font-black text-foreground">Empty Workspace</h3>
+            <p className="max-w-md text-xs font-semibold leading-5 text-muted-foreground">
             {workspaceName} has no apps yet, so there is no interop graph to configure.
             Add apps in Workspace mode and the flow canvas will react automatically.
-          </p>
-        </div>
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -195,8 +204,8 @@ export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme
         validationCount={validations.filter((v) => !v.valid).length}
       />
 
-      <div style={{ flex: 1, position: 'relative' }}>
-        <ReactFlow
+      <div className="relative min-h-0 flex-1">
+        <ReactFlow<FlowNode, FlowEdge>
           nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
@@ -204,7 +213,7 @@ export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme
           onConnect={handleConnect}
           onEdgesDelete={handleEdgesDelete}
           onEdgeClick={handleEdgeClick}
-          nodeTypes={nodeTypes}
+          nodeTypes={nodeTypes as never}
           edgeTypes={edgeTypes}
           fitView
         >
@@ -212,12 +221,12 @@ export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme
           <Controls />
           <MiniMap
             position="bottom-right"
-            width={140}
-            height={100}
             style={{
               backgroundColor: 'var(--interop-minimap-bg)',
               border: '1px solid var(--interop-border)',
               borderRadius: 8,
+              height: 100,
+              width: 140,
             }}
           />
         </ReactFlow>
@@ -225,7 +234,7 @@ export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme
         {selectedConnector && (
           <ConnectorConfigPanel
             connector={selectedConnector}
-            validation={selectedValidation}
+            validation={selectedValidation ?? undefined}
             flow={flow}
             onUpdate={updateConnector}
             onDelete={handleDeleteConnector}
@@ -236,16 +245,18 @@ export function InteropFlowDesigner({ apps, workspaceTabId, workspaceName, theme
 
       {/* Validation summary */}
       {validations.some((v) => !v.valid) && (
-        <div className="interop-flow-validation-bar">
-          <strong>⚠ {validations.filter((v) => !v.valid).length} invalid connector(s):</strong>
-          <ul style={{ margin: '6px 0 0 20px', listStyle: 'none', padding: 0 }}>
+        <Card className="m-3 mt-0 border-red-500/40 bg-red-500/10">
+          <CardContent className="p-3 text-xs text-red-500">
+            <strong>⚠ {validations.filter((v) => !v.valid).length} invalid connector(s):</strong>
+            <ul className="mt-1.5 list-none pl-5">
             {validations
               .filter((v) => !v.valid)
               .map((v) => (
                 <li key={v.connectorId}>{v.message}</li>
               ))}
-          </ul>
-        </div>
+            </ul>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

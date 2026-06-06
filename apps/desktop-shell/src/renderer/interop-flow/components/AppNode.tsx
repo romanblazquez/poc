@@ -1,10 +1,13 @@
-import type { NodeProps } from '@xyflow/react';
+import type { Node, NodeProps } from '@xyflow/react';
 import { contextInPort, contextOutPort, intentInPort, intentOutPort } from '../model/connector-types.js';
 import type { InteropAppNode } from '../model/interop-flow-types.js';
 import { ContextPort } from './ContextPort.js';
 import { IntentPort } from './IntentPort.js';
 
-export function AppNode({ data }: NodeProps<InteropAppNode>) {
+type AppNodeData = InteropAppNode & Record<string, unknown>;
+type AppFlowNode = Node<AppNodeData, 'app'>;
+
+export function AppNode({ data }: NodeProps<AppFlowNode>) {
   return (
     <div className="interop-app-node">
       <div className="interop-app-node-title">

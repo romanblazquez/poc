@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
 import type {
   AppLogEvent,
   AppLogLevel,
@@ -9,17 +8,32 @@ import type {
   PlatformLogsApi,
 } from '@fdc3-poc/fdc3-core';
 import type { AppEntry } from '../App.js';
+import { Button } from './ui/button.js';
+import { Card, CardContent } from './ui/card.js';
+import { Badge } from './ui/badge.js';
+import { cn } from '../lib/utils.js';
+import {
+  Activity,
+  AlertTriangle,
+  Download,
+  FileText,
+  Filter,
+  Layers,
+  Radio,
+  Trash2,
+  TriangleAlert,
+  Zap,
+} from 'lucide-react';
 
 /**
- * Insights — the io.Insights-class telemetry dashboard. Aggregates the live
+ * Intelligence — the io.Insights-class telemetry dashboard. Aggregates the live
  * activity + log streams the shell already publishes into rolling KPIs, a
  * time-series sparkline, channel/intent/app leaderboards, and a per-app
  * health table. Exports the buffered events as CSV or JSON so a compliance
  * team can take an audit trail off the desk.
  *
- * The component is the analytical complement to the Command Center: where
- * Command Center is a live feed, Insights is the aggregated, sliced,
- * exportable view of the same data.
+ * The component is the analytical complement inside Control Tower: live
+ * telemetry becomes aggregated, sliced, exportable operational intelligence.
  */
 
 interface InsightsProps {
@@ -83,28 +97,42 @@ const BROADCAST_KINDS = new Set<InteropActivityKind>([
   'privateChannel.broadcasted',
 ]);
 
-// ─── Styling primitives (no extra dep — match the rest of the shell) ───────
+// ─── Section helper — shadcn Card with row-style iconified header ─────────
 
-const SECTION: CSSProperties = {
-  background: 'linear-gradient(180deg, var(--shell-panel), var(--shell-panel-2))',
-  border: '1px solid var(--shell-border)',
-  borderRadius: 12,
-  boxShadow: 'var(--shell-shadow)',
-  overflow: 'hidden',
-};
-const SECTION_HEADER: CSSProperties = {
-  alignItems: 'center',
-  borderBottom: '1px solid var(--shell-border)',
-  color: 'var(--shell-muted)',
-  display: 'flex',
-  fontSize: 11,
-  fontWeight: 900,
-  justifyContent: 'space-between',
-  letterSpacing: 0.7,
-  padding: '10px 12px',
-  textTransform: 'uppercase',
-};
-const SECTION_BODY: CSSProperties = { padding: 12 };
+interface InsightsSectionProps {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  meta?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}
+/**
+ * Dashboard section card. Title + meta sit on ONE row (denser than the
+ * canonical shadcn CardHeader which stacks them) — important on a trader
+ * desktop where vertical space is at a premium. Header has a subtle
+ * bottom-border so the visual hierarchy is clear without re-introducing
+ * gradients or heavy shadows.
+ */
+function InsightsSection({ title, icon: Icon, meta, children, className }: InsightsSectionProps): React.JSX.Element {
+  return (
+    <Card className={cn('flex flex-col gap-0', className)}>
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">{title}</span>
+        </div>
+        {meta && <div className="text-[11px] font-medium text-muted-foreground">{meta}</div>}
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+function InsightsEmpty({ message }: { message: string }): React.JSX.Element {
+  return (
+    <div className="px-4 py-8 text-center text-xs text-muted-foreground">{message}</div>
+  );
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -229,27 +257,18 @@ function KpiTile({ label, value, hint, accent = 'muted', delta }: KpiTileProps):
     : delta?.accent === 'bad' ? '#ef4444'
     : 'var(--shell-muted)';
   return (
-    <div
-      style={{
-        ...SECTION,
-        padding: '10px 12px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 4,
-        minHeight: 78,
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.7, color: 'var(--shell-muted)', fontWeight: 800 }}>{label}</div>
+    <Card className="flex min-h-[78px] flex-col gap-1 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{label}</div>
         {delta && delta.label !== '·' && (
-          <div style={{ fontSize: 10, fontWeight: 800, color: deltaColor, fontVariantNumeric: 'tabular-nums' }}>
+          <div className="text-[10px] font-extrabold tabular-nums" style={{ color: deltaColor }}>
             {delta.label}
           </div>
         )}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 900, color, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{value}</div>
-      {hint && <div style={{ fontSize: 10, color: 'var(--shell-muted)', fontWeight: 600 }}>{hint}</div>}
-    </div>
+      <div className="text-[22px] font-black leading-none tabular-nums" style={{ color }}>{value}</div>
+      {hint && <div className="text-[10px] font-semibold text-muted-foreground">{hint}</div>}
+    </Card>
   );
 }
 
@@ -735,67 +754,58 @@ export function Insights({ apps }: InsightsProps): React.JSX.Element {
   // ─── Layout ──────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12, height: '100%', overflow: 'auto' }}>
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto pr-0.5 scrollbar-thin">
       {/* Header bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-          <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--shell-text)', letterSpacing: 0.4 }}>Insights</span>
-          <span style={{ fontSize: 11, color: 'var(--shell-muted)' }}>
-            {kpis.total.toLocaleString()} events in window · live
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-baseline gap-2">
+          <Activity className="h-4 w-4 self-center text-[color:var(--shell-accent)]" />
+          <span className="text-base font-black text-foreground">Intelligence</span>
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            {kpis.total.toLocaleString()} events · live
           </span>
         </div>
-        <div style={{ display: 'flex', gap: 4, padding: 3, background: 'var(--shell-panel-2)', borderRadius: 8, border: '1px solid var(--shell-border)' }}>
+        <div className="inline-flex gap-0.5 rounded-lg border border-border bg-muted p-1">
           {(Object.keys(WINDOW_MS) as WindowKey[]).map((k) => (
-            <button
+            <Button
               key={k}
               onClick={() => setWindowKey(k)}
-              style={{
-                padding: '4px 10px',
-                background: windowKey === k ? 'var(--shell-accent-soft)' : 'transparent',
-                border: 'none',
-                borderRadius: 5,
-                color: windowKey === k ? 'var(--shell-text)' : 'var(--shell-muted)',
-                cursor: 'pointer',
-                fontSize: 11,
-                fontWeight: 800,
-                letterSpacing: 0.3,
-              }}
+              size="xs"
+              variant={windowKey === k ? 'default' : 'ghost'}
             >
               {WINDOW_LABELS[k]}
-            </button>
+            </Button>
           ))}
         </div>
-        <div style={{ flex: 1 }} />
-        <button
-          onClick={exportCsv}
-          style={{ padding: '6px 12px', fontSize: 11, fontWeight: 800, background: 'var(--shell-panel-2)', border: '1px solid var(--shell-border)', borderRadius: 6, cursor: 'pointer', color: 'var(--shell-text)' }}
-          title="Download windowed activity as CSV"
-        >📥 CSV</button>
-        <button
-          onClick={exportJson}
-          style={{ padding: '6px 12px', fontSize: 11, fontWeight: 800, background: 'var(--shell-panel-2)', border: '1px solid var(--shell-border)', borderRadius: 6, cursor: 'pointer', color: 'var(--shell-text)' }}
-          title="Download windowed activity as JSON"
-        >📥 JSON</button>
-        <button
+        <div className="flex-1" />
+        <Button onClick={exportCsv} size="sm" variant="outline" title="Download windowed activity as CSV">
+          <Download /> CSV
+        </Button>
+        <Button onClick={exportJson} size="sm" variant="outline" title="Download windowed activity as JSON">
+          <Download /> JSON
+        </Button>
+        <Button
           onClick={() => {
             if (!window.confirm('Clear the persisted activity buffer? In-memory events stay until the next refresh.')) return;
             try { window.localStorage.removeItem(STORAGE_KEY_EVENTS); } catch { /* noop */ }
             try { window.localStorage.removeItem(STORAGE_KEY_LOGS); } catch { /* noop */ }
-            // Drop in-memory too so the UI matches localStorage.
             eventsRef.current = [];
             logsRef.current = [];
             setEvents([]);
             setLogs([]);
           }}
-          style={{ padding: '6px 10px', fontSize: 11, fontWeight: 800, background: 'transparent', border: '1px solid var(--shell-border)', borderRadius: 6, cursor: 'pointer', color: 'var(--shell-muted)' }}
-          title="Wipe the persisted Insights buffer (localStorage) and current in-memory events"
-        >🗑 Reset</button>
+          size="sm"
+          variant="ghost"
+          title="Wipe the persisted Intelligence buffer (localStorage) and current in-memory events"
+        >
+          <Trash2 /> Reset
+        </Button>
       </div>
 
       {/* Drill-down filter chips — render when any filter is active. */}
       {filterActive && (
-        <div style={{ ...SECTION, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.7, color: 'var(--shell-muted)', fontWeight: 800 }}>
+        <Card className="flex flex-wrap items-center gap-2 px-3 py-2">
+          <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-[10px] font-extrabold uppercase tracking-[0.07em] text-muted-foreground">
             Filter
           </span>
           {(['app', 'channel', 'intent', 'contextType'] as const).map((dim) => {
@@ -803,53 +813,29 @@ export function Insights({ apps }: InsightsProps): React.JSX.Element {
             if (!value) return null;
             const label = dim === 'app' ? appLabel(apps, value) : value;
             return (
-              <button
+              <Button
                 key={dim}
                 type="button"
                 onClick={() => setFilter((f) => ({ ...f, [dim]: undefined }))}
                 title={`Remove ${dim} filter`}
-                style={{
-                  background: 'var(--shell-accent-soft)',
-                  border: '1px solid var(--shell-accent-border)',
-                  borderRadius: 999,
-                  color: 'var(--shell-text)',
-                  cursor: 'pointer',
-                  fontSize: 11,
-                  fontWeight: 700,
-                  padding: '3px 10px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
+                size="xs"
+                variant="outline"
+                className="h-6 rounded-full border-[color:var(--shell-accent-border)] bg-[color:var(--shell-accent-soft)] px-2.5 text-[11px] font-bold text-foreground hover:bg-[color:color-mix(in_srgb,var(--shell-accent)_24%,transparent)]"
               >
-                <span style={{ color: 'var(--shell-muted)', textTransform: 'uppercase', fontSize: 9, letterSpacing: 0.6 }}>{dim}</span>
-                <span>{label}</span>
-                <span style={{ color: 'var(--shell-muted)', fontWeight: 900 }}>×</span>
-              </button>
+                <span className="text-[9px] uppercase tracking-[0.06em] text-muted-foreground">{dim}</span>
+                <span className="tabular-nums">{label}</span>
+                <span className="text-muted-foreground">×</span>
+              </Button>
             );
           })}
-          <button
-            type="button"
-            onClick={() => setFilter({})}
-            style={{
-              background: 'transparent',
-              border: 0,
-              color: 'var(--shell-muted)',
-              cursor: 'pointer',
-              fontSize: 11,
-              fontWeight: 700,
-              textDecoration: 'underline',
-              textUnderlineOffset: 3,
-              marginLeft: 'auto',
-            }}
-          >
+          <Button type="button" onClick={() => setFilter({})} variant="ghost" size="xs" className="ml-auto">
             Clear all
-          </button>
-        </div>
+          </Button>
+        </Card>
       )}
 
       {/* KPI grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2.5">
         <KpiTile label="Events/sec (60s)" value={kpis.eventsPerSec} hint={`${kpis.total} in ${WINDOW_LABELS[windowKey]}`} accent="good" delta={deltas?.eventsPerSec} />
         <KpiTile label="Broadcasts" value={kpis.broadcasts.toLocaleString()} hint={`${kpis.channelCount} channels active`} delta={deltas?.broadcasts} />
         <KpiTile label="Intents raised" value={kpis.intentsRaised.toLocaleString()} hint={`${kpis.intentsDelivered} delivered`} accent="good" delta={deltas?.intentsRaised} />
@@ -860,72 +846,76 @@ export function Insights({ apps }: InsightsProps): React.JSX.Element {
       </div>
 
       {/* Sparkline */}
-      <div style={SECTION}>
-        <div style={SECTION_HEADER}>
-          <span>Events / 5s · last 5 min</span>
-          <span style={{ display: 'flex', gap: 12 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--shell-accent)' }} />
+      <InsightsSection
+        title={`Events / 5s · last 5 min`}
+        icon={Activity}
+        meta={
+          <span className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-[color:var(--shell-accent)]" />
               all
             </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }} />
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-rose-500" />
               errors + blocked
             </span>
             {anomalyBuckets.length > 0 && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#ef4444', fontWeight: 800 }}>
-                ▾ {anomalyBuckets.length} anomal{anomalyBuckets.length === 1 ? 'y' : 'ies'}
-              </span>
+              <Badge variant="destructive" className="gap-1">
+                <TriangleAlert className="h-3 w-3" />
+                {anomalyBuckets.length} anomal{anomalyBuckets.length === 1 ? 'y' : 'ies'}
+              </Badge>
             )}
           </span>
-        </div>
-        <div style={{ padding: '8px 12px' }}>
+        }
+      >
+        <CardContent className="flex flex-col gap-1">
           <Sparkline series={sparklineSeries} accent="var(--shell-accent)" height={60} anomalies={anomalyBuckets} gradientId="spark-main" />
-          <div style={{ marginTop: -8 }}>
-            <Sparkline series={errorSparklineSeries} accent="#ef4444" height={36} gradientId="spark-err" />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--shell-muted)', fontWeight: 700, marginTop: 4 }}>
+          <Sparkline series={errorSparklineSeries} accent="#ef4444" height={36} gradientId="spark-err" />
+          <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
             <span>5m ago</span><span>now</span>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </InsightsSection>
 
       {/* Two-column: Channels + Intents */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 12 }}>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(360px,1fr))] gap-3">
         {/* Channels */}
-        <div style={SECTION}>
-          <div style={SECTION_HEADER}><span>Channel heatmap</span><span>{channels.length} active</span></div>
+        <InsightsSection
+          title="Channel heatmap"
+          icon={Radio}
+          meta={<span className="tabular-nums">{channels.length} active</span>}
+        >
           {channels.length === 0 ? (
-            <div style={{ ...SECTION_BODY, color: 'var(--shell-muted)', fontSize: 12, textAlign: 'center', padding: '24px 12px' }}>
-              No channel traffic in window.
-            </div>
+            <InsightsEmpty message="No channel traffic in window." />
           ) : (
             <div>
               {channels.map((ch) => {
                 const pct = Math.round((ch.count / maxChannelCount) * 100);
+                const active = filter.channel === ch.channelId;
                 return (
                   <div
                     key={ch.channelId}
-                    onClick={() => setFilter((f) => ({ ...f, channel: f.channel === ch.channelId ? undefined : ch.channelId }))}
-                    title={filter.channel === ch.channelId ? 'Click to clear channel filter' : `Filter to channel ${ch.channelId}`}
-                    style={{
-                      position: 'relative',
-                      borderTop: '1px solid var(--shell-border)',
-                      cursor: 'pointer',
-                      background: filter.channel === ch.channelId ? 'rgba(64, 128, 232, 0.10)' : undefined,
-                    }}
+                    onClick={() => setFilter((f) => ({ ...f, channel: active ? undefined : ch.channelId }))}
+                    title={active ? 'Click to clear channel filter' : `Filter to channel ${ch.channelId}`}
+                    className={cn(
+                      'relative cursor-pointer border-t border-border transition-colors hover:bg-[color:rgba(255,255,255,0.03)]',
+                      active && 'bg-[color:rgba(64,128,232,0.10)]',
+                    )}
                   >
-                    <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: 'var(--shell-accent-soft)', opacity: 0.5 }} />
-                    <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 10, padding: '8px 12px', fontSize: 12, alignItems: 'center' }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 800, color: 'var(--shell-text)', fontSize: 12 }}>{ch.channelId}</div>
-                        <div style={{ fontSize: 10, color: 'var(--shell-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div
+                      className="absolute inset-y-0 left-0 bg-[color:var(--shell-accent-soft)] opacity-50"
+                      style={{ width: `${pct}%` }}
+                    />
+                    <div className="relative grid grid-cols-[1fr_auto_auto] items-center gap-2.5 px-3 py-2 text-xs">
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-extrabold text-foreground">{ch.channelId}</div>
+                        <div className="truncate text-[10px] text-muted-foreground">
                           {ch.contextTypes.slice(0, 3).join(' · ') || '—'}
                           {ch.contextTypes.length > 3 ? ` · +${ch.contextTypes.length - 3} more` : ''}
                         </div>
                       </div>
-                      <div style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 800, color: 'var(--shell-text)' }}>{ch.count.toLocaleString()}</div>
-                      <div style={{ fontSize: 10, color: 'var(--shell-muted)', fontWeight: 700, minWidth: 56, textAlign: 'right' }}>
+                      <div className="font-extrabold tabular-nums text-foreground">{ch.count.toLocaleString()}</div>
+                      <div className="min-w-[3.5rem] text-right text-[10px] font-bold text-muted-foreground tabular-nums">
                         {ch.lastTs ? formatLogTime(ch.lastTs) : '—'}
                       </div>
                     </div>
@@ -934,72 +924,78 @@ export function Insights({ apps }: InsightsProps): React.JSX.Element {
               })}
             </div>
           )}
-        </div>
+        </InsightsSection>
 
         {/* Intents */}
-        <div style={SECTION}>
-          <div style={SECTION_HEADER}><span>Intent leaderboard (top 10)</span><span>{kpis.intentsRaised} raised</span></div>
+        <InsightsSection
+          title="Intent leaderboard"
+          icon={Zap}
+          meta={<span className="tabular-nums">{kpis.intentsRaised} raised · top 10</span>}
+        >
           {intents.length === 0 ? (
-            <div style={{ ...SECTION_BODY, color: 'var(--shell-muted)', fontSize: 12, textAlign: 'center', padding: '24px 12px' }}>
-              No intents raised in window.
-            </div>
+            <InsightsEmpty message="No intents raised in window." />
           ) : (
             <div>
               {intents.map((it) => {
                 const success = it.delivered;
                 const broken = it.blocked + it.failed;
                 const successRate = it.total > 0 ? Math.round((success / it.total) * 100) : 0;
+                const active = filter.intent === it.intent;
+                const rateClass =
+                  broken === 0 ? 'text-emerald-500'
+                  : broken > success ? 'text-rose-500'
+                  : 'text-amber-500';
                 return (
                   <div
                     key={it.intent}
-                    onClick={() => setFilter((f) => ({ ...f, intent: f.intent === it.intent ? undefined : it.intent }))}
-                    title={filter.intent === it.intent ? 'Click to clear intent filter' : `Filter to intent ${it.intent}`}
-                    style={{
-                      borderTop: '1px solid var(--shell-border)',
-                      padding: '8px 12px',
-                      display: 'grid',
-                      gridTemplateColumns: '1fr auto auto',
-                      gap: 10,
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                      background: filter.intent === it.intent ? 'rgba(64, 128, 232, 0.10)' : undefined,
-                    }}
+                    onClick={() => setFilter((f) => ({ ...f, intent: active ? undefined : it.intent }))}
+                    title={active ? 'Click to clear intent filter' : `Filter to intent ${it.intent}`}
+                    className={cn(
+                      'grid cursor-pointer grid-cols-[1fr_auto_auto] items-center gap-2.5 border-t border-border px-3 py-2 text-xs transition-colors hover:bg-[color:rgba(255,255,255,0.03)]',
+                      active && 'bg-[color:rgba(64,128,232,0.10)]',
+                    )}
                   >
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 800, color: 'var(--shell-text)', fontSize: 12 }}>{it.intent}</div>
-                      <div style={{ fontSize: 10, color: 'var(--shell-muted)', fontWeight: 700 }}>
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-extrabold text-foreground">{it.intent}</div>
+                      <div className="text-[10px] font-bold text-muted-foreground">
                         raised {it.raised} · delivered {it.delivered}
                         {it.blocked > 0 ? ` · blocked ${it.blocked}` : ''}
                         {it.failed > 0 ? ` · failed ${it.failed}` : ''}
                       </div>
                     </div>
-                    <div style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 800, color: 'var(--shell-text)', textAlign: 'right' }}>{it.total}</div>
-                    <div style={{ minWidth: 56, textAlign: 'right', fontSize: 11, fontWeight: 800, color: broken === 0 ? 'var(--shell-positive)' : broken > success ? '#ef4444' : '#f59e0b' }}>{successRate}%</div>
+                    <div className="text-right font-extrabold tabular-nums text-foreground">{it.total}</div>
+                    <div className={cn('min-w-[3.5rem] text-right text-[11px] font-extrabold tabular-nums', rateClass)}>
+                      {successRate}%
+                    </div>
                   </div>
                 );
               })}
             </div>
           )}
-        </div>
+        </InsightsSection>
       </div>
 
       {/* App health */}
-      <div style={SECTION}>
-        <div style={SECTION_HEADER}>
-          <span>App health</span>
-          <span>{appHealth.length} apps active</span>
-        </div>
+      <InsightsSection
+        title="App health"
+        icon={Layers}
+        meta={<span className="tabular-nums">{appHealth.length} apps active</span>}
+      >
         {appHealth.length === 0 ? (
-          <div style={{ ...SECTION_BODY, color: 'var(--shell-muted)', fontSize: 12, textAlign: 'center', padding: '24px 12px' }}>
-            No app activity in window.
-          </div>
+          <InsightsEmpty message="No app activity in window." />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead style={{ background: 'var(--shell-panel-2)' }}>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-xs">
+              <thead className="bg-secondary">
                 <tr>
                   {['App', 'Out', 'In', 'Intents raised', 'Intents handled', 'Errors', 'Blocked', 'Last seen'].map((h) => (
-                    <th key={h} style={{ padding: '8px 12px', textAlign: h === 'App' ? 'left' : 'right', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--shell-muted)', fontWeight: 800, borderBottom: '1px solid var(--shell-border)' }}>{h}</th>
+                    <th
+                      key={h}
+                      className={cn(
+                        'border-b border-border px-3 py-2 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground',
+                        h === 'App' ? 'text-left' : 'text-right',
+                      )}
+                    >{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -1010,27 +1006,31 @@ export function Insights({ apps }: InsightsProps): React.JSX.Element {
                   return (
                     <tr
                       key={r.appId}
-                      onClick={() => setFilter((f) => ({ ...f, app: f.app === r.appId ? undefined : r.appId }))}
+                      onClick={() => setFilter((f) => ({ ...f, app: active ? undefined : r.appId }))}
                       title={active ? 'Click to clear app filter' : `Filter to ${r.title}`}
-                      style={{
-                        borderBottom: '1px solid var(--shell-border)',
-                        cursor: 'pointer',
-                        background: active ? 'rgba(64, 128, 232, 0.10)' : undefined,
-                      }}
+                      className={cn(
+                        'cursor-pointer border-b border-border transition-colors hover:bg-[color:rgba(255,255,255,0.03)]',
+                        active && 'bg-[color:rgba(64,128,232,0.10)]',
+                      )}
                     >
-                      <td style={{ padding: '6px 12px', fontWeight: 800, color: 'var(--shell-text)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: idle ? 'var(--shell-muted)' : 'var(--shell-positive)' }} />
+                      <td className="px-3 py-1.5 font-extrabold text-foreground">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={cn(
+                              'h-2 w-2 rounded-full',
+                              idle ? 'bg-muted-foreground' : 'bg-emerald-500',
+                            )}
+                          />
                           {r.title}
                         </div>
                       </td>
-                      <td style={{ padding: '6px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.msgsOut}</td>
-                      <td style={{ padding: '6px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.msgsIn}</td>
-                      <td style={{ padding: '6px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.intentsRaised}</td>
-                      <td style={{ padding: '6px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.intentsHandled}</td>
-                      <td style={{ padding: '6px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: r.errors > 0 ? '#ef4444' : 'var(--shell-muted)', fontWeight: r.errors > 0 ? 800 : 500 }}>{r.errors}</td>
-                      <td style={{ padding: '6px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: r.blocked > 0 ? '#f59e0b' : 'var(--shell-muted)', fontWeight: r.blocked > 0 ? 800 : 500 }}>{r.blocked}</td>
-                      <td style={{ padding: '6px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--shell-muted)' }}>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{r.msgsOut}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{r.msgsIn}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{r.intentsRaised}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{r.intentsHandled}</td>
+                      <td className={cn('px-3 py-1.5 text-right tabular-nums', r.errors > 0 ? 'font-extrabold text-rose-500' : 'text-muted-foreground')}>{r.errors}</td>
+                      <td className={cn('px-3 py-1.5 text-right tabular-nums', r.blocked > 0 ? 'font-extrabold text-amber-500' : 'text-muted-foreground')}>{r.blocked}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
                         {r.lastTs > 0 ? formatLogTime(r.lastTs) : '—'}
                       </td>
                     </tr>
@@ -1040,34 +1040,54 @@ export function Insights({ apps }: InsightsProps): React.JSX.Element {
             </table>
           </div>
         )}
-      </div>
+      </InsightsSection>
 
       {/* Log severity */}
       {logsApi && (
-        <div style={SECTION}>
-          <div style={SECTION_HEADER}>
-            <span>Platform logs · {WINDOW_LABELS[windowKey]}</span>
-            <span>{windowedLogs.length} entries · {kpis.logErrors} errors · {kpis.logWarnings} warnings</span>
-          </div>
+        <InsightsSection
+          title={`Platform logs · ${WINDOW_LABELS[windowKey]}`}
+          icon={FileText}
+          meta={
+            <span className="flex items-center gap-2">
+              <span className="tabular-nums">{windowedLogs.length} entries</span>
+              {kpis.logErrors > 0 && (
+                <Badge variant="destructive" className="gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  {kpis.logErrors}
+                </Badge>
+              )}
+              {kpis.logWarnings > 0 && (
+                <Badge variant="warning" className="gap-1">
+                  <TriangleAlert className="h-3 w-3" />
+                  {kpis.logWarnings}
+                </Badge>
+              )}
+            </span>
+          }
+        >
           {windowedLogs.length === 0 ? (
-            <div style={{ ...SECTION_BODY, color: 'var(--shell-muted)', fontSize: 12, textAlign: 'center', padding: '24px 12px' }}>
-              No platform logs in window.
-            </div>
+            <InsightsEmpty message="No platform logs in window." />
           ) : (
-            <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+            <div className="max-h-[220px] overflow-y-auto scrollbar-thin">
               {windowedLogs.slice(0, 100).map((l) => (
-                <div key={l.id} style={{ display: 'grid', gridTemplateColumns: '70px 90px 1fr', gap: 10, padding: '4px 12px', fontSize: 11, borderTop: '1px solid var(--shell-border)' }}>
-                  <span style={{ color: 'var(--shell-muted)', fontVariantNumeric: 'tabular-nums' }}>{formatLogTime(l.ts)}</span>
-                  <span style={{ color: logAccent(l.level), fontWeight: 800, textTransform: 'uppercase', fontSize: 10, letterSpacing: 0.6 }}>{l.level}</span>
-                  <span style={{ color: 'var(--shell-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.message}>
-                    {l.appTitle ? <span style={{ color: 'var(--shell-muted)', marginRight: 6 }}>[{l.appTitle}]</span> : null}
+                <div
+                  key={l.id}
+                  className="grid grid-cols-[70px_90px_1fr] gap-2.5 border-t border-border px-3 py-1 text-[11px]"
+                >
+                  <span className="tabular-nums text-muted-foreground">{formatLogTime(l.ts)}</span>
+                  <span
+                    className="text-[10px] font-extrabold uppercase tracking-[0.06em]"
+                    style={{ color: logAccent(l.level) }}
+                  >{l.level}</span>
+                  <span className="truncate text-foreground" title={l.message}>
+                    {l.appTitle ? <span className="mr-1.5 text-muted-foreground">[{l.appTitle}]</span> : null}
                     {l.message}
                   </span>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </InsightsSection>
       )}
     </div>
   );

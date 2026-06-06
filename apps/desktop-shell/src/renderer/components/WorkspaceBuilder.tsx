@@ -1,10 +1,14 @@
 // Deprecated: replaced by single-window Dockview workspace.
 // Do not use for main workspace runtime.
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import type { CSSProperties, KeyboardEvent } from 'react';
+import type { KeyboardEvent } from 'react';
 import type { UserChannel } from '@fdc3-poc/fdc3-core';
-import type { AppEntry, WorkspaceRuntimePayload, WorkspaceWindowDraft } from '../App.js';
+import type { AppEntry } from '../App.js';
+import { cn } from '../lib/utils.js';
 import { DockviewWorkspaceEditor } from './DockviewWorkspaceEditor.js';
+import { Button } from './ui/button.js';
+import { Input } from './ui/input.js';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select.js';
 
 interface WorkspaceTab {
   id: string;
@@ -13,6 +17,9 @@ interface WorkspaceTab {
   initialPanelIds: string[];
   layoutJson?: unknown;
 }
+
+type WorkspaceRuntimePayload = unknown;
+type WorkspaceWindowDraft = unknown;
 
 interface WorkspaceBuilderProps {
   apps: AppEntry[];
@@ -141,20 +148,24 @@ export function WorkspaceBuilder({
     channels.find((c) => c.id === activeTab?.channelId) ?? currentChannel ?? null;
 
   return (
-    <div style={rootStyle}>
-      {/* ── Workspace Tab Bar ── */}
-      <div style={tabBarStyle}>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-[38px] shrink-0 items-stretch gap-0.5 border-b border-border bg-card px-2">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
           return (
             <div
               key={tab.id}
               onClick={() => setActiveTabId(tab.id)}
+              role="button"
+              tabIndex={0}
               title="Double-click to rename"
-              style={{ ...tabItemStyle, ...(isActive ? activeTabItemStyle : {}) }}
+              className={cn(
+                'mb-[-1px] flex select-none items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-2.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground',
+                isActive && 'border-[color:var(--shell-accent)] bg-secondary text-foreground',
+              )}
             >
               {renamingId === tab.id ? (
-                <input
+                <Input
                   ref={renameInputRef}
                   autoFocus
                   value={renameValue}
@@ -162,53 +173,64 @@ export function WorkspaceBuilder({
                   onBlur={commitRename}
                   onKeyDown={onRenameKeyDown}
                   onClick={(e) => e.stopPropagation()}
-                  style={renameInputStyle}
+                  className="h-6 w-32 px-2 text-xs"
                 />
               ) : (
                 <span
                   onDoubleClick={(e) => startRename(tab, e)}
-                  style={tabLabelStyle}
+                  className="max-w-36 overflow-hidden text-ellipsis"
                 >
                   {tab.name}
                 </span>
               )}
               {tabs.length > 1 && (
-                <button
+                <Button
                   onClick={(e) => closeTab(tab.id, e)}
                   title="Close workspace"
-                  style={closeTabBtnStyle}
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
                 >
                   ×
-                </button>
+                </Button>
               )}
             </div>
           );
         })}
 
-        {/* Add workspace tab */}
-        <button onClick={addTab} title="New workspace" style={addTabBtnStyle}>
+        <Button
+          onClick={addTab}
+          title="New workspace"
+          type="button"
+          variant="outline"
+          size="icon"
+          className="self-center h-6 w-6"
+        >
           +
-        </button>
+        </Button>
 
-        {/* Channel selector — aligned right */}
-        <div style={channelSelectorContainerStyle}>
-          <span style={{ fontSize: 10, color: '#606080', letterSpacing: 0.5 }}>CHANNEL</span>
-          <select
+        <div className="ml-auto flex items-center gap-2 px-1">
+          <span className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Channel</span>
+          <Select
             value={activeTab?.channelId ?? ''}
-            onChange={(e) => setTabChannel(activeTabId, e.target.value || null)}
-            style={selectStyle}
+            onValueChange={(v) => setTabChannel(activeTabId, v || null)}
           >
-            <option value="">None</option>
-            {channels.map((ch) => (
-              <option key={ch.id} value={ch.id}>
-                {ch.displayMetadata.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger size="sm" className="w-44">
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">None</SelectItem>
+              {channels.map((ch) => (
+                <SelectItem key={ch.id} value={ch.id}>
+                  {ch.displayMetadata.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      {/* ── Active Workspace Content ── */}
       {activeTab && (
         <DockviewWorkspaceEditor
           key={activeTab.id}
@@ -219,110 +241,9 @@ export function WorkspaceBuilder({
           initialLayout={activeTab.layoutJson}
           onLayoutChange={(layout) => setTabLayout(activeTab.id, layout)}
           workspaceName={activeTab.name}
+          theme="dark-financial"
         />
       )}
     </div>
   );
 }
-
-/* ── Styles ── */
-const rootStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  flex: 1,
-  minHeight: 0,
-  width: '100%',
-};
-
-const tabBarStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'stretch',
-  background: '#070711',
-  borderBottom: '1px solid #1e1e3e',
-  padding: '0 8px',
-  flexShrink: 0,
-  gap: 2,
-  minHeight: 38,
-};
-
-const tabItemStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 5,
-  padding: '0 10px',
-  cursor: 'pointer',
-  borderBottom: '2px solid transparent',
-  color: '#607098',
-  fontSize: 12,
-  fontWeight: 600,
-  transition: 'color .15s, border-color .15s',
-  whiteSpace: 'nowrap',
-  userSelect: 'none',
-  marginBottom: -1,
-};
-
-const activeTabItemStyle: CSSProperties = {
-  color: '#e0e0ff',
-  borderBottomColor: '#4080e8',
-  background: '#0e0e22',
-};
-
-const tabLabelStyle: CSSProperties = {
-  maxWidth: 140,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-};
-
-const renameInputStyle: CSSProperties = {
-  background: '#1a1a38',
-  border: '1px solid #4060b0',
-  borderRadius: 3,
-  color: '#e0e0ff',
-  fontSize: 12,
-  outline: 'none',
-  padding: '1px 5px',
-  width: 130,
-};
-
-const closeTabBtnStyle: CSSProperties = {
-  background: 'none',
-  border: 'none',
-  color: '#506080',
-  cursor: 'pointer',
-  fontSize: 15,
-  lineHeight: 1,
-  padding: '0 2px',
-};
-
-const addTabBtnStyle: CSSProperties = {
-  alignSelf: 'center',
-  background: 'none',
-  border: '1px solid #2a2a4a',
-  borderRadius: 4,
-  color: '#6080b0',
-  cursor: 'pointer',
-  fontSize: 16,
-  height: 22,
-  lineHeight: 1,
-  padding: '0 7px',
-};
-
-const channelSelectorContainerStyle: CSSProperties = {
-  alignItems: 'center',
-  display: 'flex',
-  flex: 1,
-  gap: 6,
-  justifyContent: 'flex-end',
-  padding: '0 4px',
-};
-
-const selectStyle: CSSProperties = {
-  background: '#0e1228',
-  border: '1px solid #2a3560',
-  borderRadius: 4,
-  color: '#a8bce8',
-  cursor: 'pointer',
-  fontSize: 11,
-  outline: 'none',
-  padding: '2px 6px',
-};

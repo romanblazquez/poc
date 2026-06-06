@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type * as React from 'react';
 import type { AppEntry } from '../App.js';
+import { Badge } from './ui/badge.js';
+import { Button } from './ui/button.js';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js';
+import { Input } from './ui/input.js';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select.js';
 
 /**
  * Manager Console — the io.Manager-class central distribution + admin layer.
@@ -73,44 +78,6 @@ function getManagerApi(): ManagerApi | undefined {
   return api;
 }
 
-// ─── Styles (kept inline, consistent with Insights/CommandCenter) ──────────
-
-const SECTION: CSSProperties = {
-  background: 'linear-gradient(180deg, var(--shell-panel), var(--shell-panel-2))',
-  border: '1px solid var(--shell-border)',
-  borderRadius: 12,
-  boxShadow: 'var(--shell-shadow)',
-  overflow: 'hidden',
-};
-const SECTION_HEADER: CSSProperties = {
-  alignItems: 'center',
-  borderBottom: '1px solid var(--shell-border)',
-  color: 'var(--shell-muted)',
-  display: 'flex',
-  fontSize: 11,
-  fontWeight: 900,
-  justifyContent: 'space-between',
-  letterSpacing: 0.7,
-  padding: '10px 12px',
-  textTransform: 'uppercase',
-};
-const SECTION_BODY: CSSProperties = { padding: 12 };
-const KV: CSSProperties = { display: 'grid', gridTemplateColumns: '140px 1fr', gap: '4px 10px', fontSize: 12 };
-const INPUT: CSSProperties = {
-  padding: '6px 9px', fontSize: 13,
-  background: 'var(--shell-panel-2)', border: '1px solid var(--shell-border)',
-  borderRadius: 6, color: 'var(--shell-text)', outline: 'none', width: '100%', boxSizing: 'border-box',
-};
-const BUTTON_PRIMARY: CSSProperties = {
-  padding: '7px 14px', fontSize: 12, fontWeight: 800,
-  background: 'var(--shell-accent-soft)', border: '1px solid var(--shell-accent-border)',
-  borderRadius: 6, cursor: 'pointer', color: 'var(--shell-text)',
-};
-const BUTTON_GHOST: CSSProperties = {
-  padding: '7px 14px', fontSize: 12, fontWeight: 800,
-  background: 'transparent', border: '1px solid var(--shell-border)',
-  borderRadius: 6, cursor: 'pointer', color: 'var(--shell-muted)',
-};
 const REFRESH_INTERVAL_OPTIONS = [
   { value: 0,        label: 'Off' },
   { value: 30_000,   label: '30 sec' },
@@ -276,171 +243,171 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
 
   if (!api) {
     return (
-      <div style={{ padding: 24, color: 'var(--shell-muted)' }}>
+      <Card className="p-6 text-sm font-bold text-muted-foreground">
         Manager Console bridge (<code>window.shellChrome.manager</code>) is not available.
-      </div>
+      </Card>
     );
   }
 
   if (!status) {
     return (
-      <div style={{ padding: 24, color: 'var(--shell-muted)' }}>
+      <Card className="p-6 text-sm font-bold text-muted-foreground">
         Loading Manager Console status…
-      </div>
+      </Card>
     );
   }
 
   const isRemote = status.source === 'remote' || status.source === 'cached';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12, height: '100%', overflow: 'auto' }}>
-      {/* Title row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--shell-text)', letterSpacing: 0.4 }}>Manager Console</span>
-        <span style={{ fontSize: 11, color: 'var(--shell-muted)' }}>
+    <div className="scrollbar-thin flex h-full flex-col gap-3 overflow-auto pr-1">
+      <div className="flex shrink-0 flex-wrap items-center gap-3">
+        <div className="min-w-0">
+          <div className="text-base font-black text-foreground">Manager Console</div>
+          <div className="text-xs font-bold text-muted-foreground">
           io.Manager-class central distribution · {status.identity.user}@{status.identity.host} · shell v{status.identity.appVersion}
-        </span>
-        <div style={{ flex: 1 }} />
-        <button onClick={handleCheck} disabled={busy === 'check'} style={BUTTON_PRIMARY}>
-          {busy === 'check' ? 'Checking…' : '🔄 Check for updates'}
-        </button>
+          </div>
+        </div>
+        <div className="flex-1" />
+        <Button onClick={handleCheck} disabled={busy === 'check'} type="button" variant="outline" size="sm">
+          {busy === 'check' ? 'Checking…' : 'Check for updates'}
+        </Button>
       </div>
 
       {actionMessage && (
-        <div
-          style={{
-            ...SECTION,
-            padding: '8px 12px',
-            color: actionMessage.kind === 'ok' ? 'var(--shell-positive)' : '#ef4444',
-            fontSize: 12, fontWeight: 700,
-            borderColor: actionMessage.kind === 'ok' ? 'var(--shell-positive)' : '#b42318',
-          }}
+        <Card className={actionMessage.kind === 'ok'
+          ? 'border-[color:var(--shell-positive)] p-3 text-sm font-bold text-[color:var(--shell-positive)]'
+          : 'border-[color:var(--shell-negative)] p-3 text-sm font-bold text-[color:var(--shell-negative)]'}
         >
           {actionMessage.text}
-        </div>
+        </Card>
       )}
 
-      {/* Status banner */}
-      <div style={SECTION}>
-        <div style={SECTION_HEADER}>
-          <span>Applied directory</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: sourceAccent(status.source) }} />
+      <Card>
+        <CardHeader className="flex-row items-center justify-between gap-3 border-b">
+          <CardTitle>Applied directory</CardTitle>
+          <Badge variant={status.source === 'remote' ? 'success' : status.source === 'cached' ? 'warning' : status.source === 'embedded' ? 'destructive' : 'secondary'}>
+            <span className="mr-1.5 h-2 w-2 rounded-full" style={{ background: sourceAccent(status.source) }} />
             {sourceLabel(status.source)}
-          </span>
-        </div>
-        <div style={SECTION_BODY}>
-          <dl style={KV}>
-            <dt style={{ color: 'var(--shell-muted)' }}>Source</dt>
-            <dd style={{ margin: 0, fontWeight: 700, color: 'var(--shell-text)' }}>{sourceLabel(status.source)}</dd>
-            <dt style={{ color: 'var(--shell-muted)' }}>Directory URL</dt>
-            <dd style={{ margin: 0, fontWeight: 700, color: 'var(--shell-text)', wordBreak: 'break-all' }}>{status.directoryUrl || '(local bundle)'}</dd>
-            <dt style={{ color: 'var(--shell-muted)' }}>Version</dt>
-            <dd style={{ margin: 0, fontWeight: 700, color: 'var(--shell-text)' }}>{status.currentVersion ?? '—'}{status.directoryLabel ? ` · ${status.directoryLabel}` : ''}</dd>
-            <dt style={{ color: 'var(--shell-muted)' }}>App count</dt>
-            <dd style={{ margin: 0, fontWeight: 700, color: 'var(--shell-text)', fontVariantNumeric: 'tabular-nums' }}>{status.currentAppCount}</dd>
-            <dt style={{ color: 'var(--shell-muted)' }}>ETag</dt>
-            <dd style={{ margin: 0, fontWeight: 700, color: 'var(--shell-text)', fontFamily: 'ui-monospace, Menlo, monospace' }}>{shortEtag(status.currentEtag)}</dd>
-            <dt style={{ color: 'var(--shell-muted)' }}>Last fetched</dt>
-            <dd style={{ margin: 0, fontWeight: 700, color: 'var(--shell-text)' }}>{formatTime(status.lastFetchedAt)}</dd>
-            <dt style={{ color: 'var(--shell-muted)' }}>Last checked</dt>
-            <dd style={{ margin: 0, fontWeight: 700, color: 'var(--shell-text)' }}>{formatTime(status.lastCheckedAt)}</dd>
+          </Badge>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <dl className="grid gap-x-3 gap-y-1 text-sm [grid-template-columns:140px_1fr]">
+            <dt className="text-muted-foreground">Source</dt>
+            <dd className="m-0 font-bold text-foreground">{sourceLabel(status.source)}</dd>
+            <dt className="text-muted-foreground">Directory URL</dt>
+            <dd className="m-0 break-all font-bold text-foreground">{status.directoryUrl || '(local bundle)'}</dd>
+            <dt className="text-muted-foreground">Version</dt>
+            <dd className="m-0 font-bold text-foreground">{status.currentVersion ?? '—'}{status.directoryLabel ? ` · ${status.directoryLabel}` : ''}</dd>
+            <dt className="text-muted-foreground">App count</dt>
+            <dd className="m-0 font-bold tabular-nums text-foreground">{status.currentAppCount}</dd>
+            <dt className="text-muted-foreground">ETag</dt>
+            <dd className="m-0 font-mono font-bold text-foreground">{shortEtag(status.currentEtag)}</dd>
+            <dt className="text-muted-foreground">Last fetched</dt>
+            <dd className="m-0 font-bold text-foreground">{formatTime(status.lastFetchedAt)}</dd>
+            <dt className="text-muted-foreground">Last checked</dt>
+            <dd className="m-0 font-bold text-foreground">{formatTime(status.lastCheckedAt)}</dd>
             {status.lastFetchError && (
               <>
-                <dt style={{ color: 'var(--shell-muted)' }}>Last error</dt>
-                <dd style={{ margin: 0, fontWeight: 700, color: '#ef4444' }}>{status.lastFetchError}</dd>
+                <dt className="text-muted-foreground">Last error</dt>
+                <dd className="m-0 font-bold text-[color:var(--shell-negative)]">{status.lastFetchError}</dd>
               </>
             )}
           </dl>
           {!isRemote && !status.directoryUrl && (
-            <div style={{ marginTop: 12, padding: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 6, fontSize: 11, color: 'var(--shell-muted)', lineHeight: 1.5 }}>
+            <div className="mt-2 rounded-md border bg-[color:rgba(255,255,255,0.02)] p-3 text-xs font-bold leading-relaxed text-muted-foreground">
               Running the bundled local directory. Configure a <strong>Directory URL</strong> below to start centrally
               distributing your app catalogue. The shell will fetch it over HTTPS, validate it against the schema,
               cache a copy on disk for offline use, and surface any change as a pending update.
             </div>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Pending update banner — only when a fetched version differs */}
       {status.available && (
-        <div style={{ ...SECTION, borderColor: 'var(--shell-accent)' }}>
-          <div style={{ ...SECTION_HEADER, color: 'var(--shell-accent)' }}>
-            <span>📦 Update available</span>
-            <span>{status.available.version ?? 'no version tag'}{status.available.label ? ` · ${status.available.label}` : ''}</span>
-          </div>
-          <div style={SECTION_BODY}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 12 }}>
-              <DiffTile color="var(--shell-positive)" label="Added"   ids={status.available.diff.addedApps} />
-              <DiffTile color="#ef4444"               label="Removed" ids={status.available.diff.removedApps} />
-              <DiffTile color="#f59e0b"               label="Changed" ids={status.available.diff.changedApps} />
+        <Card className="border-[color:var(--shell-accent)]">
+          <CardHeader className="flex-row items-center justify-between gap-3 border-b">
+            <CardTitle className="text-[color:var(--shell-accent)]">Update available</CardTitle>
+            <Badge variant="default">{status.available.version ?? 'no version tag'}{status.available.label ? ` · ${status.available.label}` : ''}</Badge>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 pt-4">
+            <div className="grid gap-3 md:grid-cols-3">
+              <DiffTile tone="success" label="Added" ids={status.available.diff.addedApps} />
+              <DiffTile tone="destructive" label="Removed" ids={status.available.diff.removedApps} />
+              <DiffTile tone="warning" label="Changed" ids={status.available.diff.changedApps} />
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11, color: 'var(--shell-muted)' }}>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-muted-foreground">
                 Fetched {formatTime(status.available.fetchedAt)} · {status.available.appCount} apps · etag {shortEtag(status.available.etag)}
               </span>
-              <div style={{ flex: 1 }} />
-              <button onClick={handleDismiss} disabled={busy === 'dismiss'} style={BUTTON_GHOST}>
+              <div className="flex-1" />
+              <Button onClick={handleDismiss} disabled={busy === 'dismiss'} type="button" variant="outline">
                 Dismiss
-              </button>
-              <button onClick={handleApply} disabled={busy === 'apply'} style={BUTTON_PRIMARY}>
+              </Button>
+              <Button onClick={handleApply} disabled={busy === 'apply'} type="button">
                 {busy === 'apply' ? 'Applying…' : 'Apply update'}
-              </button>
+              </Button>
             </div>
-            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--shell-muted)' }}>
+            <p className="text-xs font-bold text-muted-foreground">
               Applying swaps the in-memory directory used for new launches. Windows opened from this point on use the
               new catalogue; in-flight windows reflect the previous version until reopened.
-            </div>
-          </div>
-        </div>
+            </p>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Settings form */}
-      <div style={SECTION}>
-        <div style={SECTION_HEADER}>
-          <span>Settings</span>
-          <span>{settingsDirty ? 'Unsaved changes' : 'In sync'}</span>
-        </div>
-        <div style={{ ...SECTION_BODY, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <Card>
+        <CardHeader className="flex-row items-center justify-between gap-3 border-b">
+          <CardTitle>Settings</CardTitle>
+          <Badge variant={settingsDirty ? 'warning' : 'secondary'}>{settingsDirty ? 'Unsaved changes' : 'In sync'}</Badge>
+        </CardHeader>
+        <CardContent className="grid gap-4 pt-4 md:grid-cols-2">
           <Field label="Directory URL" description="HTTPS endpoint returning a JSON app-directory file. Leave empty to use the local bundle.">
-            <input
+            <Input
               type="text"
               placeholder="https://directory.example.com/app-directory.json"
               value={draftUrl}
               onChange={(e) => setDraftUrl(e.target.value)}
-              style={INPUT}
             />
           </Field>
 
           <Field label="Refresh interval" description="How often to poll the remote. 'Off' = manual only.">
-            <select
-              value={draftInterval}
-              onChange={(e) => setDraftInterval(Number(e.target.value))}
-              style={INPUT}
+            <Select
+              value={String(draftInterval)}
+              onValueChange={(v) => setDraftInterval(Number(v))}
             >
-              {REFRESH_INTERVAL_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+              <SelectTrigger size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {REFRESH_INTERVAL_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
 
           <Field label="Current user role" description="Drives the entitlement filter. Apps with no roles[] are visible to everyone.">
-            <select value={draftRole} onChange={(e) => setDraftRole(e.target.value)} style={INPUT}>
-              {ROLE_OPTIONS.map((r) => (<option key={r} value={r}>{r}</option>))}
-            </select>
+            <Select value={draftRole} onValueChange={setDraftRole}>
+              <SelectTrigger size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLE_OPTIONS.map((r) => (<SelectItem key={r} value={r}>{r}</SelectItem>))}
+              </SelectContent>
+            </Select>
           </Field>
 
-          <Field label="Telemetry endpoint" description="Reserved — Insights export target for future SaaS rollups.">
-            <input
+          <Field label="Telemetry endpoint" description="Reserved — Control Tower export target for future SaaS rollups.">
+            <Input
               type="text"
               placeholder="https://telemetry.example.com/v1/events"
               value={draftTelemetry}
               onChange={(e) => setDraftTelemetry(e.target.value)}
-              style={INPUT}
             />
           </Field>
-          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button
+          <div className="flex justify-end gap-2 md:col-span-2">
+            <Button
               onClick={() => {
                 if (!status) return;
                 setDraftUrl(status.settings.directoryUrl);
@@ -449,31 +416,31 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
                 setDraftTelemetry(status.settings.telemetryEndpoint);
               }}
               disabled={!settingsDirty || busy === 'save'}
-              style={BUTTON_GHOST}
+              type="button"
+              variant="outline"
             >
               Reset
-            </button>
-            <button onClick={handleSave} disabled={!settingsDirty || busy === 'save'} style={BUTTON_PRIMARY}>
+            </Button>
+            <Button onClick={handleSave} disabled={!settingsDirty || busy === 'save'} type="button">
               {busy === 'save' ? 'Saving…' : 'Save'}
-            </button>
+            </Button>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Entitlements summary */}
-      <div style={SECTION}>
-        <div style={SECTION_HEADER}>
-          <span>Entitlements ({entitlementsSummary.role})</span>
-          <span>
+      <Card className="min-h-0">
+        <CardHeader className="flex-row items-center justify-between gap-3 border-b">
+          <CardTitle>Entitlements ({entitlementsSummary.role})</CardTitle>
+          <Badge variant="outline">
             {entitlementsSummary.visible} visible · {entitlementsSummary.restricted} restricted
-          </span>
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead style={{ background: 'var(--shell-panel-2)' }}>
+          </Badge>
+        </CardHeader>
+        <div className="scrollbar-thin overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead className="bg-secondary">
               <tr>
                 {['App', 'Roles allowed', 'Effective'].map((h) => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--shell-muted)', fontWeight: 800, borderBottom: '1px solid var(--shell-border)' }}>{h}</th>
+                  <th key={h} className="border-b px-3 py-2 text-left text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -482,30 +449,25 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
                 const roles = (app as unknown as { roles?: string[] }).roles ?? [];
                 const allowed = isAllowedForRole(roles, entitlementsSummary.role);
                 return (
-                  <tr key={app.appId} style={{ borderBottom: '1px solid var(--shell-border)' }}>
-                    <td style={{ padding: '6px 12px', fontWeight: 800, color: 'var(--shell-text)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: allowed ? 'var(--shell-positive)' : 'var(--shell-muted)' }} />
+                  <tr key={app.appId} className="border-b">
+                    <td className="px-3 py-2 font-black text-foreground">
+                      <div className="flex items-center gap-2">
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: allowed ? 'var(--shell-positive)' : 'var(--shell-muted)' }} />
                         {app.title}
-                        <span style={{ color: 'var(--shell-muted)', fontWeight: 500, fontSize: 11 }}>{app.appId}</span>
+                        <span className="text-xs font-medium text-muted-foreground">{app.appId}</span>
                       </div>
                     </td>
-                    <td style={{ padding: '6px 12px', color: 'var(--shell-muted)' }}>
+                    <td className="px-3 py-2 text-muted-foreground">
                       {roles.length === 0 ? (
-                        <span style={{ fontStyle: 'italic' }}>everyone</span>
+                        <span className="italic">everyone</span>
                       ) : (
                         roles.map((r) => (
-                          <span key={r} style={{
-                            display: 'inline-block', marginRight: 4, padding: '1px 7px',
-                            background: r === entitlementsSummary.role ? 'var(--shell-accent-soft)' : 'rgba(255,255,255,0.04)',
-                            border: '1px solid var(--shell-border)', borderRadius: 999,
-                            fontSize: 10, fontWeight: 700, color: 'var(--shell-text)',
-                          }}>{r}</span>
+                          <Badge key={r} className="mr-1" variant={r === entitlementsSummary.role ? 'default' : 'secondary'}>{r}</Badge>
                         ))
                       )}
                     </td>
-                    <td style={{ padding: '6px 12px', fontWeight: 800, color: allowed ? 'var(--shell-positive)' : '#ef4444' }}>
-                      {allowed ? 'Visible' : 'Restricted'}
+                    <td className="px-3 py-2">
+                      <Badge variant={allowed ? 'success' : 'destructive'}>{allowed ? 'Visible' : 'Restricted'}</Badge>
                     </td>
                   </tr>
                 );
@@ -513,11 +475,11 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
             </tbody>
           </table>
         </div>
-        <div style={{ padding: '8px 12px', fontSize: 11, color: 'var(--shell-muted)', borderTop: '1px solid var(--shell-border)' }}>
+        <div className="border-t px-3 py-2 text-xs font-bold text-muted-foreground">
           Roles are a <strong>UI surface</strong> only — FDC3 routing, contexts and intents are unaffected.
           Apps with no <code>roles[]</code> are visible to every role.
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -526,29 +488,30 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
 
 function Field({ label, description, children }: { label: string; description: string; children: React.ReactNode }): React.JSX.Element {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.7, color: 'var(--shell-muted)', fontWeight: 800 }}>{label}</div>
+    <div className="flex flex-col gap-1">
+      <div className="text-[10px] font-black uppercase tracking-[0.07em] text-muted-foreground">{label}</div>
       {children}
-      <div style={{ fontSize: 10, color: 'var(--shell-muted)' }}>{description}</div>
+      <div className="text-[10px] font-bold text-muted-foreground">{description}</div>
     </div>
   );
 }
 
-function DiffTile({ label, ids, color }: { label: string; ids: string[]; color: string }): React.JSX.Element {
+function DiffTile({ label, ids, tone }: { label: string; ids: string[]; tone: 'success' | 'warning' | 'destructive' }): React.JSX.Element {
+  const color = tone === 'success' ? 'var(--shell-positive)' : tone === 'warning' ? '#f59e0b' : 'var(--shell-negative)';
   return (
-    <div style={{ border: '1px solid var(--shell-border)', borderRadius: 8, padding: 10, background: 'rgba(255,255,255,0.02)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-        <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6, color, fontWeight: 800 }}>{label}</span>
-        <span style={{ fontSize: 18, fontWeight: 900, color, fontVariantNumeric: 'tabular-nums' }}>{ids.length}</span>
+    <div className="flex flex-col gap-1.5 rounded-lg border bg-[color:rgba(255,255,255,0.02)] p-3">
+      <div className="flex items-baseline justify-between">
+        <span className="text-[10px] font-black uppercase tracking-[0.06em]" style={{ color }}>{label}</span>
+        <span className="text-lg font-black tabular-nums" style={{ color }}>{ids.length}</span>
       </div>
       {ids.length === 0 ? (
-        <span style={{ fontSize: 11, color: 'var(--shell-muted)' }}>—</span>
+        <span className="text-xs font-bold text-muted-foreground">—</span>
       ) : (
-        <div style={{ fontSize: 11, color: 'var(--shell-text)', lineHeight: 1.5 }}>
+        <div className="text-xs font-bold leading-relaxed text-foreground">
           {ids.slice(0, 4).map((id) => (
-            <div key={id} style={{ fontFamily: 'ui-monospace, Menlo, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{id}</div>
+            <div key={id} className="truncate font-mono">{id}</div>
           ))}
-          {ids.length > 4 && <div style={{ color: 'var(--shell-muted)' }}>+{ids.length - 4} more</div>}
+          {ids.length > 4 && <div className="text-muted-foreground">+{ids.length - 4} more</div>}
         </div>
       )}
     </div>

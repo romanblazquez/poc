@@ -10,7 +10,8 @@
       "@fdc3-poc/workspace-engine": ["../../libs/workspace-engine/src/index.ts"],
       "@fdc3-poc/interop-electron-adapter": ["../../libs/interop-electron-adapter/src/index.ts"],
       "@fdc3-poc/shared-domain": ["../../libs/shared-domain/src/index.ts"],
-      "@fdc3-poc/shared-ui": ["../../libs/shared-ui/src/index.ts"]
+      "@fdc3-poc/shared-ui": ["../../libs/shared-ui/src/index.ts"],
+      "@/*": ["src/renderer/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "electron.vite.config.ts"],

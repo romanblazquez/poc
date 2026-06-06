@@ -3,24 +3,32 @@
 import { useEffect, useRef, useState } from 'react';
 import type {
   CSSProperties,
-  DetailedHTMLProps,
-  HTMLAttributes,
   MouseEvent as ReactMouseEvent,
 } from 'react';
-import type { AppEntry, WorkspaceLayoutItem, WorkspaceRuntimePayload } from '../App.js';
+import type { AppEntry } from '../App.js';
+import { cn } from '../lib/utils.js';
+import { Badge } from './ui/badge.js';
+import { Button } from './ui/button.js';
+import { Switch } from './ui/switch.js';
 
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      webview: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
-        src?: string;
-        preload?: string;
-        partition?: string;
-        onDomReady?: (event: { currentTarget: { executeJavaScript(script: string): Promise<unknown> } }) => void;
-      };
-    }
-  }
+interface WorkspaceLayoutItem {
+  appId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
+
+interface WorkspaceRuntimePayload {
+  id: string;
+  name: string;
+  channelId: string | null;
+  items: WorkspaceLayoutItem[];
+}
+
+type EmbeddedWebview = HTMLWebViewElement & {
+  executeJavaScript(script: string): Promise<unknown>;
+};
 
 interface WorkspaceRuntimeWindowProps {
   apps: AppEntry[];
@@ -58,64 +66,76 @@ export function WorkspaceRuntimeWindow({
 
   if (!payload) {
     return (
-      <div style={emptyStyle}>
+      <div className="flex h-screen items-center justify-center overflow-hidden bg-background text-sm font-bold text-muted-foreground" data-theme={theme}>
         Loading workspace...
       </div>
     );
   }
 
   return (
-    <div style={rootStyle} data-theme={theme}>
-      <div style={headerStyle}>
-        <div>
-          <div style={{ color: '#e3e6ff', fontSize: 13, fontWeight: 900 }}>{payload.name}</div>
-          <div style={{ color: '#70709a', fontSize: 10 }}>Runtime workspace · {items.length} apps · {editing ? 'editing' : 'locked'}</div>
+    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground" data-theme={theme}>
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border bg-card px-3">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-black text-foreground">{payload.name}</div>
+          <div className="text-[10px] font-bold text-muted-foreground">
+            Runtime workspace · {items.length} apps · {editing ? 'editing' : 'locked'}
+          </div>
         </div>
-        <div style={headerActionsStyle}>
-          <label style={themeSwitchRowStyle}>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 text-[11px] font-bold text-foreground">
             <span>Theme</span>
-            <button
-              role="switch"
-              aria-checked={theme === 'dark'}
+            <Switch
+              checked={theme === 'dark'}
+              onCheckedChange={(checked) => void onThemeChange(checked ? 'dark' : 'light')}
               aria-label="Toggle workspace theme"
-              onClick={() => void onThemeChange(theme === 'dark' ? 'light' : 'dark')}
-              style={switchStyle(theme === 'dark')}
-            >
-              <span style={switchKnobStyle(theme === 'dark')} />
-              <span>{theme === 'dark' ? 'Dark' : 'Light'}</span>
-            </button>
+            />
+            <Badge variant="secondary">{theme}</Badge>
           </label>
-          <button onClick={() => setEditing((value) => !value)} style={buttonStyle}>{editing ? 'Lock Layout' : 'Edit Layout'}</button>
-          <button onClick={() => saveRuntimeLayout(payload.id, items)} style={buttonStyle}>Save Layout</button>
+          <Button onClick={() => setEditing((value) => !value)} size="sm" type="button" variant="outline">
+            {editing ? 'Lock Layout' : 'Edit Layout'}
+          </Button>
+          <Button onClick={() => saveRuntimeLayout(payload.id, items)} size="sm" type="button">
+            Save Layout
+          </Button>
         </div>
       </div>
 
-      <div ref={canvasRef} style={canvasStyle}>
+      <div ref={canvasRef} className="relative min-h-0 flex-1">
         {items.map((item) => {
           const app = appById.get(item.appId);
           if (!app) return null;
 
           return (
-            <div key={item.appId} style={tileStyle(item)}>
+            <div
+              key={item.appId}
+              className="absolute flex overflow-hidden rounded-md border border-[color:var(--shell-accent-border)] bg-card shadow-sm"
+              style={tileStyle(item)}
+            >
               <div
                 onMouseDown={(event) => {
                   if (editing) startMove(item.appId, event);
                 }}
-                style={tileHeaderStyle(editing)}
+                className={cn(
+                  'flex h-8 shrink-0 items-center gap-2 border-b border-[color:var(--shell-accent-border)] bg-secondary px-2 text-foreground',
+                  editing ? 'cursor-move' : 'cursor-default',
+                )}
               >
                 <span>{app.icon ?? '□'}</span>
-                <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.title}</strong>
+                <strong className="truncate text-xs font-black">{app.title}</strong>
               </div>
               {preloadPath && (
                 <webview
+                  ref={(node) => {
+                    if (!node) return;
+                    const webview = node as EmbeddedWebview;
+                    webview.addEventListener('dom-ready', () => {
+                      void webview.executeJavaScript(`window.fdc3?.joinUserChannel(${JSON.stringify(payload.channelId)})`);
+                    }, { once: true });
+                  }}
                   src={resolveEmbeddedAppUrl(app)}
                   preload={`file://${preloadPath}`}
                   partition={`persist:${payload.id}-${app.appId}`}
                   style={webviewStyle}
-                  onDomReady={(event) => {
-                    const webview = event.currentTarget;
-                    void webview.executeJavaScript(`window.fdc3?.joinUserChannel(${JSON.stringify(payload.channelId)})`);
-                  }}
                 />
               )}
               {editing && (
@@ -207,121 +227,12 @@ function resolveEmbeddedAppUrl(app: AppEntry): string {
   return app.url;
 }
 
-const rootStyle: CSSProperties = {
-  background: '#090916',
-  display: 'flex',
-  flexDirection: 'column',
-  height: '100vh',
-  overflow: 'hidden',
-};
-
-const emptyStyle: CSSProperties = {
-  ...rootStyle,
-  alignItems: 'center',
-  color: '#a8acd8',
-  justifyContent: 'center',
-};
-
-const headerStyle: CSSProperties = {
-  alignItems: 'center',
-  background: '#0a0a18',
-  borderBottom: '1px solid #25254a',
-  display: 'flex',
-  flexShrink: 0,
-  height: 36,
-  justifyContent: 'space-between',
-  padding: '0 10px',
-};
-
-const headerActionsStyle: CSSProperties = {
-  alignItems: 'center',
-  display: 'flex',
-  gap: 6,
-};
-
-const buttonStyle: CSSProperties = {
-  background: '#1e2a4a',
-  border: '1px solid #2a3a6a',
-  borderRadius: 4,
-  color: '#dbe6ff',
-  cursor: 'pointer',
-  fontSize: 11,
-  fontWeight: 800,
-  height: 24,
-  padding: '0 8px',
-};
-
-const themeSwitchRowStyle: CSSProperties = {
-  alignItems: 'center',
-  color: '#a8acd8',
-  display: 'flex',
-  fontSize: 11,
-  fontWeight: 800,
-  gap: 7,
-};
-
-function switchStyle(dark: boolean): CSSProperties {
-  return {
-    alignItems: 'center',
-    background: dark ? '#25304f' : '#dbeafe',
-    border: '1px solid #3d5f9f',
-    borderRadius: 999,
-    color: dark ? '#dbeafe' : '#1e3a8a',
-    cursor: 'pointer',
-    display: 'flex',
-    fontSize: 10,
-    fontWeight: 900,
-    gap: 6,
-    height: 24,
-    padding: '2px 8px 2px 3px',
-  };
-}
-
-function switchKnobStyle(dark: boolean): CSSProperties {
-  return {
-    background: dark ? '#60a5fa' : '#fff',
-    borderRadius: '50%',
-    boxShadow: '0 1px 4px rgba(0,0,0,.35)',
-    display: 'inline-block',
-    height: 16,
-    width: 16,
-  };
-}
-
-const canvasStyle: CSSProperties = {
-  flex: 1,
-  minHeight: 0,
-  position: 'relative',
-};
-
 function tileStyle(item: WorkspaceLayoutItem): CSSProperties {
   return {
-    background: '#101024',
-    border: '1px solid #334b86',
-    borderRadius: 4,
-    display: 'flex',
-    flexDirection: 'column',
     height: `${item.height}%`,
     left: `${item.x}%`,
-    overflow: 'hidden',
-    position: 'absolute',
     top: `${item.y}%`,
     width: `${item.width}%`,
-  };
-}
-
-function tileHeaderStyle(editing: boolean): CSSProperties {
-  return {
-  alignItems: 'center',
-  background: '#18233f',
-  borderBottom: '1px solid #365da8',
-  color: '#e3e6ff',
-  cursor: editing ? 'move' : 'default',
-  display: 'flex',
-  flexShrink: 0,
-  gap: 8,
-  height: 30,
-  padding: '0 7px',
   };
 }
 

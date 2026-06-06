@@ -1,4 +1,6 @@
-import React from 'react';
+import { Badge } from '../../components/ui/badge.js';
+import { Button } from '../../components/ui/button.js';
+import { Switch } from '../../components/ui/switch.js';
 
 interface FlowToolbarProps {
   workspaceName: string;
@@ -22,81 +24,40 @@ export function FlowToolbar({
   validationCount,
 }: FlowToolbarProps) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        padding: '12px 16px',
-        background: 'var(--interop-panel)',
-        borderBottom: '1px solid var(--interop-border)',
-        flexShrink: 0,
-      }}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-        <div style={{ color: 'var(--interop-text-strong)', fontSize: 12, fontWeight: 800 }}>{workspaceName}</div>
-        <div style={{ color: 'var(--interop-text-muted)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+    <div className="flex flex-shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-3">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <div className="truncate text-xs font-extrabold text-foreground">{workspaceName}</div>
+        <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
           {appCount} app{appCount === 1 ? '' : 's'} in this workspace
         </div>
       </div>
 
-      <button
+      <Button
         onClick={onAutoWire}
         disabled={!canAutoWire}
         title="Generate compatible FDC3 connectors automatically from app context and intent capabilities"
-        style={{
-          padding: '6px 12px',
-          background: canAutoWire ? 'var(--interop-accent)' : 'var(--interop-panel-2)',
-          border: `1px solid ${canAutoWire ? 'var(--interop-accent-border)' : 'var(--interop-border)'}`,
-          borderRadius: 6,
-          color: canAutoWire ? 'var(--interop-accent-contrast)' : 'var(--interop-text-muted)',
-          fontSize: 12,
-          fontWeight: 700,
-          cursor: canAutoWire ? 'pointer' : 'not-allowed',
-          transition: 'background 0.2s',
-        }}
+        size="sm"
       >
         Auto-wire FDC3
-      </button>
+      </Button>
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '4px 8px',
-          background: 'var(--interop-panel-2)',
-          borderRadius: 6,
-          border: '1px solid var(--interop-border)',
-        }}
-      >
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: 'var(--interop-text)' }}>
-          <input
-            type="checkbox"
+      <div className="flex items-center gap-2 rounded-md border border-border bg-secondary px-2 py-1">
+        <label className="flex items-center gap-2 text-[11px] font-bold text-foreground">
+          <Switch
             checked={flowEnabled}
-            onChange={(e) => onToggleFlowEnabled(e.target.checked)}
-            style={{ cursor: 'pointer' }}
+            onCheckedChange={onToggleFlowEnabled}
+            aria-label="Toggle interop flow"
           />
           <span>Flow Active</span>
         </label>
       </div>
 
-      <div style={{ flex: 1 }} />
+      <div className="flex-1" />
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 16,
-          fontSize: 11,
-          color: 'var(--interop-text-muted)',
-        }}
-      >
-        <span>Connectors: <strong style={{ color: 'var(--interop-text-strong)' }}>{connectorCount}</strong></span>
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <Badge variant="secondary">Connectors: {connectorCount}</Badge>
         {validationCount > 0 && (
-          <span style={{ color: 'var(--interop-danger)' }}>
-            Invalid: <strong>{validationCount}</strong>
-          </span>
+          <Badge variant="destructive">Invalid: {validationCount}</Badge>
         )}
       </div>
     </div>

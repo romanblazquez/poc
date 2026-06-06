@@ -1,5 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type * as React from 'react';
 import type { AppEntry } from '../App.js';
+import { Badge } from './ui/badge.js';
+import { Button } from './ui/button.js';
+import { Card, CardContent } from './ui/card.js';
 
 const CATEGORY_COLORS: Record<string, string> = {
   CRM: '#4080e8',
@@ -42,7 +46,7 @@ function readPinned(): string[] {
   }
 }
 
-export function AppLauncher({ apps, onOpen }: AppLauncherProps) {
+export function AppLauncher({ apps, onOpen }: AppLauncherProps): JSX.Element {
   const lifecycleApi = getLifecycleApi();
   const [pinnedIds, setPinnedIds] = useState<string[]>(readPinned);
   const [lifecycle, setLifecycle] = useState<AppLifecycleSnapshot[]>([]);
@@ -93,7 +97,7 @@ export function AppLauncher({ apps, onOpen }: AppLauncherProps) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 24 }}>
+    <div className="flex flex-col gap-6 pb-6">
       {pinnedApps.length > 0 && (
         <AppSection title="Pinned" color="var(--shell-accent)">
           {pinnedApps.map((app) => (
@@ -139,26 +143,14 @@ function AppSection({
   title: string;
   color: string;
   children: React.ReactNode;
-}) {
+}): JSX.Element {
   return (
     <section>
-      <div
-        style={{
-          alignItems: 'center',
-          color,
-          display: 'flex',
-          fontSize: 11,
-          fontWeight: 800,
-          gap: 8,
-          letterSpacing: 1.2,
-          marginBottom: 12,
-          textTransform: 'uppercase',
-        }}
-      >
-        <div style={{ background: color, height: 1, opacity: 0.5, width: 20 }} />
+      <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-[0.1em]" style={{ color }}>
+        <div className="h-px w-5 opacity-60" style={{ background: color }} />
         {title}
       </div>
-      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+      <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(230px,1fr))]">
         {children}
       </div>
     </section>
@@ -179,8 +171,7 @@ function AppCard({
   onOpen: (id: string) => void;
   onRestart: (id: string) => void;
   onTogglePin: (id: string) => void;
-}) {
-  const [hover, setHover] = React.useState(false);
+}): JSX.Element {
   const categoryColor = CATEGORY_COLORS[app.category ?? 'Other'] ?? '#8080a0';
   const transport = app.devPort > 0 ? `dev:${app.devPort}` : app.url.startsWith('http') ? 'remote' : 'bundled';
   const capabilityCount =
@@ -192,143 +183,67 @@ function AppCard({
   const minimized = !!lifecycle?.isMinimized;
 
   return (
-    <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        alignItems: 'flex-start',
-        background: hover ? 'var(--shell-panel)' : 'var(--shell-panel-2)',
-        border: `1px solid ${hover ? 'var(--shell-accent-border)' : 'var(--shell-border)'}`,
-        borderRadius: 8,
-        boxShadow: hover ? '0 4px 20px rgba(64, 128, 232, 0.15)' : 'none',
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: 178,
-        padding: '13px 14px',
-        textAlign: 'left',
-        transform: hover ? 'translateY(-1px)' : 'none',
-        transition: 'all 0.15s ease',
-      }}
-    >
-      <div style={{ alignItems: 'center', display: 'flex', gap: 10, width: '100%' }}>
-        <div
-          style={{
-            alignItems: 'center',
-            background: `${categoryColor}20`,
-            border: `1px solid ${categoryColor}55`,
-            borderRadius: 8,
-            color: categoryColor,
-            display: 'flex',
-            fontSize: 24,
-            height: 40,
-            justifyContent: 'center',
-            width: 40,
-          }}
-        >
-          {app.icon ?? app.title.slice(0, 1)}
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ color: 'var(--shell-text)', fontSize: 13, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {app.title}
+    <Card className="group flex min-h-44 flex-col rounded-lg transition-transform hover:-translate-y-px hover:border-[color:var(--shell-accent-border)] hover:shadow-[0_4px_20px_rgba(64,128,232,0.15)]">
+      <CardContent className="flex h-full flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-2xl"
+            style={{ background: `${categoryColor}20`, borderColor: `${categoryColor}55`, color: categoryColor }}
+          >
+            {app.icon ?? app.title.slice(0, 1)}
           </div>
-          <div style={{ color: 'var(--shell-muted)', fontSize: 10, fontWeight: 750, marginTop: 2 }}>
-            {app.category ?? 'Other'} / {transport}
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <div className="truncate text-sm font-black text-foreground">{app.title}</div>
+            <div className="text-[10px] font-bold text-muted-foreground">
+              {app.category ?? 'Other'} / {transport}
+            </div>
           </div>
+          <Button
+            type="button"
+            onClick={() => onTogglePin(app.appId)}
+            title={pinned ? 'Unpin app' : 'Pin app'}
+            className="ml-auto"
+            size="xs"
+            variant={pinned ? 'default' : 'outline'}
+          >
+            {pinned ? 'Pin' : '+'}
+          </Button>
         </div>
-        <button
-          type="button"
-          onClick={() => onTogglePin(app.appId)}
-          title={pinned ? 'Unpin app' : 'Pin app'}
-          style={{
-            background: pinned ? 'var(--shell-accent-soft)' : 'transparent',
-            border: `1px solid ${pinned ? 'var(--shell-accent-border)' : 'var(--shell-border)'}`,
-            borderRadius: 6,
-            color: pinned ? 'var(--shell-accent-text)' : 'var(--shell-muted)',
-            cursor: 'pointer',
-            fontSize: 11,
-            fontWeight: 900,
-            height: 24,
-            marginLeft: 'auto',
-            width: 28,
-          }}
-        >
-          {pinned ? 'Pin' : '+'}
-        </button>
-      </div>
 
-      {app.description && (
-        <div style={{ color: 'var(--shell-muted)', fontSize: 11, lineHeight: 1.4, marginTop: 10, minHeight: 46 }}>
-          {app.description}
+        {app.description && (
+          <div className="line-clamp-3 min-h-11 text-xs font-bold leading-snug text-muted-foreground">
+            {app.description}
+          </div>
+        )}
+
+        <div className="mt-auto flex flex-wrap items-center gap-1.5">
+          <StatusPill
+            variant={running ? 'success' : 'secondary'}
+            label={running ? (minimized ? 'Minimized' : 'Running') : 'Available'}
+          />
+          {capabilityCount > 0 && <StatusPill variant="default" label={`${capabilityCount} caps`} />}
+          {app.intents && app.intents.length > 0 && <StatusPill variant="warning" label={`${app.intents.length} intents`} />}
         </div>
-      )}
 
-      <div style={{ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 'auto', paddingTop: 12 }}>
-        <StatusPill
-          color={running ? 'var(--shell-positive)' : 'var(--shell-muted)'}
-          label={running ? (minimized ? 'Minimized' : 'Running') : 'Available'}
-        />
-        {capabilityCount > 0 && <StatusPill color="var(--shell-accent)" label={`${capabilityCount} caps`} />}
-        {app.intents && app.intents.length > 0 && <StatusPill color="#f59e0b" label={`${app.intents.length} intents`} />}
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginTop: 12, width: '100%' }}>
-        <button
-          type="button"
-          onClick={() => onOpen(app.appId)}
-          style={{
-            background: 'var(--shell-accent-soft)',
-            border: '1px solid var(--shell-accent-border)',
-            borderRadius: 6,
-            color: 'var(--shell-accent-text)',
-            cursor: 'pointer',
-            flex: 1,
-            fontSize: 11,
-            fontWeight: 850,
-            height: 28,
-          }}
-        >
-          {running ? 'Focus' : 'Open'}
-        </button>
-        <button
-          type="button"
-          onClick={() => onRestart(app.appId)}
-          title={running ? 'Close and reopen this app' : 'Open this app'}
-          style={{
-            background: 'transparent',
-            border: '1px solid var(--shell-border)',
-            borderRadius: 6,
-            color: 'var(--shell-muted)',
-            cursor: 'pointer',
-            fontSize: 11,
-            fontWeight: 850,
-            height: 28,
-            padding: '0 10px',
-          }}
-        >
-          {running ? 'Restart' : 'Start'}
-        </button>
-      </div>
-    </div>
+        <div className="flex w-full gap-2">
+          <Button className="flex-1" onClick={() => onOpen(app.appId)} size="sm" type="button">
+            {running ? 'Focus' : 'Open'}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => onRestart(app.appId)}
+            title={running ? 'Close and reopen this app' : 'Open this app'}
+            size="sm"
+            variant="outline"
+          >
+            {running ? 'Restart' : 'Start'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
-function StatusPill({ color, label }: { color: string; label: string }) {
-  return (
-    <span
-      style={{
-        alignItems: 'center',
-        border: `1px solid ${color}55`,
-        borderRadius: 999,
-        color,
-        display: 'inline-flex',
-        fontSize: 10,
-        fontWeight: 850,
-        gap: 5,
-        padding: '2px 7px',
-      }}
-    >
-      <span style={{ background: color, borderRadius: 999, height: 6, width: 6 }} />
-      {label}
-    </span>
-  );
+function StatusPill({ variant, label }: { variant: 'default' | 'secondary' | 'success' | 'warning'; label: string }): JSX.Element {
+  return <Badge variant={variant}>{label}</Badge>;
 }

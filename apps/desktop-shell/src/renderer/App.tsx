@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { cn } from './lib/utils.js';
 import { AppLauncher } from './components/AppLauncher.js';
 import { ChannelBar } from './components/ChannelBar.js';
 import { WorkspaceToolbar } from './components/WorkspaceToolbar.js';
@@ -8,10 +9,15 @@ import { NotificationsCenter } from './components/NotificationsCenter.js';
 import { HotkeyHelp } from './components/HotkeyHelp.js';
 import { DockviewWorkspace } from './components/DockviewWorkspace.js';
 import type { DetachedWorkspacePayload, DisplayInfo } from './components/DockviewWorkspace.js';
-import { CommandCenter } from './components/CommandCenter.js';
-import { Insights } from './components/Insights.js';
+import { ControlTower } from './components/ControlTower.js';
 import { Manager } from './components/Manager.js';
 import { Bridge } from './components/Bridge.js';
+import { Badge } from './components/ui/badge.js';
+import { Button } from './components/ui/button.js';
+import { Card, CardContent } from './components/ui/card.js';
+import { Input } from './components/ui/input.js';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select.js';
+import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs.js';
 import { InteropCopilot } from './copilot/InteropCopilot.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
 import type { Fdc3Context, UserChannel } from '@fdc3-poc/fdc3-core';
@@ -69,7 +75,7 @@ export interface AppEntry {
 }
 
 type ThemeMode = ThemeName;
-type WorkspaceMode = 'launcher' | 'workspace' | 'interop-flow' | 'command-center' | 'insights' | 'manager' | 'bridge';
+type WorkspaceMode = 'launcher' | 'workspace' | 'interop-flow' | 'control-tower' | 'manager' | 'bridge';
 
 interface WorkspaceState {
   channelId: string | null;
@@ -330,10 +336,9 @@ export function App() {
       const modeByKey: Partial<Record<string, WorkspaceMode>> = {
         '1': 'workspace',
         '2': 'interop-flow',
-        '3': 'command-center',
-        '4': 'insights',
-        '5': 'manager',
-        '6': 'bridge',
+        '3': 'control-tower',
+        '4': 'manager',
+        '5': 'bridge',
         '0': 'launcher',
       };
       const mode = modeByKey[key];
@@ -643,65 +648,43 @@ export function App() {
 
   return (
     <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100vh',
-        background: 'var(--shell-bg)',
-        color: 'var(--shell-text)',
-        fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      }}
+      className="flex h-screen flex-col bg-background text-foreground"
     >
       <TopBar
         title={shellManifest?.title ?? 'FDC3 Desktop Shell'}
         subtitle={shellManifest?.subtitle ?? 'TRADER WORKSTATION'}
         actions={
           <>
-          <button
+          <Button
             onClick={() => setCopilotOpen(true)}
             title="Ask the Desktop (⌘K) — natural-language FDC3 orchestration"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6, height: 22, padding: '0 10px',
-              background: 'var(--shell-accent-soft)', border: '1px solid var(--shell-accent-border)',
-              borderRadius: 6, color: 'var(--shell-accent-text)', cursor: 'pointer', fontSize: 11, fontWeight: 800,
-            }}
+            size="sm"
+            type="button"
           >
-            <span>✦</span>Ask
-            <span style={{ opacity: 0.7, fontSize: 10, fontWeight: 700 }}>⌘K</span>
-          </button>
-          <select
-            value={theme}
-            onChange={(e) => void handleThemeChange(e.target.value as ThemeName)}
-            style={{
-              background: 'var(--shell-panel-2)',
-              border: '1px solid var(--shell-border)',
-              borderRadius: 6,
-              color: 'var(--shell-text)',
-              cursor: 'pointer',
-              fontSize: 11,
-              fontWeight: 700,
-              height: 22,
-              padding: '0 6px',
-            }}
-          >
-            {Object.entries(THEMES).map(([key, cfg]) => (
-              <option key={key} value={key}>{cfg.label}</option>
-            ))}
-          </select>
+            ✦ Ask
+            <span className="text-[10px] font-semibold opacity-60">⌘K</span>
+          </Button>
+          <Select value={theme} onValueChange={(v) => void handleThemeChange(v as ThemeName)}>
+            <SelectTrigger size="sm" className="min-w-[128px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(THEMES).map(([key, cfg]) => (
+                <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <ZoomControl />
           <NotificationsCenter open={notificationsOpen} onOpenChange={setNotificationsOpen} />
-          <button
+          <Button
             type="button"
             onClick={() => setHotkeysOpen(true)}
             title="Keyboard shortcuts (Cmd/Ctrl+/)"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6, height: 22, padding: '0 9px',
-              background: 'var(--shell-panel-2)', border: '1px solid var(--shell-border)',
-              borderRadius: 6, color: 'var(--shell-text)', cursor: 'pointer', fontSize: 11, fontWeight: 800,
-            }}
+            size="sm"
+            variant="outline"
           >
             Keys
-          </button>
+          </Button>
           <WorkspaceToolbar onSave={handleSave} saveStatus={saveStatus} />
           <ChannelBar
             currentChannel={currentChannel}
@@ -711,9 +694,9 @@ export function App() {
         }
       />
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px 0', flexShrink: 0 }}>
-        {activeMode !== 'launcher' ? (
-          <div style={{ display: 'flex', gap: 4 }}>
+      <div className="flex h-10 shrink-0 items-stretch border-b">
+        {activeMode !== 'launcher' && (
+          <div className="flex min-w-0 items-stretch overflow-x-auto scrollbar-thin">
             {workspaceTabs.map((workspace) => (
               <WorkspaceTabButton
                 key={workspace.id}
@@ -733,62 +716,29 @@ export function App() {
             <button
               onClick={handleAddWorkspace}
               title="Add workspace"
-              style={{
-                background: 'var(--shell-panel-2)',
-                border: '1px solid var(--shell-border)',
-                borderRadius: '6px 6px 0 0',
-                color: 'var(--shell-text)',
-                cursor: 'pointer',
-                fontSize: 14,
-                fontWeight: 900,
-                height: 28,
-                lineHeight: '24px',
-                padding: '0 10px',
-              }}
+              type="button"
+              className="flex items-center border-r px-3 text-base text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               +
             </button>
           </div>
-        ) : (
-          <div />
         )}
-        <div style={{ flex: 1 }} />
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            background: 'var(--shell-panel)',
-            border: '1px solid var(--shell-border)',
-            borderRadius: 8,
-            padding: 3,
-            gap: 3,
-          }}
-        >
-          <TabButton active={activeMode === 'workspace'} grouped onClick={() => setActiveMode('workspace')}>
-            Workspace
-          </TabButton>
-          <TabButton active={activeMode === 'interop-flow'} grouped onClick={() => setActiveMode('interop-flow')}>
-            Interop Flow
-          </TabButton>
-          <TabButton active={activeMode === 'command-center'} grouped onClick={() => setActiveMode('command-center')}>
-            Command Center
-          </TabButton>
-          <TabButton active={activeMode === 'insights'} grouped onClick={() => setActiveMode('insights')}>
-            Insights
-          </TabButton>
-          <TabButton active={activeMode === 'manager'} grouped onClick={() => setActiveMode('manager')}>
-            Manager
-          </TabButton>
-          <TabButton active={activeMode === 'bridge'} grouped onClick={() => setActiveMode('bridge')}>
-            Bridge
-          </TabButton>
-          <TabButton active={activeMode === 'launcher'} grouped onClick={() => setActiveMode('launcher')}>
-            App Launcher
-          </TabButton>
+        <div className="flex-1" />
+        <div className="flex items-center border-l px-2">
+          <Tabs value={activeMode} onValueChange={(v) => setActiveMode(v as WorkspaceMode)}>
+            <TabsList className="h-7 gap-0.5 bg-transparent p-0">
+              <TabsTrigger value="workspace" className="h-7 px-2.5 text-[11px]">Workspace</TabsTrigger>
+              <TabsTrigger value="interop-flow" className="h-7 px-2.5 text-[11px]">Interop Flow</TabsTrigger>
+              <TabsTrigger value="control-tower" className="h-7 px-2.5 text-[11px]">Control Tower</TabsTrigger>
+              <TabsTrigger value="manager" className="h-7 px-2.5 text-[11px]">Manager</TabsTrigger>
+              <TabsTrigger value="bridge" className="h-7 px-2.5 text-[11px]">Bridge</TabsTrigger>
+              <TabsTrigger value="launcher" className="h-7 px-2.5 text-[11px]">App Launcher</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, padding: '10px 12px 12px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
         {activeMode === 'workspace' ? (
           activeDetachedWorkspace ? (
             <DetachedWorkspacePlaceholder
@@ -812,10 +762,7 @@ export function App() {
               displays={displays}
             />
           ) : (
-            <div style={{
-              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: THEMES[theme].dataTheme === 'dark' ? '#4a6080' : '#8aa0b8', fontSize: 12, letterSpacing: 1,
-            }}>
+            <div className="flex flex-1 items-center justify-center text-xs tracking-wide text-muted-foreground">
               Connecting to FDC3 bus…
             </div>
           )
@@ -827,26 +774,24 @@ export function App() {
             theme={theme}
             appIds={interopWorkspaceAppIds}
           />
-        ) : activeMode === 'command-center' ? (
-          <CommandCenter
+        ) : activeMode === 'control-tower' ? (
+          <ControlTower
             apps={apps}
             currentChannel={currentChannel}
             onOpen={handleOpen}
             onComposeWorkspace={handleComposeWorkspace}
           />
-        ) : activeMode === 'insights' ? (
-          <Insights apps={apps} />
         ) : activeMode === 'manager' ? (
           <Manager apps={apps} />
         ) : activeMode === 'bridge' ? (
           <Bridge />
         ) : (
-          <div style={{ flex: 1, overflow: 'auto' }}>
-            <div style={{ marginBottom: 20 }}>
-              <h2 style={{ color: '#a0a0d0', fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto scrollbar-thin">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 Application Launcher
               </h2>
-              <p style={{ color: '#606080', fontSize: 12 }}>
+              <p className="text-xs text-muted-foreground">
                 Click an app to open it in a new window. All apps share the same FDC3 channel.
               </p>
             </div>
@@ -856,18 +801,7 @@ export function App() {
       </div>
 
       {/* Status bar */}
-      <div
-        style={{
-          height: 28,
-          background: 'var(--shell-panel)',
-          borderTop: '1px solid var(--shell-border)',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 16px',
-          gap: 20,
-          flexShrink: 0,
-        }}
-      >
+      <div className="flex h-7 shrink-0 items-center gap-4 border-t bg-card px-4">
         <StatusItem label="Workspace" value={activeWorkspaceTab.name} color="#91b4ff" />
         <StatusItem
           label="Channel"
@@ -979,84 +913,57 @@ function DetachedWorkspaceShell({
   }, [payload]);
 
   return (
-    <div style={{ background: 'var(--shell-bg)', color: 'var(--shell-text)', display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div className="flex h-screen flex-col bg-background text-foreground">
       <TopBar
         title={payload?.name ?? 'Detached Workspace'}
         subtitle="DETACHED WORKSPACE"
         mark={
-          <div
-            style={{
-              alignItems: 'center',
-              background: 'var(--shell-accent-soft)',
-              border: '1px solid var(--shell-accent-border)',
-              borderRadius: 4,
-              color: 'var(--shell-accent-text)',
-              display: 'flex',
-              fontSize: 9,
-              fontWeight: 900,
-              height: 18,
-              justifyContent: 'center',
-              width: 22,
-            }}
-          >
+          <Badge variant="outline" className="h-[18px] w-[22px] justify-center rounded px-0 text-[9px] font-black">
             WS
-          </div>
+          </Badge>
         }
         leftActions={
           <>
-            <button
+            <Button
               onClick={() => setEditLayout((v) => !v)}
               title={editLayout ? 'Lock layout — hide panel headers' : 'Edit layout — show panel headers to drag and rearrange panels'}
-              style={{ ...detachedShellButtonStyle, background: editLayout ? 'var(--shell-accent-soft)' : 'var(--shell-panel-2)', color: editLayout ? 'var(--shell-accent-text)' : 'var(--shell-muted)' }}
+              variant={editLayout ? 'default' : 'secondary'}
+              size="sm"
             >
               {editLayout ? '✓ Done' : '✎ Edit Layout'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => void window.fdc3.recallWorkspaceWindow(workspaceId)}
               title="Pull back to main shell"
-              style={detachedShellButtonStyle}
+              variant="secondary"
+              size="sm"
             >
               ← Pull Back
-            </button>
+            </Button>
           </>
         }
         actions={
           <>
-            <select
+            <Select
               value={payload?.theme ?? 'dark-financial'}
-              onChange={(event) => void handleDetachedThemeChange(event.target.value as ThemeName)}
-              style={{
-                background: 'var(--shell-panel-2)',
-                border: '1px solid var(--shell-border)',
-                borderRadius: 6,
-                color: 'var(--shell-text)',
-                cursor: 'pointer',
-                fontSize: 11,
-                fontWeight: 700,
-                height: 22,
-                padding: '0 6px',
-              }}
+              onValueChange={(v) => void handleDetachedThemeChange(v as ThemeName)}
             >
-              {Object.entries(THEMES).map(([key, cfg]) => (
-                <option key={key} value={key}>{cfg.label}</option>
-              ))}
-            </select>
+              <SelectTrigger size="sm" className="min-w-[128px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(THEMES).map(([key, cfg]) => (
+                  <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <ZoomControl />
             <WorkspaceToolbar onSave={handleDetachedSave} saveStatus={saveStatus} />
           </>
         }
       />
       {!payload || apps.length === 0 || !preloadPath ? (
-        <div style={{
-          alignItems: 'center',
-          color: 'var(--shell-muted)',
-          display: 'flex',
-          flex: 1,
-          fontSize: 12,
-          fontWeight: 800,
-          justifyContent: 'center',
-          minHeight: 0,
-        }}>
+        <div className="flex min-h-0 flex-1 items-center justify-center text-xs font-extrabold text-muted-foreground">
           Loading detached workspace...
         </div>
       ) : (
@@ -1077,20 +984,6 @@ function DetachedWorkspaceShell({
   );
 }
 
-const detachedShellButtonStyle: React.CSSProperties = {
-  background: 'var(--shell-panel-2)',
-  border: '1px solid var(--shell-border)',
-  borderRadius: 5,
-  color: 'var(--shell-text)',
-  cursor: 'pointer',
-  flexShrink: 0,
-  fontSize: 11,
-  fontWeight: 800,
-  height: 22,
-  padding: '0 9px',
-  textTransform: 'uppercase',
-};
-
 function DetachedWorkspacePlaceholder({
   workspaceName,
   panelCount,
@@ -1101,61 +994,18 @@ function DetachedWorkspacePlaceholder({
   onRecall: () => void;
 }) {
   return (
-    <div
-      style={{
-        alignItems: 'center',
-        background: 'var(--shell-panel)',
-        border: '1px solid var(--shell-border)',
-        borderRadius: 8,
-        color: 'var(--shell-text)',
-        display: 'flex',
-        flex: 1,
-        flexDirection: 'column',
-        gap: 12,
-        justifyContent: 'center',
-        minHeight: 0,
-        padding: 24,
-      }}
-    >
-      <div
-        style={{
-          alignItems: 'center',
-          background: 'var(--shell-accent-soft)',
-          border: '1px solid var(--shell-accent-border)',
-          borderRadius: 8,
-          color: 'var(--shell-accent-text)',
-          display: 'flex',
-          fontSize: 14,
-          fontWeight: 900,
-          height: 42,
-          justifyContent: 'center',
-          width: 42,
-        }}
-      >
-        WS
-      </div>
-      <div style={{ fontSize: 16, fontWeight: 900 }}>{workspaceName} is detached</div>
-      <div style={{ color: 'var(--shell-muted)', fontSize: 12, fontWeight: 800 }}>
-        {panelCount} panels are running in the floating workspace window.
-      </div>
-      <button
-        onClick={onRecall}
-        style={{
-          background: 'var(--shell-accent-soft)',
-          border: '1px solid var(--shell-accent-border)',
-          borderRadius: 6,
-          color: 'var(--shell-accent-text)',
-          cursor: 'pointer',
-          fontSize: 12,
-          fontWeight: 900,
-          height: 30,
-          padding: '0 14px',
-          textTransform: 'uppercase',
-        }}
-      >
-        Pull Workspace Back
-      </button>
-    </div>
+    <Card className="flex min-h-0 flex-1 items-center justify-center">
+      <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
+        <Badge variant="outline" className="h-11 w-11 justify-center rounded-lg px-0 text-sm font-black">
+          WS
+        </Badge>
+        <div className="text-base font-black text-foreground">{workspaceName} is detached</div>
+        <div className="text-xs font-extrabold text-muted-foreground">
+          {panelCount} panels are running in the floating workspace window.
+        </div>
+        <Button onClick={onRecall} size="sm">Pull Workspace Back</Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1186,23 +1036,16 @@ function WorkspaceTabButton({
     <button
       onClick={onClick}
       onDoubleClick={onDoubleClick}
-      style={{
-        background: active ? 'var(--shell-accent-soft)' : 'var(--shell-panel-2)',
-        border: `1px solid ${active ? 'var(--shell-accent-border)' : 'var(--shell-border)'}`,
-        borderRadius: '6px 6px 0 0',
-        color: active ? 'var(--shell-accent-text)' : 'var(--shell-muted)',
-        cursor: 'pointer',
-        fontSize: 11,
-        fontWeight: 800,
-        height: 28,
-        padding: '0 8px 0 12px',
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
-      }}
+      type="button"
+      className={cn(
+        'flex h-full items-center gap-1.5 border-r px-3 text-xs font-medium outline-none transition-colors select-none',
+        active
+          ? 'bg-background text-foreground'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+      )}
     >
       {editing ? (
-        <input
+        <Input
           autoFocus
           value={editingValue}
           onChange={(event) => onEditingChange?.(event.target.value)}
@@ -1214,18 +1057,7 @@ function WorkspaceTabButton({
             if (event.key === 'Enter') onEditingCommit?.();
             if (event.key === 'Escape') onEditingCancel?.();
           }}
-          style={{
-            background: 'rgba(255, 255, 255, 0.9)',
-            border: '1px solid var(--shell-accent-border)',
-            borderRadius: 4,
-            color: '#0b1118',
-            fontSize: 11,
-            fontWeight: 800,
-            height: 20,
-            minWidth: 96,
-            outline: 'none',
-            padding: '0 6px',
-          }}
+          className="h-5 min-w-24 bg-background px-2 text-xs"
         />
       ) : (
         <span>{children}</span>
@@ -1240,18 +1072,7 @@ function WorkspaceTabButton({
           role="button"
           aria-label="Close workspace"
           title="Close workspace"
-          style={{
-            alignItems: 'center',
-            borderRadius: 3,
-            color: active ? 'var(--shell-accent-text)' : 'var(--shell-muted)',
-            display: 'inline-flex',
-            fontSize: 12,
-            fontWeight: 900,
-            height: 16,
-            justifyContent: 'center',
-            lineHeight: '12px',
-            width: 16,
-          }}
+          className="flex h-4 w-4 items-center justify-center rounded text-[11px] leading-none opacity-50 hover:opacity-100"
         >
           ×
         </span>
@@ -1260,43 +1081,12 @@ function WorkspaceTabButton({
   );
 }
 
-function TabButton({
-  active,
-  grouped = false,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  grouped?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        background: active ? 'var(--shell-accent-soft)' : 'var(--shell-panel-2)',
-        border: `1px solid ${active ? 'var(--shell-accent-border)' : 'var(--shell-border)'}`,
-        borderRadius: grouped ? 6 : 6,
-        color: active ? 'var(--shell-accent-text)' : 'var(--shell-muted)',
-        cursor: 'pointer',
-        fontSize: 11,
-        fontWeight: 800,
-        height: 26,
-        padding: '0 10px',
-        textTransform: 'uppercase',
-      }}
-    >
-      {children}
-    </button>
-  );
-}
 
 function StatusItem({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-      <span style={{ color: 'var(--shell-subtle)' }}>{label}:</span>
-      <span style={{ color, fontWeight: 600 }}>{value}</span>
+    <div className="flex items-center gap-1.5 text-[11px]">
+      <span className="text-[color:var(--shell-subtle)]">{label}:</span>
+      <span className="font-semibold" style={{ color }}>{value}</span>
     </div>
   );
 }

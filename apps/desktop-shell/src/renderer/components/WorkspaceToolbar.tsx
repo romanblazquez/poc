@@ -1,4 +1,5 @@
-import React from 'react';
+import { Save } from 'lucide-react';
+import { Button } from './ui/button.js';
 
 interface WorkspaceToolbarProps {
   onSave: () => void;
@@ -7,28 +8,14 @@ interface WorkspaceToolbarProps {
 
 export function WorkspaceToolbar({ onSave, saveStatus }: WorkspaceToolbarProps) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div className="flex items-center gap-2">
       {saveStatus && (
-        <span style={{ color: 'var(--shell-positive)', fontSize: 12, fontWeight: 800 }}>{saveStatus}</span>
+        <span className="text-xs font-semibold text-[color:var(--shell-positive)]">{saveStatus}</span>
       )}
-      <button
-        onClick={onSave}
-        style={{
-          padding: '5px 12px',
-          background: 'var(--shell-panel-2)',
-          border: '1px solid var(--shell-border)',
-          borderRadius: 6,
-          color: 'var(--shell-text)',
-          cursor: 'pointer',
-          fontSize: 12,
-          fontWeight: 800,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-        }}
-      >
-        💾 Save Workspace
-      </button>
+      <Button onClick={onSave} size="sm" type="button" variant="secondary">
+        <Save />
+        Save
+      </Button>
     </div>
   );
 }

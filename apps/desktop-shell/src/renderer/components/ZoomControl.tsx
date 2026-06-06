@@ -1,11 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { Button } from './ui/button.js';
 
-/**
- * Shell-wide zoom control. Drives `window.shellChrome.setZoom(factor)` which
- * the main process broadcasts to every preload-injected webContents — shell
- * renderer, detached workspace windows, AND embedded `<webview>` apps — so a
- * single click resizes the entire trader desktop in lockstep.
- */
 const STEP = 0.1;
 const MIN = 0.5;
 const MAX = 2.0;
@@ -40,49 +35,40 @@ export function ZoomControl(): React.JSX.Element | null {
   if (!api) return null;
   const pct = Math.round(zoom * 100);
 
-  const btn: React.CSSProperties = {
-    width: 24, height: 22,
-    padding: 0,
-    background: 'var(--shell-panel-2)',
-    border: '1px solid var(--shell-border)',
-    color: 'var(--shell-text)',
-    cursor: 'pointer',
-    fontSize: 13,
-    fontWeight: 800,
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    lineHeight: 1,
-  };
-
   return (
     <div
-      style={{ display: 'inline-flex', alignItems: 'stretch', borderRadius: 6, overflow: 'hidden', border: '0' }}
+      className="inline-flex items-stretch overflow-hidden rounded-md border"
       title="Zoom the entire workspace"
       role="group"
       aria-label="Zoom"
     >
-      <button
+      <Button
         type="button"
         onClick={() => void apply(zoom - STEP)}
         disabled={zoom <= MIN + 0.001}
-        style={{ ...btn, borderTopLeftRadius: 6, borderBottomLeftRadius: 6, borderRight: 'none' }}
+        className="h-7 w-7 rounded-none border-0 border-r px-0"
+        size="icon-sm"
+        variant="secondary"
         aria-label="Zoom out"
-      >−</button>
-      <button
+      >−</Button>
+      <Button
         type="button"
         onClick={() => void apply(1)}
-        style={{ ...btn, width: 50, fontSize: 11, fontWeight: 800, letterSpacing: '0.02em' }}
+        className="h-7 w-14 rounded-none border-0 border-r px-0 text-xs"
+        size="icon-sm"
+        variant="secondary"
         aria-label="Reset zoom"
         title={`Zoom ${pct}% (click to reset to 100%)`}
-      >{pct}%</button>
-      <button
+      >{pct}%</Button>
+      <Button
         type="button"
         onClick={() => void apply(zoom + STEP)}
         disabled={zoom >= MAX - 0.001}
-        style={{ ...btn, borderTopRightRadius: 6, borderBottomRightRadius: 6, borderLeft: 'none' }}
+        className="h-7 w-7 rounded-none border-0 px-0"
+        size="icon-sm"
+        variant="secondary"
         aria-label="Zoom in"
-      >+</button>
+      >+</Button>
     </div>
   );
 }

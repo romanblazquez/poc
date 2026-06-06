@@ -1,31 +1,31 @@
 /* Dockview styling aligned with the workstation shell and embedded Angular apps. */
 
 .dockview {
-  --dv-bg-color: var(--shell-bg);
-  --dv-group-view-background-color: var(--shell-bg);
-  --dv-tabs-and-actions-container-background-color: var(--shell-panel);
-  --dv-activegroup-visiblepanel-tab-background-color: var(--shell-accent-soft);
-  --dv-activegroup-hiddenpanel-tab-background-color: var(--shell-panel);
-  --dv-inactivegroup-visiblepanel-tab-background-color: var(--shell-panel-2);
-  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--shell-panel);
-  --dv-tab-divider-color: var(--shell-border);
-  --dv-activegroup-visiblepanel-tab-color: var(--shell-accent-text);
-  --dv-activegroup-hiddenpanel-tab-color: var(--shell-muted);
-  --dv-inactivegroup-visiblepanel-tab-color: var(--shell-text);
-  --dv-inactivegroup-hiddenpanel-tab-color: var(--shell-muted);
-  --dv-separator-border: var(--shell-border);
-  --dv-paneview-active-outline-color: var(--shell-accent);
-  --dv-drag-over-background-color: var(--shell-accent-soft);
-  --dv-drag-over-border-color: var(--shell-accent);
+  --dv-bg-color: var(--background);
+  --dv-group-view-background-color: var(--background);
+  --dv-tabs-and-actions-container-background-color: var(--card);
+  --dv-activegroup-visiblepanel-tab-background-color: oklch(0.488 0.243 264.376 / 15%);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--card);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--secondary);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--card);
+  --dv-tab-divider-color: var(--border);
+  --dv-activegroup-visiblepanel-tab-color: oklch(0.748 0.15 264.376);
+  --dv-activegroup-hiddenpanel-tab-color: var(--muted-foreground);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--foreground);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--muted-foreground);
+  --dv-separator-border: var(--border);
+  --dv-paneview-active-outline-color: oklch(0.488 0.243 264.376);
+  --dv-drag-over-background-color: oklch(0.488 0.243 264.376 / 15%);
+  --dv-drag-over-border-color: oklch(0.488 0.243 264.376);
   --dv-overlay-z-index: 999;
-  background: var(--shell-bg);
-  border: 1px solid var(--shell-border);
-  color: var(--shell-text);
+  background: var(--background);
+  border: 1px solid var(--border);
+  color: var(--foreground);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .dockview-container {
-  background: var(--shell-bg);
+  background: var(--background);
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -33,15 +33,15 @@
 }
 
 .dockview-tabs {
-  background: var(--shell-panel);
-  border-bottom: 1px solid var(--shell-border);
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
   min-height: 34px;
 }
 
 .dockview-tab {
-  background: var(--shell-panel);
-  border-right: 1px solid var(--shell-border-soft);
-  color: var(--shell-muted);
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  color: var(--muted-foreground);
   cursor: pointer;
   font-size: 11px;
   font-weight: 800;
@@ -57,18 +57,18 @@
 }
 
 .dockview-tab:hover {
-  background: var(--shell-panel-2);
-  color: var(--shell-text);
+  background: var(--secondary);
+  color: var(--foreground);
 }
 
 .dockview-tab.active {
-  background: var(--shell-accent-soft);
-  border-bottom: 2px solid var(--shell-accent);
-  color: var(--shell-accent-text);
+  background: oklch(0.488 0.243 264.376 / 15%);
+  border-bottom: 2px solid oklch(0.488 0.243 264.376);
+  color: oklch(0.748 0.15 264.376);
 }
 
 .dockview-tab-close-action {
-  color: var(--shell-muted);
+  color: var(--muted-foreground);
   margin-left: 8px;
   opacity: 0.65;
   transition: opacity 0.14s ease, color 0.14s ease;
@@ -81,49 +81,49 @@
 
 .dockview-panel,
 .dockview-panel-content {
-  background: var(--shell-bg);
+  background: var(--background);
   overflow: hidden;
 }
 
 .dockview-panel {
-  border: 1px solid var(--shell-border-soft);
+  border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
 }
 
 .dockview-group {
-  background: var(--shell-bg);
+  background: var(--background);
   border: none;
   display: flex;
   flex-direction: column;
 }
 
 .dockview-group-control {
-  background: var(--shell-panel);
-  border-bottom: 1px solid var(--shell-border);
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
 }
 
 .dockview-resizer {
-  background: var(--shell-border);
+  background: var(--border);
   transition: background 0.14s ease, width 0.14s ease, height 0.14s ease;
 }
 
 .dockview-resizer:hover,
 .dockview-resizer.active {
-  background: var(--shell-accent);
+  background: oklch(0.488 0.243 264.376);
 }
 
 .dockview-scrollbar-track {
-  background: var(--shell-panel-2);
+  background: var(--secondary);
 }
 
 .dockview-scrollbar-thumb {
-  background: var(--shell-border);
+  background: var(--border);
   border-radius: 3px;
 }
 
 .dockview-scrollbar-thumb:hover {
-  background: var(--shell-muted);
+  background: var(--muted-foreground);
 }
 
 .dockview-drop-indicator,
@@ -131,22 +131,22 @@
 .dockview-drop-indicator-bottom,
 .dockview-drop-indicator-left,
 .dockview-drop-indicator-right {
-  background: var(--shell-accent-soft);
-  border: 2px solid var(--shell-accent);
+  background: oklch(0.488 0.243 264.376 / 15%);
+  border: 2px solid oklch(0.488 0.243 264.376);
   border-radius: 4px;
 }
 
 .dockview-floating {
-  background: var(--shell-panel);
-  border: 1px solid var(--shell-accent-border);
+  background: var(--card);
+  border: 1px solid oklch(0.488 0.243 264.376 / 40%);
   border-radius: 8px;
-  box-shadow: var(--shell-shadow);
+  box-shadow: 0 4px 24px oklch(0 0 0 / 40%);
 }
 
 .dockview-title {
-  background: var(--shell-panel);
-  border-bottom: 1px solid var(--shell-border);
-  color: var(--shell-muted);
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0;
@@ -155,14 +155,14 @@
 }
 
 .dockview-overflow-container {
-  background: var(--shell-panel);
-  border: 1px solid var(--shell-border);
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: var(--shell-shadow);
+  box-shadow: 0 4px 24px oklch(0 0 0 / 40%);
 }
 
 .dockview-overflow-item {
-  color: var(--shell-text);
+  color: var(--foreground);
   cursor: pointer;
   font-size: 12px;
   padding: 8px 12px;
@@ -170,7 +170,7 @@
 }
 
 .dockview-overflow-item:hover {
-  background: var(--shell-accent-soft);
+  background: oklch(0.488 0.243 264.376 / 15%);
 }
 
 .dockview-tab.disabled {

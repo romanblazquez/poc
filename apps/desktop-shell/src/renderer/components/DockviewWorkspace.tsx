@@ -1,30 +1,17 @@
-import React, { useCallback, useContext, useEffect, useRef, useState, createContext } from 'react';
-import type { DetailedHTMLProps, HTMLAttributes, CSSProperties } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, createContext } from 'react';
+import type { CSSProperties } from 'react';
 import { DockviewReact, type IDockviewPanelProps, type DockviewApi, type DockviewReadyEvent } from 'dockview';
 import type { AppEntry } from '../App.js';
 import type { UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { ThemeName } from '@fdc3-poc/fdc3-core';
+import { Button } from './ui/button.js';
 import 'dockview/dist/styles/dockview.css';
 import '../styles/dockview-override.css';
 
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      webview: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
-        src?: string;
-        preload?: string;
-        partition?: string;
-        ref?: React.Ref<HTMLElement>;
-        onDomReady?: (event: { currentTarget: EmbeddedWebview }) => void;
-      };
-    }
-  }
-}
-
 type ThemeMode = ThemeName;
 
-type EmbeddedWebview = HTMLElement & {
+type EmbeddedWebview = HTMLWebViewElement & {
   executeJavaScript(script: string): Promise<unknown>;
 };
 
@@ -114,18 +101,23 @@ function syncEmbeddedApp(webview: EmbeddedWebview, channelId: string | null, the
 
 function AppPanelComponent({ params }: IDockviewPanelProps<AppPanelParams>) {
   const { registerWebview, markReady } = useContext(WebviewContext);
+  const handleWebviewRef = useCallback((node: HTMLWebViewElement | null) => {
+    const webview = node as EmbeddedWebview | null;
+    registerWebview(params.appId, webview);
+    if (!webview) return;
+    webview.addEventListener('dom-ready', () => {
+      markReady(params.appId, params.channelId, params.theme);
+    }, { once: true });
+  }, [markReady, params.appId, params.channelId, params.theme, registerWebview]);
+
   return (
-    <div style={{ height: '100%', width: '100%', background: 'var(--shell-bg)' }}>
+    <div className="h-full w-full bg-[color:var(--shell-bg)]">
       <webview
-        ref={(node) => registerWebview(params.appId, node as EmbeddedWebview | null)}
+        ref={handleWebviewRef}
         src={params.appUrl}
         preload={`file://${params.preloadPath}`}
         partition={`persist:workspace-${params.appId}`}
         style={{ height: '100%', width: '100%', border: 'none' } as CSSProperties}
-        onDomReady={() => {
-          // dom-ready fired — now safe to call executeJavaScript
-          markReady(params.appId, params.channelId, params.theme);
-        }}
       />
     </div>
   );
@@ -460,69 +452,71 @@ export function DockviewWorkspace({
       {...(headersVisible ? { 'data-edit-layout': '' } : {})}
     >
       {!detached && (
-        <div style={toolbarStyle}>
-          <button onClick={resetLayout} style={secondaryButtonStyle}>
+        <div className="flex flex-shrink-0 items-center gap-2 border-b border-border bg-card px-3 py-2">
+          <Button onClick={resetLayout} variant="outline" size="sm">
             Reset Layout
-          </button>
+          </Button>
           {onDetachWorkspace && openPanelIds.size > 0 && (
             displays.length > 1 ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ color: 'var(--shell-muted)', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Detach to:</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">Detach to:</span>
                 {displays.map((d, i) => (
-                  <button
+                  <Button
                     key={d.id}
                     onClick={() => void detachToDisplay(d)}
                     title={`${d.bounds.width}×${d.bounds.height}  ·  ${d.isPrimary ? 'Primary display' : `Display ${i + 1}`}`}
-                    style={d.isPrimary ? detachButtonStyle : detachSecondaryButtonStyle}
+                    variant={d.isPrimary ? 'default' : 'secondary'}
+                    size="sm"
                   >
                     {d.isPrimary ? '▣' : '▢'} {d.isPrimary ? 'Primary' : `Display ${i + 1}`}
-                  </button>
+                  </Button>
                 ))}
               </div>
             ) : (
-              <button onClick={() => void detachToDisplay()} style={detachButtonStyle} title="Detach this workspace as one window">
+              <Button onClick={() => void detachToDisplay()} size="sm" variant="outline" title="Detach this workspace as one window">
                 Detach Workspace
-              </button>
+              </Button>
             )
           )}
-          <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowAddMenu((value) => !value)} style={primaryButtonStyle}>
+          <div className="relative">
+            <Button onClick={() => setShowAddMenu((value) => !value)} size="sm">
               Add App
-            </button>
+            </Button>
             {showAddMenu && (
-              <div style={addMenuStyle}>
+              <div className="absolute left-0 top-full z-20 mt-1 flex max-h-80 min-w-56 flex-col overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg scrollbar-thin">
                 {closedApps.length === 0 && (
-                  <div style={{ padding: '8px 12px', color: 'var(--shell-muted)', fontSize: 11 }}>All apps open</div>
+                  <div className="px-3 py-2 text-[11px] font-semibold text-muted-foreground">All apps open</div>
                 )}
                 {closedApps.map((app) => (
-                  <button
+                  <Button
                     key={app.appId}
                     onClick={() => addPanel(app)}
-                    style={addMenuItemStyle}
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start"
                   >
                     {app.title}
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
           </div>
-          <div style={{ flex: 1 }} />
-          <span style={{ color: 'var(--shell-muted)', fontSize: 11, fontWeight: 800, letterSpacing: 0 }}>
+          <div className="flex-1" />
+          <span className="text-[11px] font-extrabold text-muted-foreground">
             {workspaceName ?? 'Workspace'}
           </span>
-          <span style={{ color: 'var(--shell-subtle)', fontSize: 11 }}>
+          <span className="text-[11px] text-muted-foreground/75">
             Single-window Dockview workspace
           </span>
         </div>
       )}
 
-      <div style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
+      <div className="min-h-0 min-w-0 flex-1">
         <WebviewContext.Provider value={{ registerWebview, markReady }}>
           <DockviewReact
             onReady={onReady}
             components={{ 'app-panel': AppPanelComponent }}
-            className={THEMES[theme].dockview}
-            style={{ height: '100%', width: '100%' }}
+            className={`${THEMES[theme].dockview} h-full w-full`}
           />
         </WebviewContext.Provider>
       </div>
@@ -536,91 +530,4 @@ const rootStyle: CSSProperties = {
   flexDirection: 'column',
   minHeight: 0,
   width: '100%',
-};
-
-const toolbarStyle: CSSProperties = {
-  alignItems: 'center',
-  background: 'var(--shell-panel)',
-  borderBottom: '1px solid var(--shell-border)',
-  display: 'flex',
-  flexShrink: 0,
-  gap: 8,
-  padding: '5px 10px',
-};
-
-const primaryButtonStyle: CSSProperties = {
-  background: 'var(--shell-accent-soft)',
-  border: '1px solid var(--shell-accent-border)',
-  borderRadius: 6,
-  color: 'var(--shell-accent-text)',
-  cursor: 'pointer',
-  fontSize: 11,
-  fontWeight: 800,
-  height: 24,
-  padding: '0 10px',
-  textTransform: 'uppercase',
-};
-
-const secondaryButtonStyle: CSSProperties = {
-  background: 'var(--shell-panel-2)',
-  border: '1px solid var(--shell-border)',
-  borderRadius: 6,
-  color: 'var(--shell-text)',
-  cursor: 'pointer',
-  fontSize: 11,
-  fontWeight: 800,
-  height: 24,
-  padding: '0 10px',
-  textTransform: 'uppercase',
-};
-
-const detachButtonStyle: CSSProperties = {
-  background: 'var(--shell-accent-soft)',
-  border: '1px solid var(--shell-accent-border)',
-  borderRadius: 6,
-  color: 'var(--shell-accent-text)',
-  cursor: 'pointer',
-  fontSize: 11,
-  fontWeight: 800,
-  height: 24,
-  padding: '0 10px',
-  textTransform: 'uppercase',
-};
-
-const detachSecondaryButtonStyle: CSSProperties = {
-  background: 'var(--shell-panel-2)',
-  border: '1px solid var(--shell-border)',
-  borderRadius: 6,
-  color: 'var(--shell-text)',
-  cursor: 'pointer',
-  fontSize: 11,
-  fontWeight: 800,
-  height: 24,
-  padding: '0 10px',
-  textTransform: 'uppercase',
-};
-
-const addMenuStyle: CSSProperties = {
-  background: 'var(--shell-panel)',
-  border: '1px solid var(--shell-border)',
-  borderRadius: 8,
-  boxShadow: '0 10px 24px rgba(0,0,0,0.45)',
-  display: 'flex',
-  flexDirection: 'column',
-  left: 0,
-  marginTop: 4,
-  minWidth: 180,
-  position: 'absolute',
-  top: '100%',
-  zIndex: 20,
-};
-
-const addMenuItemStyle: CSSProperties = {
-  background: 'transparent',
-  border: 'none',
-  color: 'var(--shell-text)',
-  cursor: 'pointer',
-  fontSize: 12,
-  padding: '8px 12px',
-  textAlign: 'left',
 };

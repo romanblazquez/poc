@@ -1,5 +1,6 @@
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { resolve } from 'path';
 
 const root = resolve(__dirname, '../..');
@@ -48,11 +49,12 @@ export default defineConfig({
 
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
         ...libAliases,
         '@fdc3-poc/shared-ui': resolve(libsRoot, 'shared-ui/src/index.ts'),
+        '@': resolve(__dirname, 'src/renderer'),
       },
     },
     server: {

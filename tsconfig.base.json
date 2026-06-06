@@ -34,6 +34,7 @@
       "@fdc3-poc/interop-ioconnect-adapter": ["libs/interop-ioconnect-adapter/src/index.ts"],
       "@fdc3-poc/shared-domain": ["libs/shared-domain/src/index.ts"],
       "@fdc3-poc/shared-ui": ["libs/shared-ui/src/index.ts"],
+      "@/*": ["apps/desktop-shell/src/renderer/*"],
       "@fdc3-poc/interop-angular": ["libs/interop-angular/src/index.ts"],
       "@fdc3-poc/interop-angular/theme": ["libs/interop-angular/theme/src/public-api.ts"],
       "@fdc3-poc/interop-angular/logs": ["libs/interop-angular/logs/src/public-api.ts"],

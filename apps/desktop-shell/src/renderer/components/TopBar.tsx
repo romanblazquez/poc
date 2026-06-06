@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-
-const TITLE_BAR_HEIGHT = 30;
+import { Badge } from './ui/badge.js';
+import { cn } from '../lib/utils.js';
 
 type AppRegionStyle = React.CSSProperties & {
   WebkitAppRegion?: 'drag' | 'no-drag';
@@ -61,62 +61,30 @@ export function TopBar({ title, subtitle, mark, leftActions, actions }: TopBarPr
 
   return (
     <div
+      className="flex h-12 shrink-0 select-none items-center justify-between border-b bg-card"
       style={{
         ...dragStyle,
-        alignItems: 'center',
-        background: 'var(--shell-panel)',
-        borderBottom: '1px solid var(--shell-border)',
-        display: 'flex',
-        flexShrink: 0,
-        height: TITLE_BAR_HEIGHT,
-        justifyContent: 'space-between',
-        minHeight: TITLE_BAR_HEIGHT,
         paddingLeft: isMac ? 86 : 14,
         paddingRight: isMac ? 14 : 152,
-        userSelect: 'none',
       }}
     >
-      <div style={{ alignItems: 'center', display: 'flex', gap: 10, minWidth: 0 }}>
+      <div className="flex min-w-0 items-center gap-2.5">
         {leftActions && (
-          <div style={{ ...noDragStyle, alignItems: 'center', display: 'flex', gap: 6, flexShrink: 0 }}>
+          <div className="flex flex-shrink-0 items-center gap-1.5" style={noDragStyle}>
             {leftActions}
           </div>
         )}
         {mark ?? (
-          <div
-            style={{
-              alignItems: 'center',
-              background: 'var(--shell-accent-soft)',
-              border: '1px solid var(--shell-accent-border)',
-              borderRadius: 4,
-              color: 'var(--shell-accent-text)',
-              display: 'flex',
-              fontSize: 10,
-              height: 18,
-              justifyContent: 'center',
-              width: 18,
-            }}
-          >
+          <Badge variant="outline" className="h-[18px] w-[18px] justify-center rounded px-0 text-[10px]">
             ⚡
-          </div>
+          </Badge>
         )}
-        <div style={{ alignItems: 'baseline', display: 'flex', gap: 8, minWidth: 0 }}>
-          <div
-            style={{
-              color: 'var(--shell-text)',
-              fontSize: 12,
-              fontWeight: 800,
-              letterSpacing: 0,
-              minWidth: 0,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
+        <div className="flex min-w-0 items-baseline gap-2">
+          <div className="min-w-0 truncate text-xs font-extrabold text-foreground">
             {title}
           </div>
           {subtitle && (
-            <div style={{ color: 'var(--shell-muted)', flexShrink: 0, fontSize: 10, letterSpacing: 0 }}>
+            <div className="flex-shrink-0 text-[10px] text-muted-foreground">
               {subtitle}
             </div>
           )}
@@ -124,11 +92,13 @@ export function TopBar({ title, subtitle, mark, leftActions, actions }: TopBarPr
       </div>
 
       {actions && (
-        <div style={{ ...noDragStyle, alignItems: 'center', display: 'flex', gap: 8, minWidth: 0 }}>
+        <div
+          className={cn('flex min-w-0 items-center gap-2')}
+          style={noDragStyle}
+        >
           {actions}
         </div>
       )}
     </div>
   );
 }
-

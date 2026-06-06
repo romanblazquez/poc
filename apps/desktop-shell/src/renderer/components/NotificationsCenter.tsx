@@ -1,5 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Fdc3Context, NotificationRaiseInput, NotificationsApi, ShellNotification } from '@fdc3-poc/fdc3-core';
+import { Badge } from './ui/badge.js';
+import { Button } from './ui/button.js';
+import { Card, CardContent, CardHeader } from './ui/card.js';
 
 interface NotificationFdc3 {
   raiseIntent(intent: string, context?: Fdc3Context): Promise<unknown>;
@@ -16,6 +19,13 @@ function getNotificationsApi(): NotificationsApi | undefined {
 
 function getFdc3(): NotificationFdc3 | undefined {
   return (window as unknown as { fdc3?: NotificationFdc3 }).fdc3;
+}
+
+function severityVariant(severity: ShellNotification['severity']): 'default' | 'success' | 'warning' | 'destructive' {
+  if (severity === 'success') return 'success';
+  if (severity === 'warning') return 'warning';
+  if (severity === 'error') return 'destructive';
+  return 'default';
 }
 
 function severityColor(severity: ShellNotification['severity']): string {
@@ -39,7 +49,7 @@ interface ToastProps {
   onHide(id: string): void;
 }
 
-function NotificationToast({ notification, onOpen, onHide }: ToastProps): React.JSX.Element {
+function NotificationToast({ notification, onOpen, onHide }: ToastProps): JSX.Element {
   const [hovered, setHovered] = useState(false);
   const remainingRef = useRef(notification.ttlMs);
 
@@ -60,51 +70,35 @@ function NotificationToast({ notification, onOpen, onHide }: ToastProps): React.
   const accent = severityColor(notification.severity);
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       onClick={() => onOpen(notification)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{
-        background: 'var(--shell-panel)',
-        border: `1px solid ${accent}`,
-        borderLeft: `4px solid ${accent}`,
-        borderRadius: 8,
-        boxShadow: '0 18px 50px rgba(0,0,0,0.36)',
-        color: 'var(--shell-text)',
-        cursor: 'pointer',
-        display: 'block',
-        padding: '10px 12px',
-        textAlign: 'left',
-        width: 340,
-      }}
+      className="flex h-auto w-[340px] flex-col items-start gap-1 whitespace-normal rounded-lg border bg-card p-3 text-left text-card-foreground shadow-2xl hover:bg-secondary"
+      style={{ borderColor: accent, borderLeftWidth: 4 }}
     >
-      <div style={{ alignItems: 'center', display: 'flex', gap: 8, marginBottom: 4 }}>
-        <span style={{ color: accent, fontSize: 10, fontWeight: 900, textTransform: 'uppercase' }}>
-          {notification.severity}
-        </span>
-        <span style={{ color: 'var(--shell-muted)', fontSize: 10, fontWeight: 700, marginLeft: 'auto' }}>
+      <div className="flex w-full items-center gap-2">
+        <Badge variant={severityVariant(notification.severity)}>{notification.severity}</Badge>
+        <span className="ml-auto truncate text-[10px] font-bold text-muted-foreground">
           {sourceLabel(notification)}
         </span>
       </div>
-      <div style={{ color: 'var(--shell-text)', fontSize: 13, fontWeight: 850, lineHeight: 1.25 }}>
-        {notification.title}
-      </div>
+      <div className="text-sm font-black leading-snug text-foreground">{notification.title}</div>
       {notification.body && (
-        <div style={{ color: 'var(--shell-muted)', fontSize: 11, fontWeight: 600, lineHeight: 1.35, marginTop: 4 }}>
-          {notification.body}
-        </div>
+        <div className="line-clamp-2 text-xs font-bold leading-snug text-muted-foreground">{notification.body}</div>
       )}
       {notification.action?.label && (
-        <div style={{ color: 'var(--shell-accent-text)', fontSize: 10, fontWeight: 800, marginTop: 6 }}>
+        <div className="text-[10px] font-black uppercase tracking-[0.05em] text-[color:var(--shell-accent-text)]">
           {notification.action.label}
         </div>
       )}
-    </button>
+    </Button>
   );
 }
 
-export function NotificationsCenter({ open, onOpenChange }: NotificationsCenterProps): React.JSX.Element | null {
+export function NotificationsCenter({ open, onOpenChange }: NotificationsCenterProps): JSX.Element | null {
   const api = getNotificationsApi();
   const [items, setItems] = useState<ShellNotification[]>([]);
   const [hiddenToastIds, setHiddenToastIds] = useState<Set<string>>(() => new Set());
@@ -160,58 +154,24 @@ export function NotificationsCenter({ open, onOpenChange }: NotificationsCenterP
 
   return (
     <>
-      <button
+      <Button
         type="button"
         onClick={() => onOpenChange(!open)}
         title="Notifications (Cmd/Ctrl+B)"
-        style={{
-          alignItems: 'center',
-          background: open ? 'var(--shell-accent-soft)' : 'var(--shell-panel-2)',
-          border: `1px solid ${open ? 'var(--shell-accent-border)' : 'var(--shell-border)'}`,
-          borderRadius: 6,
-          color: open ? 'var(--shell-accent-text)' : 'var(--shell-text)',
-          cursor: 'pointer',
-          display: 'inline-flex',
-          fontSize: 11,
-          fontWeight: 850,
-          gap: 6,
-          height: 22,
-          padding: '0 9px',
-        }}
+        size="sm"
+        variant={open ? 'default' : 'secondary'}
       >
-        <span>Alerts</span>
+        Alerts
         {unreadCount > 0 && (
-          <span
-            style={{
-              alignItems: 'center',
-              background: '#ef4444',
-              borderRadius: 999,
-              color: '#fff',
-              display: 'inline-flex',
-              fontSize: 10,
-              fontWeight: 900,
-              height: 16,
-              justifyContent: 'center',
-              minWidth: 16,
-              padding: '0 4px',
-            }}
-          >
+          <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-black text-white">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
-      </button>
+      </Button>
 
       <div
         aria-live="polite"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-          position: 'fixed',
-          right: 12,
-          top: 42,
-          zIndex: 9200,
-        }}
+        className="fixed right-3 top-[92px] z-[9200] flex flex-col gap-2"
       >
         {toastItems.map((notification) => (
           <NotificationToast
@@ -224,144 +184,67 @@ export function NotificationsCenter({ open, onOpenChange }: NotificationsCenterP
       </div>
 
       {open && (
-        <div
-          style={{
-            background: 'linear-gradient(180deg, var(--shell-panel), var(--shell-panel-2))',
-            border: '1px solid var(--shell-border)',
-            borderRadius: 10,
-            boxShadow: '0 24px 80px rgba(0,0,0,0.45)',
-            color: 'var(--shell-text)',
-            maxHeight: 'calc(100vh - 64px)',
-            overflow: 'hidden',
-            position: 'fixed',
-            right: 12,
-            top: 42,
-            width: 420,
-            zIndex: 9100,
-          }}
-        >
-          <div
-            style={{
-              alignItems: 'center',
-              borderBottom: '1px solid var(--shell-border)',
-              display: 'flex',
-              gap: 8,
-              padding: '10px 12px',
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 900 }}>Notifications</div>
-              <div style={{ color: 'var(--shell-muted)', fontSize: 10, fontWeight: 700 }}>
-                {unreadCount} unread / {items.length} active
+        <Card className="fixed right-3 top-[92px] z-[9100] flex max-h-[calc(100vh-100px)] w-[420px] flex-col">
+          <CardHeader className="shrink-0 flex-row items-center justify-between gap-3 border-b">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-foreground">Notifications</div>
+              <div className="text-[11px] text-muted-foreground">
+                {unreadCount} unread · {items.length} active
               </div>
             </div>
-            <div style={{ flex: 1 }} />
-            <button type="button" onClick={() => { void raiseDemoNotification(); }} style={drawerButtonStyle()}>
-              Test
-            </button>
-            <button type="button" onClick={() => { void api.markAllRead(); }} style={drawerButtonStyle()}>
-              Mark read
-            </button>
-            <button type="button" onClick={() => { void api.clearAll(); }} style={drawerButtonStyle()}>
-              Clear
-            </button>
-          </div>
+            <div className="flex items-center gap-1">
+              <Button type="button" onClick={() => { void raiseDemoNotification(); }} size="xs" variant="ghost">Test</Button>
+              <Button type="button" onClick={() => { void api.markAllRead(); }} size="xs" variant="ghost">Mark read</Button>
+              <Button type="button" onClick={() => { void api.clearAll(); }} size="xs" variant="ghost">Clear</Button>
+            </div>
+          </CardHeader>
 
-          <div style={{ maxHeight: 'calc(100vh - 126px)', overflow: 'auto' }}>
+          <CardContent className="scrollbar-thin min-h-0 overflow-y-auto p-0">
             {items.length === 0 ? (
-              <div style={{ color: 'var(--shell-muted)', fontSize: 12, padding: 18 }}>
-                No notifications yet.
-              </div>
+              <div className="p-5 text-sm font-bold text-muted-foreground">No notifications yet.</div>
             ) : items.map((notification) => {
               const accent = severityColor(notification.severity);
               return (
-                <div
-                  key={notification.id}
-                  style={{
-                    borderBottom: '1px solid var(--shell-border)',
-                    display: 'grid',
-                    gap: 8,
-                    gridTemplateColumns: '6px 1fr auto',
-                    padding: '10px 12px',
-                  }}
-                >
-                  <span style={{ background: accent, borderRadius: 999, height: 36, marginTop: 2, width: 4 }} />
-                  <button
+                <div key={notification.id} className="grid grid-cols-[6px_1fr_auto] gap-2 border-b p-3">
+                  <span className="mt-0.5 h-9 w-1 rounded-full" style={{ background: accent }} />
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => { void openNotification(notification); }}
-                    style={{
-                      background: 'transparent',
-                      border: 0,
-                      color: 'inherit',
-                      cursor: 'pointer',
-                      minWidth: 0,
-                      padding: 0,
-                      textAlign: 'left',
-                    }}
+                    className="flex h-auto min-w-0 flex-col items-start gap-1 justify-start whitespace-normal bg-transparent p-0 text-left hover:bg-transparent"
                   >
-                    <div style={{ alignItems: 'center', display: 'flex', gap: 8, marginBottom: 3 }}>
-                      {!notification.read && (
-                        <span style={{ background: accent, borderRadius: 999, height: 7, width: 7 }} />
-                      )}
-                      <span style={{ color: accent, fontSize: 10, fontWeight: 900, textTransform: 'uppercase' }}>
-                        {notification.severity}
-                      </span>
-                      <span style={{ color: 'var(--shell-muted)', fontSize: 10, fontWeight: 700, marginLeft: 'auto' }}>
-                        {formatTime(notification.ts)}
-                      </span>
+                    <div className="flex w-full items-center gap-2">
+                      {!notification.read && <span className="h-2 w-2 rounded-full" style={{ background: accent }} />}
+                      <Badge variant={severityVariant(notification.severity)}>{notification.severity}</Badge>
+                      <span className="ml-auto text-[10px] font-bold text-muted-foreground">{formatTime(notification.ts)}</span>
                     </div>
-                    <div style={{ color: 'var(--shell-text)', fontSize: 12.5, fontWeight: notification.read ? 700 : 900 }}>
+                    <div className={notification.read ? 'text-sm font-bold text-foreground' : 'text-sm font-black text-foreground'}>
                       {notification.title}
                     </div>
                     {notification.body && (
-                      <div style={{ color: 'var(--shell-muted)', fontSize: 11, fontWeight: 600, lineHeight: 1.35, marginTop: 3 }}>
-                        {notification.body}
-                      </div>
+                      <div className="text-xs font-bold leading-snug text-muted-foreground">{notification.body}</div>
                     )}
-                    <div style={{ color: 'var(--shell-muted)', fontSize: 10, fontWeight: 700, marginTop: 5 }}>
+                    <div className="text-[10px] font-bold text-muted-foreground">
                       {sourceLabel(notification)}
-                      {notification.action?.intent ? ` -> ${notification.action.intent}` : ''}
+                      {notification.action?.intent ? ` → ${notification.action.intent}` : ''}
                     </div>
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={() => { void api.dismiss(notification.id); }}
                     title="Dismiss"
-                    style={{
-                      alignSelf: 'start',
-                      background: 'transparent',
-                      border: '1px solid var(--shell-border)',
-                      borderRadius: 6,
-                      color: 'var(--shell-muted)',
-                      cursor: 'pointer',
-                      fontSize: 11,
-                      fontWeight: 900,
-                      height: 24,
-                      width: 24,
-                    }}
+                    size="xs"
+                    variant="ghost"
+                    className="h-6 w-6 shrink-0 p-0 text-muted-foreground"
                   >
-                    x
-                  </button>
+                    ×
+                  </Button>
                 </div>
               );
             })}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
     </>
   );
-}
-
-function drawerButtonStyle(): React.CSSProperties {
-  return {
-    background: 'var(--shell-panel-2)',
-    border: '1px solid var(--shell-border)',
-    borderRadius: 6,
-    color: 'var(--shell-text)',
-    cursor: 'pointer',
-    fontSize: 10,
-    fontWeight: 850,
-    height: 24,
-    padding: '0 8px',
-  };
 }
