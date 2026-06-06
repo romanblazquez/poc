@@ -1,0 +1,220 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ─── Dark Financial (default) ───────────────────────────────────────────────
+   Calibrated dark terminal. Neutral grays, blue accent — the Bloomberg feel.  */
+:root,
+[data-theme="dark-financial"] {
+  --background:            oklch(0.145 0 0);
+  --foreground:            oklch(0.985 0 0);
+  --card:                  oklch(0.205 0 0);
+  --card-foreground:       oklch(0.985 0 0);
+  --popover:               oklch(0.205 0 0);
+  --popover-foreground:    oklch(0.985 0 0);
+  --primary:               oklch(0.922 0 0);
+  --primary-foreground:    oklch(0.205 0 0);
+  --secondary:             oklch(0.269 0 0);
+  --secondary-foreground:  oklch(0.985 0 0);
+  --muted:                 oklch(0.269 0 0);
+  --muted-foreground:      oklch(0.708 0 0);
+  --accent:                oklch(0.269 0 0);
+  --accent-foreground:     oklch(0.985 0 0);
+  --destructive:           oklch(0.704 0.191 22.216);
+  --border:                oklch(1 0 0 / 10%);
+  --input:                 oklch(1 0 0 / 15%);
+  --ring:                  oklch(0.556 0 0);
+  --radius:                0.5rem;
+
+  --shell-bg:              var(--background);
+  --shell-panel:           var(--card);
+  --shell-panel-2:         var(--secondary);
+  --shell-border:          var(--border);
+  --shell-border-soft:     var(--border);
+  --shell-text:            var(--foreground);
+  --shell-muted:           var(--muted-foreground);
+  --shell-subtle:          oklch(0.708 0 0 / 70%);
+  --shell-accent:          oklch(0.488 0.243 264.376);
+  --shell-accent-soft:     oklch(0.488 0.243 264.376 / 15%);
+  --shell-accent-border:   oklch(0.488 0.243 264.376 / 40%);
+  --shell-accent-text:     oklch(0.748 0.15 264.376);
+  --shell-positive:        oklch(0.696 0.17 162.48);
+  --shell-negative:        var(--destructive);
+  --shell-shadow:          0 4px 24px oklch(0 0 0 / 40%);
+}
+
+/* ─── Light Financial ────────────────────────────────────────────────────────
+   Crisp professional light mode. Refinitiv Workspace / Eikon aesthetic.       */
+[data-theme="light-financial"] {
+  --background:            oklch(0.965 0 0);
+  --foreground:            oklch(0.145 0 0);
+  --card:                  oklch(1 0 0);
+  --card-foreground:       oklch(0.145 0 0);
+  --popover:               oklch(1 0 0);
+  --popover-foreground:    oklch(0.145 0 0);
+  --primary:               oklch(0.205 0 0);
+  --primary-foreground:    oklch(0.985 0 0);
+  --secondary:             oklch(0.92 0 0);
+  --secondary-foreground:  oklch(0.145 0 0);
+  --muted:                 oklch(0.92 0 0);
+  --muted-foreground:      oklch(0.46 0 0);
+  --accent:                oklch(0.92 0 0);
+  --accent-foreground:     oklch(0.145 0 0);
+  --destructive:           oklch(0.577 0.245 27.325);
+  --border:                oklch(0 0 0 / 11%);
+  --input:                 oklch(0 0 0 / 11%);
+  --ring:                  oklch(0.46 0 0);
+  --radius:                0.5rem;
+
+  --shell-bg:              var(--background);
+  --shell-panel:           var(--card);
+  --shell-panel-2:         var(--secondary);
+  --shell-border:          var(--border);
+  --shell-border-soft:     var(--border);
+  --shell-text:            var(--foreground);
+  --shell-muted:           var(--muted-foreground);
+  --shell-subtle:          oklch(0.46 0 0 / 65%);
+  --shell-accent:          oklch(0.488 0.243 264.376);
+  --shell-accent-soft:     oklch(0.488 0.243 264.376 / 12%);
+  --shell-accent-border:   oklch(0.488 0.243 264.376 / 35%);
+  --shell-accent-text:     oklch(0.38 0.2 264.376);
+  --shell-positive:        oklch(0.55 0.17 145);
+  --shell-negative:        var(--destructive);
+  --shell-shadow:          0 4px 24px oklch(0 0 0 / 14%);
+}
+
+/* ─── High Contrast ──────────────────────────────────────────────────────────
+   Accessibility-grade dark mode. Maximum legibility, vivid accent.            */
+[data-theme="high-contrast"] {
+  --background:            oklch(0.03 0 0);
+  --foreground:            oklch(0.98 0 0);
+  --card:                  oklch(0.09 0 0);
+  --card-foreground:       oklch(0.98 0 0);
+  --popover:               oklch(0.09 0 0);
+  --popover-foreground:    oklch(0.98 0 0);
+  --primary:               oklch(0.98 0 0);
+  --primary-foreground:    oklch(0.03 0 0);
+  --secondary:             oklch(0.16 0 0);
+  --secondary-foreground:  oklch(0.98 0 0);
+  --muted:                 oklch(0.16 0 0);
+  --muted-foreground:      oklch(0.80 0 0);
+  --accent:                oklch(0.16 0 0);
+  --accent-foreground:     oklch(0.98 0 0);
+  --destructive:           oklch(0.66 0.28 25);
+  --border:                oklch(1 0 0 / 22%);
+  --input:                 oklch(1 0 0 / 18%);
+  --ring:                  oklch(0.88 0.19 95);
+  --radius:                0.375rem;
+
+  --shell-bg:              var(--background);
+  --shell-panel:           var(--card);
+  --shell-panel-2:         var(--secondary);
+  --shell-border:          var(--border);
+  --shell-border-soft:     var(--border);
+  --shell-text:            var(--foreground);
+  --shell-muted:           var(--muted-foreground);
+  --shell-subtle:          oklch(0.80 0 0 / 70%);
+  --shell-accent:          oklch(0.88 0.19 95);
+  --shell-accent-soft:     oklch(0.88 0.19 95 / 15%);
+  --shell-accent-border:   oklch(0.88 0.19 95 / 45%);
+  --shell-accent-text:     oklch(0.92 0.15 95);
+  --shell-positive:        oklch(0.82 0.22 145);
+  --shell-negative:        var(--destructive);
+  --shell-shadow:          0 4px 24px oklch(0 0 0 / 60%);
+}
+
+/* ─── Luxury Neutral ─────────────────────────────────────────────────────────
+   Warm parchment + gold. Premium private-banking / wealth-management feel.    */
+[data-theme="luxury-neutral"] {
+  --background:            oklch(0.955 0.008 80);
+  --foreground:            oklch(0.20 0.015 60);
+  --card:                  oklch(0.985 0.005 80);
+  --card-foreground:       oklch(0.20 0.015 60);
+  --popover:               oklch(0.985 0.005 80);
+  --popover-foreground:    oklch(0.20 0.015 60);
+  --primary:               oklch(0.30 0.05 55);
+  --primary-foreground:    oklch(0.985 0.005 80);
+  --secondary:             oklch(0.905 0.01 80);
+  --secondary-foreground:  oklch(0.20 0.015 60);
+  --muted:                 oklch(0.905 0.01 80);
+  --muted-foreground:      oklch(0.50 0.02 70);
+  --accent:                oklch(0.905 0.01 80);
+  --accent-foreground:     oklch(0.20 0.015 60);
+  --destructive:           oklch(0.577 0.245 27.325);
+  --border:                oklch(0 0 0 / 10%);
+  --input:                 oklch(0 0 0 / 10%);
+  --ring:                  oklch(0.60 0.10 65);
+  --radius:                0.625rem;
+
+  --shell-bg:              var(--background);
+  --shell-panel:           var(--card);
+  --shell-panel-2:         var(--secondary);
+  --shell-border:          var(--border);
+  --shell-border-soft:     var(--border);
+  --shell-text:            var(--foreground);
+  --shell-muted:           var(--muted-foreground);
+  --shell-subtle:          oklch(0.50 0.02 70 / 70%);
+  --shell-accent:          oklch(0.65 0.14 65);
+  --shell-accent-soft:     oklch(0.65 0.14 65 / 12%);
+  --shell-accent-border:   oklch(0.65 0.14 65 / 35%);
+  --shell-accent-text:     oklch(0.42 0.12 60);
+  --shell-positive:        oklch(0.55 0.15 145);
+  --shell-negative:        var(--destructive);
+  --shell-shadow:          0 4px 24px oklch(0 0 0 / 12%);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-color: oklch(0.708 0 0 / 40%) transparent;
+    scrollbar-width: thin;
+  }
+}
