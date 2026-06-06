@@ -184,7 +184,7 @@ function AppCard({
 
   return (
     <Card className="group flex min-h-44 flex-col rounded-lg transition-transform hover:-translate-y-px hover:border-[color:var(--shell-accent-border)] hover:shadow-[0_4px_20px_rgba(64,128,232,0.15)]">
-      <CardContent className="flex h-full flex-col gap-3">
+      <CardContent className="flex h-full flex-col gap-3 pt-4">
         <div className="flex items-center gap-3">
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-2xl"
