@@ -83,6 +83,25 @@ const interopActivityHandlers = new Set<(event: InteropActivityEvent) => void>()
 const appLogHandlers = new Set<(event: AppLogEvent) => void>();
 const notificationHandlers = new Set<(snapshot: ShellNotification[]) => void>();
 
+interface IntentResolverCandidate {
+  appId: string;
+  title?: string;
+  description?: string;
+  icon?: string;
+  isRunning: boolean;
+  instanceId?: number;
+}
+
+interface IntentResolverRequest {
+  requestId: string;
+  intent: string;
+  contextType?: string;
+  contextName?: string;
+  candidates: IntentResolverCandidate[];
+}
+
+const intentResolverRequestHandlers = new Set<(req: IntentResolverRequest) => void>();
+
 // ─── Inbound IPC listeners (main → preload) ───────────────────────────────
 
 ipcRenderer.on(IpcEvents.CONTEXT_UPDATE, (_event, context: Fdc3Context, metadata?: ContextMetadata) => {
@@ -223,6 +242,16 @@ ipcRenderer.on(IpcEvents.NOTIFICATIONS_CHANGED, (_event, snapshot: ShellNotifica
       handler(snapshot);
     } catch (e) {
       console.error('[preload notifications] handler threw:', e);
+    }
+  }
+});
+
+ipcRenderer.on(IpcEvents.INTENT_RESOLVER_REQUEST, (_event, req: IntentResolverRequest) => {
+  for (const handler of intentResolverRequestHandlers) {
+    try {
+      handler(req);
+    } catch (e) {
+      console.error('[preload intentResolver] handler threw:', e);
     }
   }
 });
@@ -615,6 +644,15 @@ contextBridge.exposeInMainWorld('shellChrome', {
     },
     restart(appId: string): Promise<boolean> {
       return ipcRenderer.invoke(IpcEvents.RESTART_APP, appId) as Promise<boolean>;
+    },
+  },
+  intentResolver: {
+    onRequest(handler: (req: IntentResolverRequest) => void): () => void {
+      intentResolverRequestHandlers.add(handler);
+      return () => intentResolverRequestHandlers.delete(handler);
+    },
+    respond(requestId: string, appId: string | null, instanceId?: number): Promise<void> {
+      return ipcRenderer.invoke(IpcEvents.INTENT_RESOLVER_RESPOND, { requestId, appId, instanceId }) as Promise<void>;
     },
   },
 });

@@ -77,8 +77,10 @@ export const IpcEvents = {
   RESTART_APP: 'shell:restartApp',
   GET_WINDOW_FULLSCREEN: 'shell:getWindowFullscreen',
   GET_SHELL_MANIFEST: 'shell:getManifest',
+  INTENT_RESOLVER_RESPOND: 'fdc3:intentResolverRespond',
 
   // ─── Main → Renderer (webContents.send) ──────────────────────────────────
+  INTENT_RESOLVER_REQUEST: 'fdc3:intentResolverRequest',
   CONTEXT_UPDATE: 'fdc3:contextUpdate',
   INTENT_FIRE: 'fdc3:intentFire',
   CHANNEL_CHANGED: 'fdc3:channelChanged',

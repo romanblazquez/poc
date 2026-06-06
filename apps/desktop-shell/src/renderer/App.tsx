@@ -7,6 +7,7 @@ import { ZoomControl } from './components/ZoomControl.js';
 import { TopBar } from './components/TopBar.js';
 import { NotificationsCenter } from './components/NotificationsCenter.js';
 import { HotkeyHelp } from './components/HotkeyHelp.js';
+import { IntentResolverDialog } from './components/IntentResolverDialog.js';
 import { DockviewWorkspace } from './components/DockviewWorkspace.js';
 import type { DetachedWorkspacePayload, DisplayInfo } from './components/DockviewWorkspace.js';
 import { ControlTower } from './components/ControlTower.js';
@@ -819,6 +820,7 @@ export function App() {
         currentChannelId={currentChannel?.id ?? null}
       />
       <HotkeyHelp open={hotkeysOpen} onClose={() => setHotkeysOpen(false)} />
+      <IntentResolverDialog apps={apps} />
     </div>
   );
 }

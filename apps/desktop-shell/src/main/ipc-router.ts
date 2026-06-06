@@ -10,6 +10,7 @@ import { AppChannelStore, PrivateChannelStore } from '@fdc3-poc/channel-engine';
 import type { AppChannelMeta, PrivateChannelLifecycleEvent } from '@fdc3-poc/channel-engine';
 import type { IntentRegistry } from '@fdc3-poc/intent-engine';
 import { IntentResolver } from '@fdc3-poc/intent-engine';
+import type { IntentResolverCandidate } from '@fdc3-poc/intent-engine';
 import { AppRegistry } from '@fdc3-poc/app-registry';
 import { IntentResolverWindowManager } from './intent-resolver-window.js';
 import type { ManagerService } from './manager-service.js';
@@ -46,8 +47,13 @@ export class IpcRouter {
   private readonly appChannels = new AppChannelStore();
   /** FDC3 PrivateChannels (`createPrivateChannel` + intent-result delivery). */
   private readonly privateChannels = new PrivateChannelStore();
-  /** Modal resolver windows shown when more than one app handles a raised intent. */
+  /** Fallback: separate popup windows for intent resolution when shell renderer is unavailable. */
   private readonly intentResolverWindows = new IntentResolverWindowManager();
+  /** In-shell intent resolution: requestId → { resolve, candidates }. */
+  private readonly pendingResolverRequests = new Map<string, {
+    resolve: (choice: IntentResolverCandidate | null) => void;
+    candidates: IntentResolverCandidate[];
+  }>();
 
   /**
    * Resolve an appId for any webContents — BrowserWindow apps (via the registry)
@@ -346,6 +352,7 @@ export class IpcRouter {
     this.handlePrivateChannelRemoveListener();
     this.handlePrivateChannelGetCurrentContext();
     this.handlePrivateChannelDisconnect();
+    this.handleIntentResolverRespond();
     this.handleIntentResolverGetPayload();
     this.handleIntentResolverPick();
     this.handleIntentResolverCancel();
@@ -678,18 +685,33 @@ export class IpcRouter {
             context,
             registry: this.intentRegistry,
             appDirectory: this.appDirectory,
-            chooseHandler: (intentName, ctx, candidates) =>
-              this.intentResolverWindows.show(
-                {
-                  intent: intentName,
-                  context: ctx,
-                  contextType: ctx?.type,
-                  contextName: typeof ctx?.name === 'string' ? ctx?.name : undefined,
-                  theme: this.themeManager.getTheme(),
-                  candidates,
-                },
-                parentWindow,
-              ),
+            chooseHandler: (intentName, ctx, candidates) => {
+              const shellWin = this.windowManager.findByAppId('shell');
+              if (!shellWin || shellWin.isDestroyed()) {
+                return this.intentResolverWindows.show(
+                  {
+                    intent: intentName,
+                    context: ctx,
+                    contextType: ctx?.type,
+                    contextName: typeof ctx?.name === 'string' ? ctx?.name : undefined,
+                    theme: this.themeManager.getTheme(),
+                    candidates,
+                  },
+                  parentWindow,
+                );
+              }
+              const requestId = randomUUID();
+              shellWin.webContents.send(IpcEvents.INTENT_RESOLVER_REQUEST, {
+                requestId,
+                intent: intentName,
+                contextType: ctx?.type,
+                contextName: typeof ctx?.name === 'string' ? ctx?.name : undefined,
+                candidates,
+              });
+              return new Promise<IntentResolverCandidate | null>((resolve) => {
+                this.pendingResolverRequests.set(requestId, { resolve, candidates });
+              });
+            },
             deliverToWindow: (targetId, intentName, ctx) => {
               const targetAppId = this.getAppIdForWebContents(targetId);
               if (!this.isIntentRouteAllowed(senderAppId, intentName, targetId)) {
@@ -1204,7 +1226,26 @@ export class IpcRouter {
     return [...routes.values()].sort((a, b) => `${a.sourceAppId}:${a.targetAppId}`.localeCompare(`${b.sourceAppId}:${b.targetAppId}`));
   }
 
-  // ─── Intent resolver modal window ─────────────────────────────────────────
+  // ─── Intent resolver (in-shell dialog + fallback popup) ───────────────────
+
+  private handleIntentResolverRespond(): void {
+    ipcMain.handle(
+      IpcEvents.INTENT_RESOLVER_RESPOND,
+      (_event, { requestId, appId, instanceId }: { requestId: string; appId: string | null; instanceId?: number }) => {
+        const entry = this.pendingResolverRequests.get(requestId);
+        if (!entry) return;
+        this.pendingResolverRequests.delete(requestId);
+        if (!appId) {
+          entry.resolve(null);
+          return;
+        }
+        const candidate = entry.candidates.find(
+          (c) => c.appId === appId && (instanceId === undefined || c.instanceId === instanceId),
+        );
+        entry.resolve(candidate ?? null);
+      },
+    );
+  }
 
   private handleIntentResolverGetPayload(): void {
     ipcMain.handle(IpcEvents.INTENT_RESOLVER_GET_PAYLOAD, (event) => {
