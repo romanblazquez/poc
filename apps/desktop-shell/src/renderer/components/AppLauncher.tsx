@@ -58,6 +58,7 @@ export function AppLauncher({ apps, onOpen }: AppLauncherProps): JSX.Element {
   const [lifecycle, setLifecycle] = useState<AppLifecycleSnapshot[]>([]);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const clearFilters = useCallback(clearFilters, []);
 
   useEffect(() => {
     window.localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify(pinnedIds));
@@ -186,7 +187,7 @@ export function AppLauncher({ apps, onOpen }: AppLauncherProps): JSX.Element {
             {(search || categoryFilter) && (
               <button
                 type="button"
-                onClick={() => { setSearch(''); setCategoryFilter(null); }}
+                onClick={clearFilters}
                 className="ml-2 font-semibold text-foreground hover:underline"
               >
                 Clear
@@ -220,7 +221,7 @@ export function AppLauncher({ apps, onOpen }: AppLauncherProps): JSX.Element {
           pinnedIds.length === 0 ? (
             <EmptyState
               message="No pinned apps. Click the Pin button on any app card."
-              onClear={() => { setSearch(''); setCategoryFilter(null); }}
+              onClear={clearFilters}
             />
           ) : (
             <AppSection title="Pinned" color="#f59e0b">
@@ -261,7 +262,7 @@ export function AppLauncher({ apps, onOpen }: AppLauncherProps): JSX.Element {
         {isFiltering && filteredApps.length === 0 && categoryFilter !== '__pinned__' && (
           <EmptyState
             message={search ? `No apps match "${search}"` : `No apps in this category`}
-            onClear={() => { setSearch(''); setCategoryFilter(null); }}
+            onClear={clearFilters}
           />
         )}
       </div>
