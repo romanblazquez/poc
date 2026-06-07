@@ -396,6 +396,11 @@ export function App() {
         setNotificationsOpen((prev) => !prev);
         return;
       }
+      if (key === 's') {
+        event.preventDefault();
+        void handleSave();
+        return;
+      }
       if (key === '/' || event.code === 'Slash') {
         event.preventDefault();
         setHotkeysOpen((prev) => !prev);
@@ -403,7 +408,7 @@ export function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [handleSave]);
 
   useEffect(() => {
     const ts = Date.now();
