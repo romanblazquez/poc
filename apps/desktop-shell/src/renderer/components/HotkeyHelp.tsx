@@ -14,7 +14,7 @@ interface HotkeyHelpProps {
 
 const HOTKEYS = [
   { key: 'Cmd/Ctrl+1', label: 'Workspace' },
-  { key: 'Cmd/Ctrl+2', label: 'Interop Flow' },
+  { key: 'Cmd/Ctrl+2', label: 'Flow Designer' },
   { key: 'Cmd/Ctrl+3', label: 'Control Tower' },
   { key: 'Cmd/Ctrl+4', label: 'Manager' },
   { key: 'Cmd/Ctrl+5', label: 'Bridge' },

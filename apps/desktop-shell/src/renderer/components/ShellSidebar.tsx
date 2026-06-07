@@ -42,7 +42,7 @@ const MODE_ITEMS: Array<{
 }> = [
   { mode: 'workspace',     label: 'Workspace',     icon: LayoutDashboard, shortcut: '⌘1' },
   { mode: 'dashboard',     label: 'WS Dashboard',  icon: BarChart3 },
-  { mode: 'interop-flow',  label: 'Interop Flow',  icon: Workflow,        shortcut: '⌘2' },
+  { mode: 'interop-flow',  label: 'Flow Designer',  icon: Workflow,        shortcut: '⌘2' },
   { mode: 'control-tower', label: 'Control Tower', icon: Radio,           shortcut: '⌘3' },
   { mode: 'manager',       label: 'Manager',        icon: CloudDownload,   shortcut: '⌘4' },
   { mode: 'bridge',        label: 'Bridge',         icon: Network,         shortcut: '⌘5' },
