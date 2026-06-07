@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { AppLauncher } from './components/AppLauncher.js';
 import { ChannelBar } from './components/ChannelBar.js';
 import { WorkspaceToolbar } from './components/WorkspaceToolbar.js';
@@ -366,6 +366,10 @@ export function App() {
     window.localStorage.setItem('fdc3.desktop.theme', theme);
   }, [theme]);
 
+  // Keep a stable ref so the hotkey handler always calls the latest handleSave
+  // without being listed as a dep (handleSave is declared below this effect).
+  const handleSaveRef = useRef<() => Promise<void>>(async () => undefined);
+
   // Shell-level hotkeys. Renderer-scoped by design: this handles shell
   // navigation and overlays without registering OS-global shortcuts.
   useEffect(() => {
@@ -398,7 +402,7 @@ export function App() {
       }
       if (key === 's') {
         event.preventDefault();
-        void handleSave();
+        void handleSaveRef.current();
         return;
       }
       if (key === '/' || event.code === 'Slash') {
@@ -408,7 +412,7 @@ export function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleSave]);
+  }, []);
 
   useEffect(() => {
     const ts = Date.now();
@@ -447,6 +451,7 @@ export function App() {
     setSaveStatus('Workspace saved');
     setTimeout(() => setSaveStatus(''), 2000);
   }, [activeWorkspaceTab.id, workspaceStates, workspaceTabs]);
+  handleSaveRef.current = handleSave;
 
   const handleThemeChange = useCallback(async (nextTheme: ThemeMode) => {
     const appliedTheme = await window.fdc3.setTheme(nextTheme);
