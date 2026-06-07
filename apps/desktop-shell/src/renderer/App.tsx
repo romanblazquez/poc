@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { cn } from './lib/utils.js';
 import { AppLauncher } from './components/AppLauncher.js';
 import { ChannelBar } from './components/ChannelBar.js';
 import { WorkspaceToolbar } from './components/WorkspaceToolbar.js';
@@ -18,11 +17,13 @@ import { Bridge } from './components/Bridge.js';
 import { Badge } from './components/ui/badge.js';
 import { Button } from './components/ui/button.js';
 import { Card, CardContent } from './components/ui/card.js';
-import { Input } from './components/ui/input.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select.js';
-import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs.js';
 import { InteropCopilot } from './copilot/InteropCopilot.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
+import { ShellSidebar } from './components/ShellSidebar.js';
+import { UserProfile } from './components/UserProfile.js';
+import { WorkspaceDashboard } from './components/WorkspaceDashboard.js';
+import { RbacPanel } from './components/RbacPanel.js';
 import type { Fdc3Context, UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { FlowPolicy, ThemeName } from '@fdc3-poc/fdc3-core';
@@ -78,15 +79,15 @@ export interface AppEntry {
 }
 
 type ThemeMode = ThemeName;
-type WorkspaceMode = 'launcher' | 'workspace' | 'interop-flow' | 'control-tower' | 'manager' | 'bridge' | 'app-directory';
+export type WorkspaceMode = 'launcher' | 'workspace' | 'dashboard' | 'interop-flow' | 'control-tower' | 'manager' | 'bridge' | 'app-directory' | 'rbac';
 
-interface WorkspaceState {
+export interface WorkspaceState {
   channelId: string | null;
   theme: ThemeMode;
   layout: unknown | null;
 }
 
-interface WorkspaceTab {
+export interface WorkspaceTab {
   id: string;
   name: string;
   panelIds: string[];
@@ -603,6 +604,28 @@ export function App() {
     setEditingWorkspaceName(currentName);
   }, []);
 
+  const handleDuplicateWorkspace = useCallback((workspaceId: string) => {
+    const source = workspaceTabs.find((tab) => tab.id === workspaceId);
+    if (!source) return;
+    const nextId = `workspace-${Date.now().toString(36)}`;
+    const nextName = `${source.name} (copy)`;
+    const panelIds = [...source.panelIds];
+    const sourceState = workspaceStates[workspaceId] ?? { channelId: null, theme: globalTheme, layout: null };
+
+    setWorkspaceTabs((prev) => ([
+      ...prev,
+      { id: nextId, name: nextName, panelIds },
+    ]));
+    setWorkspaceStates((prev) => ({
+      ...prev,
+      [nextId]: { ...sourceState, layout: null },
+    }));
+    setActiveWorkspaceId(nextId);
+    setActiveMode('workspace');
+    setOpenPanelIds(panelIds);
+    setWorkspaceEpoch((value) => value + 1);
+  }, [globalTheme, workspaceTabs, workspaceStates]);
+
   const handleCloseWorkspace = useCallback((workspaceId: string) => {
     setWorkspaceTabs((prev) => {
       if (prev.length <= 1) return prev;
@@ -717,6 +740,7 @@ export function App() {
             </SelectContent>
           </Select>
           <ZoomControl />
+          <UserProfile />
           <NotificationsCenter open={notificationsOpen} onOpenChange={setNotificationsOpen} />
           <Button
             type="button"
@@ -741,113 +765,107 @@ export function App() {
         <RestoreBanner savedAt={initialWorkspaceStore.savedAt} onDismiss={() => setShowRestoreBanner(false)} />
       )}
 
-      <div className="flex h-10 shrink-0 items-stretch border-b">
-        {activeMode !== 'launcher' && (
-          <div className="flex min-w-0 items-stretch overflow-x-auto scrollbar-thin">
-            {workspaceTabs.map((workspace) => (
-              <WorkspaceTabButton
-                key={workspace.id}
-                active={activeWorkspaceTab.id === workspace.id}
-                onClick={() => setActiveWorkspaceId(workspace.id)}
-                onDoubleClick={() => handleWorkspaceRenameStart(workspace.id, workspace.name)}
-                onClose={workspaceTabs.length > 1 ? () => handleCloseWorkspace(workspace.id) : undefined}
-                editing={editingWorkspaceId === workspace.id}
-                editingValue={editingWorkspaceName}
-                onEditingChange={setEditingWorkspaceName}
-                onEditingCommit={() => commitWorkspaceRename(workspace.id)}
-                onEditingCancel={cancelWorkspaceRename}
-              >
-                {workspace.name}
-              </WorkspaceTabButton>
-            ))}
-            <button
-              onClick={handleAddWorkspace}
-              title="Add workspace"
-              type="button"
-              className="flex items-center border-r px-3 text-base text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              +
-            </button>
-          </div>
-        )}
-        <div className="flex-1" />
-        <div className="flex items-center border-l px-2">
-          <Tabs value={activeMode} onValueChange={(v) => setActiveMode(v as WorkspaceMode)}>
-            <TabsList className="h-7 gap-0.5 bg-transparent p-0">
-              <TabsTrigger value="workspace" className="h-7 px-2.5 text-[11px]">Workspace</TabsTrigger>
-              <TabsTrigger value="interop-flow" className="h-7 px-2.5 text-[11px]">Interop Flow</TabsTrigger>
-              <TabsTrigger value="control-tower" className="h-7 px-2.5 text-[11px]">Control Tower</TabsTrigger>
-              <TabsTrigger value="manager" className="h-7 px-2.5 text-[11px]">Manager</TabsTrigger>
-              <TabsTrigger value="bridge" className="h-7 px-2.5 text-[11px]">Bridge</TabsTrigger>
-              <TabsTrigger value="app-directory" className="h-7 px-2.5 text-[11px]">App Directory</TabsTrigger>
-              <TabsTrigger value="launcher" className="h-7 px-2.5 text-[11px]">App Launcher</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-      </div>
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <ShellSidebar
+          activeMode={activeMode}
+          onModeChange={setActiveMode}
+          workspaceTabs={workspaceTabs}
+          activeWorkspaceId={activeWorkspaceId}
+          onWorkspaceChange={(id) => {
+            setActiveWorkspaceId(id);
+            setActiveMode('workspace');
+          }}
+          onWorkspaceRename={handleWorkspaceRenameStart}
+          onWorkspaceClose={handleCloseWorkspace}
+          onWorkspaceAdd={handleAddWorkspace}
+          editingWorkspaceId={editingWorkspaceId}
+          editingWorkspaceName={editingWorkspaceName}
+          onEditingChange={setEditingWorkspaceName}
+          onEditingCommit={commitWorkspaceRename}
+          onEditingCancel={cancelWorkspaceRename}
+        />
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
-        {activeMode === 'workspace' ? (
-          activeDetachedWorkspace ? (
-            <DetachedWorkspacePlaceholder
-              workspaceName={activeWorkspaceTab.name}
-              panelCount={activeDetachedWorkspace.panelIds.length}
-              onRecall={() => void handleRecallWorkspace(activeWorkspaceTab.id)}
-            />
-          ) : apps.length > 0 && preloadPath ? (
-            <DockviewWorkspace
-              key={`${activeWorkspaceTab.id}-${workspaceEpoch}`}
-              apps={apps}
-              currentChannel={currentChannel}
-              preloadPath={preloadPath}
-              initialPanelIds={activeWorkspaceTab.panelIds}
-              initialLayout={activeWorkspaceState.layout}
-              onLayoutChange={handleLayoutChange}
-              onOpenPanelsChange={handleOpenPanelsChange}
-              onDetachWorkspace={handleDetachWorkspace}
-              workspaceName={activeWorkspaceTab.name}
-              theme={theme}
-              displays={displays}
-            />
-          ) : (
-            <div className="flex flex-1 items-center justify-center text-xs tracking-wide text-muted-foreground">
-              Connecting to FDC3 bus…
-            </div>
-          )
-        ) : activeMode === 'interop-flow' ? (
-          <InteropFlowDesigner
-            apps={activeWorkspaceApps}
-            workspaceTabId={activeWorkspaceTab.id}
-            workspaceName={activeWorkspaceTab.name}
-            theme={theme}
-            appIds={interopWorkspaceAppIds}
-          />
-        ) : activeMode === 'control-tower' ? (
-          <ControlTower
-            apps={apps}
-            currentChannel={currentChannel}
-            onOpen={handleOpen}
-            onComposeWorkspace={handleComposeWorkspace}
-          />
-        ) : activeMode === 'manager' ? (
-          <Manager apps={apps} />
-        ) : activeMode === 'bridge' ? (
-          <Bridge />
-        ) : activeMode === 'app-directory' ? (
-          <AppDirectoryEditor apps={apps} onAppsChanged={setApps} />
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto scrollbar-thin">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                Application Launcher
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Click an app to open it in a new window. All apps share the same FDC3 channel.
-              </p>
-            </div>
-            <AppLauncher apps={apps} onOpen={handleOpen} />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
+            {activeMode === 'workspace' ? (
+              activeDetachedWorkspace ? (
+                <DetachedWorkspacePlaceholder
+                  workspaceName={activeWorkspaceTab.name}
+                  panelCount={activeDetachedWorkspace.panelIds.length}
+                  onRecall={() => void handleRecallWorkspace(activeWorkspaceTab.id)}
+                />
+              ) : apps.length > 0 && preloadPath ? (
+                <DockviewWorkspace
+                  key={`${activeWorkspaceTab.id}-${workspaceEpoch}`}
+                  apps={apps}
+                  currentChannel={currentChannel}
+                  preloadPath={preloadPath}
+                  initialPanelIds={activeWorkspaceTab.panelIds}
+                  initialLayout={activeWorkspaceState.layout}
+                  onLayoutChange={handleLayoutChange}
+                  onOpenPanelsChange={handleOpenPanelsChange}
+                  onDetachWorkspace={handleDetachWorkspace}
+                  workspaceName={activeWorkspaceTab.name}
+                  theme={theme}
+                  displays={displays}
+                />
+              ) : (
+                <div className="flex flex-1 items-center justify-center text-xs tracking-wide text-muted-foreground">
+                  Connecting to FDC3 bus…
+                </div>
+              )
+            ) : activeMode === 'dashboard' ? (
+              <WorkspaceDashboard
+                workspaceTabs={workspaceTabs}
+                workspaceStates={workspaceStates}
+                activeWorkspaceId={activeWorkspaceId}
+                apps={apps}
+                onSwitch={(id) => {
+                  setActiveWorkspaceId(id);
+                  setActiveMode('workspace');
+                }}
+                onDuplicate={handleDuplicateWorkspace}
+                onDelete={handleCloseWorkspace}
+                onAdd={handleAddWorkspace}
+              />
+            ) : activeMode === 'interop-flow' ? (
+              <InteropFlowDesigner
+                apps={activeWorkspaceApps}
+                workspaceTabId={activeWorkspaceTab.id}
+                workspaceName={activeWorkspaceTab.name}
+                theme={theme}
+                appIds={interopWorkspaceAppIds}
+              />
+            ) : activeMode === 'control-tower' ? (
+              <ControlTower
+                apps={apps}
+                currentChannel={currentChannel}
+                onOpen={handleOpen}
+                onComposeWorkspace={handleComposeWorkspace}
+              />
+            ) : activeMode === 'manager' ? (
+              <Manager apps={apps} />
+            ) : activeMode === 'bridge' ? (
+              <Bridge />
+            ) : activeMode === 'app-directory' ? (
+              <AppDirectoryEditor apps={apps} onAppsChanged={setApps} />
+            ) : activeMode === 'rbac' ? (
+              <RbacPanel apps={apps} />
+            ) : (
+              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto scrollbar-thin">
+                <div className="flex flex-col gap-1">
+                  <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Application Launcher
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Click an app to open it in a new window. All apps share the same FDC3 channel.
+                  </p>
+                </div>
+                <AppLauncher apps={apps} onOpen={handleOpen} />
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Status bar */}
@@ -1059,79 +1077,6 @@ function DetachedWorkspacePlaceholder({
     </Card>
   );
 }
-
-function WorkspaceTabButton({
-  active,
-  onClick,
-  onDoubleClick,
-  onClose,
-  editing = false,
-  editingValue = '',
-  onEditingChange,
-  onEditingCommit,
-  onEditingCancel,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  onDoubleClick?: () => void;
-  onClose?: () => void;
-  editing?: boolean;
-  editingValue?: string;
-  onEditingChange?: (value: string) => void;
-  onEditingCommit?: () => void;
-  onEditingCancel?: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      type="button"
-      className={cn(
-        'flex h-full items-center gap-1.5 border-r px-3 text-xs font-medium outline-none transition-colors select-none',
-        active
-          ? 'bg-background text-foreground'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-      )}
-    >
-      {editing ? (
-        <Input
-          autoFocus
-          value={editingValue}
-          onChange={(event) => onEditingChange?.(event.target.value)}
-          onClick={(event) => event.stopPropagation()}
-          onDoubleClick={(event) => event.stopPropagation()}
-          onBlur={() => onEditingCommit?.()}
-          onKeyDown={(event) => {
-            event.stopPropagation();
-            if (event.key === 'Enter') onEditingCommit?.();
-            if (event.key === 'Escape') onEditingCancel?.();
-          }}
-          className="h-5 min-w-24 bg-background px-2 text-xs"
-        />
-      ) : (
-        <span>{children}</span>
-      )}
-      {onClose && (
-        <span
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onClose();
-          }}
-          role="button"
-          aria-label="Close workspace"
-          title="Close workspace"
-          className="flex h-4 w-4 items-center justify-center rounded text-[11px] leading-none opacity-50 hover:opacity-100"
-        >
-          ×
-        </span>
-      )}
-    </button>
-  );
-}
-
 
 function StatusItem({ label, value, color }: { label: string; value: string; color: string }) {
   return (
