@@ -230,7 +230,7 @@ export function ShellMenu({ theme, onThemeChange, onOpenHotkeys }: ShellMenuProp
                   <SelectTrigger size="sm" className="h-7 w-40 text-[11px]">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="z-[10000]">
+                  <SelectContent>
                     {Object.entries(THEMES).map(([key, cfg]) => (
                       <SelectItem key={key} value={key} className="text-[12px]">{cfg.label}</SelectItem>
                     ))}
