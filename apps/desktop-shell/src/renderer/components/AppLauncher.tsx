@@ -218,7 +218,10 @@ export function AppLauncher({ apps, onOpen }: AppLauncherProps): JSX.Element {
         {/* Pinned-only filter */}
         {categoryFilter === '__pinned__' && (
           pinnedIds.length === 0 ? (
-            <EmptyState message="No pinned apps. Click the Pin button on any app card." />
+            <EmptyState
+              message="No pinned apps. Click the Pin button on any app card."
+              onClear={() => { setSearch(''); setCategoryFilter(null); }}
+            />
           ) : (
             <AppSection title="Pinned" color="#f59e0b">
               {apps.filter((app) => pinnedSet.has(app.appId)).map((app) => (
