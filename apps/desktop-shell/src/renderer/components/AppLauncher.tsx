@@ -58,7 +58,7 @@ export function AppLauncher({ apps, onOpen }: AppLauncherProps): JSX.Element {
   const [lifecycle, setLifecycle] = useState<AppLifecycleSnapshot[]>([]);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const clearFilters = useCallback(clearFilters, []);
+  const clearFilters = useCallback(() => { setSearch(''); setCategoryFilter(null); }, []);
 
   useEffect(() => {
     window.localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify(pinnedIds));
