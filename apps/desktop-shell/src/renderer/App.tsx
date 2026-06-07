@@ -8,7 +8,6 @@ import { NotificationsCenter } from './components/NotificationsCenter.js';
 import { HotkeyHelp } from './components/HotkeyHelp.js';
 import { IntentResolverDialog } from './components/IntentResolverDialog.js';
 import { AppDirectoryEditor } from './components/AppDirectoryEditor.js';
-import { ContextClipboard } from './components/ContextClipboard.js';
 import { DockviewWorkspace } from './components/DockviewWorkspace.js';
 import type { DetachedWorkspacePayload, DisplayInfo, DockviewWorkspaceHandle } from './components/DockviewWorkspace.js';
 import { ControlTower } from './components/ControlTower.js';
@@ -23,10 +22,10 @@ import { cn } from './lib/utils.js';
 import { InteropCopilot } from './copilot/InteropCopilot.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
 import { ShellSidebar } from './components/ShellSidebar.js';
-import { UserProfile } from './components/UserProfile.js';
 import { WorkspaceDashboard } from './components/WorkspaceDashboard.js';
 import { RbacPanel } from './components/RbacPanel.js';
 import { AddAppsDialog } from './components/AddAppsDialog.js';
+import { ShellMenu } from './components/ShellMenu.js';
 import type { Fdc3Context, UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { FlowPolicy, ThemeName } from '@fdc3-poc/fdc3-core';
@@ -735,43 +734,26 @@ export function App() {
         subtitle={shellManifest?.subtitle ?? 'TRADER WORKSTATION'}
         actions={
           <>
-          <Button
-            onClick={() => setCopilotOpen(true)}
-            title="Ask the Desktop (⌘K) — natural-language FDC3 orchestration"
-            size="sm"
-            type="button"
-          >
-            ✦ Ask
-            <span className="text-[10px] font-semibold opacity-60">⌘K</span>
-          </Button>
-          <Select value={theme} onValueChange={(v) => void handleThemeChange(v as ThemeName)}>
-            <SelectTrigger size="sm" className="min-w-[128px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(THEMES).map(([key, cfg]) => (
-                <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <ZoomControl />
-          <UserProfile />
-          <NotificationsCenter open={notificationsOpen} onOpenChange={setNotificationsOpen} />
-          <Button
-            type="button"
-            onClick={() => setHotkeysOpen(true)}
-            title="Keyboard shortcuts (Cmd/Ctrl+/)"
-            size="sm"
-            variant="outline"
-          >
-            Keys
-          </Button>
-          <WorkspaceToolbar onSave={handleSave} saveStatus={saveStatus} lastSavedAt={lastSavedAt} />
-          <ContextClipboard />
-          <ChannelBar
-            currentChannel={currentChannel}
-            onChannelChange={handleChannelChange}
-          />
+            <Button
+              onClick={() => setCopilotOpen(true)}
+              title="Ask the Desktop (⌘K) — natural-language FDC3 orchestration"
+              size="sm"
+              type="button"
+            >
+              ✦ Ask
+              <span className="text-[10px] font-semibold opacity-60">⌘K</span>
+            </Button>
+            <ChannelBar
+              currentChannel={currentChannel}
+              onChannelChange={handleChannelChange}
+            />
+            <WorkspaceToolbar onSave={handleSave} saveStatus={saveStatus} lastSavedAt={lastSavedAt} />
+            <NotificationsCenter open={notificationsOpen} onOpenChange={setNotificationsOpen} />
+            <ShellMenu
+              theme={theme}
+              onThemeChange={(t) => void handleThemeChange(t)}
+              onOpenHotkeys={() => setHotkeysOpen(true)}
+            />
           </>
         }
       />
