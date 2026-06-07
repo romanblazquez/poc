@@ -178,7 +178,7 @@ export function AppLauncher({ apps, onOpen }: AppLauncherProps): JSX.Element {
         </div>
 
         {/* Result count when filtering */}
-        {isFiltering && (
+        {isFiltering && categoryFilter !== '__pinned__' && (
           <p className="text-[11px] text-muted-foreground">
             {filteredApps.length === 0
               ? 'No apps match your search'
@@ -255,8 +255,11 @@ export function AppLauncher({ apps, onOpen }: AppLauncherProps): JSX.Element {
           </AppSection>
         ))}
 
-        {isFiltering && filteredApps.length === 0 && (
-          <EmptyState message={`No apps match "${search || categoryFilter}"`} />
+        {isFiltering && filteredApps.length === 0 && categoryFilter !== '__pinned__' && (
+          <EmptyState
+            message={search ? `No apps match "${search}"` : `No apps in this category`}
+            onClear={() => { setSearch(''); setCategoryFilter(null); }}
+          />
         )}
       </div>
     </div>
@@ -301,11 +304,20 @@ function CategoryPill({
   );
 }
 
-function EmptyState({ message }: { message: string }): JSX.Element {
+function EmptyState({ message, onClear }: { message: string; onClear?: () => void }): JSX.Element {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-2 py-16 text-center">
       <Search className="size-8 text-muted-foreground/30" />
       <p className="text-sm text-muted-foreground">{message}</p>
+      {onClear && (
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-sm font-semibold text-foreground hover:underline"
+        >
+          Clear filters
+        </button>
+      )}
     </div>
   );
 }
