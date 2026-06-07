@@ -655,6 +655,11 @@ contextBridge.exposeInMainWorld('shellChrome', {
       return ipcRenderer.invoke(IpcEvents.INTENT_RESOLVER_RESPOND, { requestId, appId, instanceId }) as Promise<void>;
     },
   },
+  appDirectory: {
+    save(apps: unknown[]): Promise<{ ok: boolean; count: number }> {
+      return ipcRenderer.invoke(IpcEvents.APP_DIRECTORY_SAVE, apps) as Promise<{ ok: boolean; count: number }>;
+    },
+  },
 });
 
 // ─── window.fdc3 surface ──────────────────────────────────────────────────

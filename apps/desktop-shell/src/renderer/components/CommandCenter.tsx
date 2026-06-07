@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { AppLogEvent, AppLogLevel, Fdc3Context, InteropActivityEvent, InteropRouteSnapshot, InteropSnapshot, PlatformLogsApi, UserChannel, WorkflowRecording, WorkflowStep } from '@fdc3-poc/fdc3-core';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { AppLogEvent, AppLogLevel, Fdc3Context, FlowPolicy, InteropActivityEvent, InteropRouteSnapshot, InteropSnapshot, PlatformLogsApi, UserChannel, WorkflowRecording, WorkflowStep } from '@fdc3-poc/fdc3-core';
 import type { AppEntry, SmartWorkspaceTemplate } from '../App.js';
 import { cn } from '../lib/utils.js';
 import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js';
+import { Switch } from './ui/switch.js';
 
 interface CommandCenterProps {
   apps: AppEntry[];
@@ -136,12 +137,15 @@ export function CommandCenter({ apps, currentChannel, onOpen, onComposeWorkspace
   const [recording, setRecording] = useState<WorkflowRecording | null>(() => readWorkflowRecording());
   const [logLevelFilter, setLogLevelFilter] = useState<AppLogLevel | 'all'>('all');
   const [section, setSection] = useState<SectionId>('activity');
+  const [localPolicy, setLocalPolicy] = useState<FlowPolicy>({ enabled: false, disabledContextRoutes: [], disabledIntentRoutes: [] });
   const fdc3 = window.fdc3 as unknown as CommandCenterFdc3Api | undefined;
   const platformLogs = window.platformLogs;
 
   const refresh = async (): Promise<void> => {
     if (!fdc3?.getInteropSnapshot) return;
-    setSnapshot(await fdc3.getInteropSnapshot());
+    const snap = await fdc3.getInteropSnapshot();
+    setSnapshot(snap);
+    if (snap.flowPolicy) setLocalPolicy(snap.flowPolicy);
   };
 
   useEffect(() => {
@@ -156,6 +160,29 @@ export function CommandCenter({ apps, currentChannel, onOpen, onComposeWorkspace
 
   const activeRoutes = useMemo(() => snapshot?.routes.filter((route) => route.allowed) ?? [], [snapshot]);
   const blockedRoutes = useMemo(() => snapshot?.routes.filter((route) => !route.allowed) ?? [], [snapshot]);
+
+  const routeKey = useCallback((route: InteropRouteSnapshot): string => {
+    const mid = route.type === 'context' ? (route.contextType ?? '*') : (route.intentName ?? '*');
+    return `${route.sourceAppId}:${mid}:${route.targetAppId}`;
+  }, []);
+
+  const applyPolicy = useCallback((next: FlowPolicy): void => {
+    setLocalPolicy(next);
+    void (window.fdc3 as unknown as { setFlowPolicy(p: FlowPolicy): Promise<void> } | undefined)
+      ?.setFlowPolicy(next);
+  }, []);
+
+  const togglePolicyEnabled = useCallback((enabled: boolean): void => {
+    applyPolicy({ ...localPolicy, enabled });
+  }, [localPolicy, applyPolicy]);
+
+  const toggleRoute = useCallback((route: InteropRouteSnapshot): void => {
+    const key = routeKey(route);
+    const list = route.type === 'context' ? 'disabledContextRoutes' : 'disabledIntentRoutes';
+    const current = localPolicy[list];
+    const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
+    applyPolicy({ ...localPolicy, enabled: true, [list]: next });
+  }, [localPolicy, routeKey, applyPolicy]);
   const appLogs = useMemo(() => {
     const logs = snapshot?.appLogs ?? [];
     return logLevelFilter === 'all' ? logs : logs.filter((log) => log.level === logLevelFilter);
@@ -375,14 +402,35 @@ export function CommandCenter({ apps, currentChannel, onOpen, onComposeWorkspace
           {section === 'routes' && (
             <Card className="flex min-h-0 w-full flex-col overflow-hidden">
               <CardHeader className="shrink-0 flex-row items-center justify-between gap-3 border-b">
-                <CardTitle>Route Matrix</CardTitle>
-                <Badge variant={blockedRoutes.length > 0 ? 'warning' : 'success'}>
-                  {activeRoutes.length} allowed / {blockedRoutes.length} blocked
-                </Badge>
+                <CardTitle>Route Policy Editor</CardTitle>
+                <div className="flex items-center gap-3">
+                  <Badge variant={blockedRoutes.length > 0 ? 'warning' : 'success'}>
+                    {activeRoutes.length} allowed / {blockedRoutes.length} blocked
+                  </Badge>
+                </div>
               </CardHeader>
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-2.5">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-black text-foreground">Policy enforcement</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {localPolicy.enabled ? 'Active — toggling a route blocks it immediately' : 'Inactive — all traffic flows freely'}
+                  </span>
+                </div>
+                <Switch
+                  checked={localPolicy.enabled}
+                  onCheckedChange={togglePolicyEnabled}
+                  aria-label="Enable flow policy"
+                />
+              </div>
               <CardContent className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pt-3 pb-4">
                 {(snapshot?.routes ?? []).slice(0, 90).map((route) => (
-                  <RouteRow key={route.id} route={route} apps={apps} />
+                  <RouteRow
+                    key={route.id}
+                    route={route}
+                    apps={apps}
+                    policyEnabled={localPolicy.enabled}
+                    onToggle={() => toggleRoute(route)}
+                  />
                 ))}
                 {snapshot && snapshot.routes.length === 0 && (
                   <EmptyState title="No declared routes" detail="Add broadcasts/listeners or intents to the app directory." />
@@ -525,10 +573,23 @@ function AppLogRow({ log, apps }: { log: AppLogEvent; apps: AppEntry[] }) {
   );
 }
 
-function RouteRow({ route, apps }: { route: InteropRouteSnapshot; apps: AppEntry[] }) {
+function RouteRow({
+  route,
+  apps,
+  policyEnabled,
+  onToggle,
+}: {
+  route: InteropRouteSnapshot;
+  apps: AppEntry[];
+  policyEnabled: boolean;
+  onToggle: () => void;
+}) {
   const color = route.allowed ? 'var(--shell-positive)' : '#f59e0b';
   return (
-    <Card className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg p-2.5" style={{ background: route.allowed ? 'rgba(63, 185, 80, 0.08)' : 'rgba(245, 158, 11, 0.1)', borderColor: `${color}44` }}>
+    <Card
+      className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg p-2.5"
+      style={{ background: route.allowed ? 'rgba(63, 185, 80, 0.08)' : 'rgba(245, 158, 11, 0.1)', borderColor: `${color}44` }}
+    >
       <div className="min-w-0">
         <div className="truncate text-[11px] font-extrabold text-foreground">
           {appLabel(apps, route.sourceAppId)} → {appLabel(apps, route.targetAppId)}
@@ -536,6 +597,13 @@ function RouteRow({ route, apps }: { route: InteropRouteSnapshot; apps: AppEntry
         <div className="text-[10px] text-muted-foreground">{route.type}: {routeLabel(route)}</div>
       </div>
       <Badge variant={route.allowed ? 'success' : 'warning'}>{route.allowed ? 'allowed' : 'blocked'}</Badge>
+      <Switch
+        checked={route.allowed}
+        onCheckedChange={onToggle}
+        disabled={!policyEnabled}
+        aria-label={route.allowed ? 'Block this route' : 'Allow this route'}
+        title={policyEnabled ? (route.allowed ? 'Click to block' : 'Click to allow') : 'Enable policy to edit routes'}
+      />
     </Card>
   );
 }

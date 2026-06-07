@@ -8,6 +8,8 @@ import { TopBar } from './components/TopBar.js';
 import { NotificationsCenter } from './components/NotificationsCenter.js';
 import { HotkeyHelp } from './components/HotkeyHelp.js';
 import { IntentResolverDialog } from './components/IntentResolverDialog.js';
+import { AppDirectoryEditor } from './components/AppDirectoryEditor.js';
+import { ContextClipboard } from './components/ContextClipboard.js';
 import { DockviewWorkspace } from './components/DockviewWorkspace.js';
 import type { DetachedWorkspacePayload, DisplayInfo } from './components/DockviewWorkspace.js';
 import { ControlTower } from './components/ControlTower.js';
@@ -76,7 +78,7 @@ export interface AppEntry {
 }
 
 type ThemeMode = ThemeName;
-type WorkspaceMode = 'launcher' | 'workspace' | 'interop-flow' | 'control-tower' | 'manager' | 'bridge';
+type WorkspaceMode = 'launcher' | 'workspace' | 'interop-flow' | 'control-tower' | 'manager' | 'bridge' | 'app-directory';
 
 interface WorkspaceState {
   channelId: string | null;
@@ -144,11 +146,13 @@ function readWorkspaceStore(): {
   tabs: WorkspaceTab[];
   states: Record<string, WorkspaceState>;
   activeWorkspaceId: string;
+  savedAt: number | null;
 } {
   const defaults = {
     tabs: DEFAULT_WORKSPACE_TABS,
     states: DEFAULT_WORKSPACE_STATES,
     activeWorkspaceId: DEFAULT_WORKSPACE_TABS[0].id,
+    savedAt: null as number | null,
   };
 
   try {
@@ -158,6 +162,7 @@ function readWorkspaceStore(): {
         tabs?: Array<Partial<WorkspaceTab>>;
         states?: Record<string, Partial<WorkspaceState>>;
         activeWorkspaceId?: string;
+        savedAt?: number;
       };
 
       const parsedTabs = (parsed.tabs ?? [])
@@ -187,7 +192,7 @@ function readWorkspaceStore(): {
         ? (parsed.activeWorkspaceId as string)
         : tabs[0].id;
 
-      return { tabs, states, activeWorkspaceId };
+      return { tabs, states, activeWorkspaceId, savedAt: typeof parsed.savedAt === 'number' ? parsed.savedAt : null };
     }
 
     const legacyRaw = window.localStorage.getItem(LEGACY_WORKSPACE_STATE_STORAGE_KEY);
@@ -209,10 +214,38 @@ function readWorkspaceStore(): {
         },
       },
       activeWorkspaceId: DEFAULT_WORKSPACE_TABS[0].id,
+      savedAt: null,
     };
   } catch {
     return defaults;
   }
+}
+
+function RestoreBanner({ savedAt, onDismiss }: { savedAt: number; onDismiss: () => void }) {
+  const time = new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  const date = new Date(savedAt).toLocaleDateString([], { month: 'short', day: 'numeric' });
+  const isToday = new Date(savedAt).toDateString() === new Date().toDateString();
+
+  useEffect(() => {
+    const id = setTimeout(onDismiss, 5000);
+    return () => clearTimeout(id);
+  }, [onDismiss]);
+
+  return (
+    <div className="flex h-7 shrink-0 items-center gap-2 border-b border-[color:var(--shell-positive)]/20 bg-[color:var(--shell-positive)]/8 px-4">
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--shell-positive)]" />
+      <span className="text-[11px] font-bold text-[color:var(--shell-positive)]">
+        Session restored from {isToday ? time : `${date} ${time}`}
+      </span>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="ml-auto text-[11px] font-bold text-muted-foreground hover:text-foreground"
+      >
+        ✕
+      </button>
+    </div>
+  );
 }
 
 export function App() {
@@ -221,6 +254,8 @@ export function App() {
   const [preloadPath, setPreloadPath] = useState('');
   const [currentChannel, setCurrentChannel] = useState<UserChannel | null>(null);
   const [saveStatus, setSaveStatus] = useState('');
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(initialWorkspaceStore.savedAt);
+  const [showRestoreBanner, setShowRestoreBanner] = useState<boolean>(initialWorkspaceStore.savedAt != null);
   const [activeMode, setActiveMode] = useState<WorkspaceMode>('workspace');
   const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceTab[]>(initialWorkspaceStore.tabs);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(initialWorkspaceStore.activeWorkspaceId);
@@ -368,11 +403,14 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    const ts = Date.now();
     window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({
       tabs: workspaceTabs,
       states: workspaceStates,
       activeWorkspaceId: activeWorkspaceTab.id,
+      savedAt: ts,
     }));
+    setLastSavedAt(ts);
   }, [activeWorkspaceTab.id, workspaceStates, workspaceTabs]);
 
   useEffect(() => {
@@ -390,11 +428,14 @@ export function App() {
   }, []);
 
   const handleSave = useCallback(async () => {
+    const ts = Date.now();
     window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({
       tabs: workspaceTabs,
       states: workspaceStates,
       activeWorkspaceId: activeWorkspaceTab.id,
+      savedAt: ts,
     }));
+    setLastSavedAt(ts);
     setSaveStatus('Workspace saved');
     setTimeout(() => setSaveStatus(''), 2000);
   }, [activeWorkspaceTab.id, workspaceStates, workspaceTabs]);
@@ -686,7 +727,8 @@ export function App() {
           >
             Keys
           </Button>
-          <WorkspaceToolbar onSave={handleSave} saveStatus={saveStatus} />
+          <WorkspaceToolbar onSave={handleSave} saveStatus={saveStatus} lastSavedAt={lastSavedAt} />
+          <ContextClipboard />
           <ChannelBar
             currentChannel={currentChannel}
             onChannelChange={handleChannelChange}
@@ -694,6 +736,10 @@ export function App() {
           </>
         }
       />
+
+      {showRestoreBanner && initialWorkspaceStore.savedAt && (
+        <RestoreBanner savedAt={initialWorkspaceStore.savedAt} onDismiss={() => setShowRestoreBanner(false)} />
+      )}
 
       <div className="flex h-10 shrink-0 items-stretch border-b">
         {activeMode !== 'launcher' && (
@@ -733,6 +779,7 @@ export function App() {
               <TabsTrigger value="control-tower" className="h-7 px-2.5 text-[11px]">Control Tower</TabsTrigger>
               <TabsTrigger value="manager" className="h-7 px-2.5 text-[11px]">Manager</TabsTrigger>
               <TabsTrigger value="bridge" className="h-7 px-2.5 text-[11px]">Bridge</TabsTrigger>
+              <TabsTrigger value="app-directory" className="h-7 px-2.5 text-[11px]">App Directory</TabsTrigger>
               <TabsTrigger value="launcher" className="h-7 px-2.5 text-[11px]">App Launcher</TabsTrigger>
             </TabsList>
           </Tabs>
@@ -786,6 +833,8 @@ export function App() {
           <Manager apps={apps} />
         ) : activeMode === 'bridge' ? (
           <Bridge />
+        ) : activeMode === 'app-directory' ? (
+          <AppDirectoryEditor apps={apps} onAppsChanged={setApps} />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto scrollbar-thin">
             <div className="flex flex-col gap-1">

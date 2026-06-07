@@ -377,6 +377,7 @@ export class IpcRouter {
     this.handleBridgeUpdateSettings();
     this.handleGetAppLifecycle();
     this.handleRestartApp();
+    this.handleAppDirectorySave();
   }
 
   // ─── FINOS bridge readiness (non-experimental Backplane discovery) ───────
@@ -1490,6 +1491,13 @@ export class IpcRouter {
           DesktopAgentBridging: false,
         },
       };
+    });
+  }
+
+  private handleAppDirectorySave(): void {
+    ipcMain.handle(IpcEvents.APP_DIRECTORY_SAVE, (_event, apps: AppDefinition[]) => {
+      this.replaceRuntimeAppDirectory(apps);
+      return { ok: true, count: apps.length };
     });
   }
 

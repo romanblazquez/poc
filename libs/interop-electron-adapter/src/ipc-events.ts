@@ -78,6 +78,7 @@ export const IpcEvents = {
   GET_WINDOW_FULLSCREEN: 'shell:getWindowFullscreen',
   GET_SHELL_MANIFEST: 'shell:getManifest',
   INTENT_RESOLVER_RESPOND: 'fdc3:intentResolverRespond',
+  APP_DIRECTORY_SAVE: 'shell:appDirectorySave',
 
   // ─── Main → Renderer (webContents.send) ──────────────────────────────────
   INTENT_RESOLVER_REQUEST: 'fdc3:intentResolverRequest',
