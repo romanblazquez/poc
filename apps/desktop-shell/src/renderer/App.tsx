@@ -17,7 +17,9 @@ import { Bridge } from './components/Bridge.js';
 import { Badge } from './components/ui/badge.js';
 import { Button } from './components/ui/button.js';
 import { Card, CardContent } from './components/ui/card.js';
+import { Input } from './components/ui/input.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select.js';
+import { cn } from './lib/utils.js';
 import { InteropCopilot } from './copilot/InteropCopilot.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
 import { ShellSidebar } from './components/ShellSidebar.js';
@@ -765,24 +767,40 @@ export function App() {
         <RestoreBanner savedAt={initialWorkspaceStore.savedAt} onDismiss={() => setShowRestoreBanner(false)} />
       )}
 
+      {/* Workspace tab bar */}
+      <div className="flex h-10 shrink-0 items-stretch border-b">
+        <div className="flex min-w-0 items-stretch overflow-x-auto scrollbar-thin">
+          {workspaceTabs.map((tab) => (
+            <WorkspaceTabButton
+              key={tab.id}
+              active={activeWorkspaceTab.id === tab.id}
+              onClick={() => { setActiveWorkspaceId(tab.id); setActiveMode('workspace'); }}
+              onDoubleClick={() => handleWorkspaceRenameStart(tab.id, tab.name)}
+              onClose={workspaceTabs.length > 1 ? () => handleCloseWorkspace(tab.id) : undefined}
+              editing={editingWorkspaceId === tab.id}
+              editingValue={editingWorkspaceName}
+              onEditingChange={setEditingWorkspaceName}
+              onEditingCommit={() => commitWorkspaceRename(tab.id)}
+              onEditingCancel={cancelWorkspaceRename}
+            >
+              {tab.name}
+            </WorkspaceTabButton>
+          ))}
+          <button
+            onClick={handleAddWorkspace}
+            title="Add workspace"
+            type="button"
+            className="flex items-center border-r px-3 text-base text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            +
+          </button>
+        </div>
+      </div>
+
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <ShellSidebar
           activeMode={activeMode}
           onModeChange={setActiveMode}
-          workspaceTabs={workspaceTabs}
-          activeWorkspaceId={activeWorkspaceId}
-          onWorkspaceChange={(id) => {
-            setActiveWorkspaceId(id);
-            setActiveMode('workspace');
-          }}
-          onWorkspaceDoubleClick={handleWorkspaceRenameStart}
-          onWorkspaceClose={handleCloseWorkspace}
-          onWorkspaceAdd={handleAddWorkspace}
-          editingWorkspaceId={editingWorkspaceId}
-          editingWorkspaceName={editingWorkspaceName}
-          onEditingChange={setEditingWorkspaceName}
-          onEditingCommit={commitWorkspaceRename}
-          onEditingCancel={cancelWorkspaceRename}
         />
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -1078,6 +1096,62 @@ function DetachedWorkspacePlaceholder({
   );
 }
 
+
+function WorkspaceTabButton({
+  active, onClick, onDoubleClick, onClose,
+  editing = false, editingValue = '',
+  onEditingChange, onEditingCommit, onEditingCancel, children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  onDoubleClick?: () => void;
+  onClose?: () => void;
+  editing?: boolean;
+  editingValue?: string;
+  onEditingChange?: (v: string) => void;
+  onEditingCommit?: () => void;
+  onEditingCancel?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      type="button"
+      className={cn(
+        'flex h-full items-center gap-1.5 border-r px-3 text-xs font-medium outline-none transition-colors select-none',
+        active ? 'bg-background text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+      )}
+    >
+      {editing ? (
+        <Input
+          autoFocus
+          value={editingValue}
+          onChange={(e) => onEditingChange?.(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+          onBlur={() => onEditingCommit?.()}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') onEditingCommit?.();
+            if (e.key === 'Escape') onEditingCancel?.();
+          }}
+          className="h-5 min-w-24 bg-background px-2 text-xs"
+        />
+      ) : (
+        <span>{children}</span>
+      )}
+      {onClose && (
+        <span
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClose(); }}
+          role="button"
+          aria-label="Close workspace"
+          className="flex h-4 w-4 items-center justify-center rounded text-[11px] leading-none opacity-50 hover:opacity-100"
+        >×</span>
+      )}
+    </button>
+  );
+}
 
 function StatusItem({ label, value, color }: { label: string; value: string; color: string }) {
   return (
