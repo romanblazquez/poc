@@ -930,6 +930,9 @@ export function App() {
           const app = apps.find((a) => a.appId === appId);
           if (app) dockviewRef.current?.addApp(app);
         }}
+        onRemoveFromWorkspace={(appId) => {
+          dockviewRef.current?.removeApp(appId);
+        }}
       />
     </div>
   );

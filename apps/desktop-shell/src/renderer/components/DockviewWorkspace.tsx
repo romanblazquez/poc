@@ -201,6 +201,7 @@ function populatePanels(
 
 export interface DockviewWorkspaceHandle {
   addApp: (app: AppEntry) => void;
+  removeApp: (appId: string) => void;
 }
 
 export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWorkspaceProps>(function DockviewWorkspace({
@@ -424,7 +425,14 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
     console.warn('[DockviewWorkspace] Failed to add panel', app.appId);
   }, [channelId, preloadPath, syncDetachedTabTooltips, theme]);
 
-  useImperativeHandle(ref, () => ({ addApp: addPanel }), [addPanel]);
+  const removePanel = useCallback((appId: string) => {
+    const api = dockApiRef.current;
+    if (!api) return;
+    const panel = api.getPanel(appId);
+    if (panel) api.removePanel(panel);
+  }, []);
+
+  useImperativeHandle(ref, () => ({ addApp: addPanel, removeApp: removePanel }), [addPanel, removePanel]);
 
   const detachToDisplay = useCallback(async (display?: DisplayInfo) => {
     if (!onDetachWorkspace) return;

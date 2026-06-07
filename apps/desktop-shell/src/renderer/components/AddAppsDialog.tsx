@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Search, X, CheckCircle2, Plus } from 'lucide-react';
+import { Search, X, CheckCircle2, Plus, Minus } from 'lucide-react';
 import type { AppEntry } from '../App.js';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog.js';
 import { Input } from './ui/input.js';
@@ -24,9 +24,10 @@ interface AddAppsDialogProps {
   apps: AppEntry[];
   currentWorkspaceAppIds: string[];
   onAddToWorkspace: (appId: string) => void;
+  onRemoveFromWorkspace: (appId: string) => void;
 }
 
-export function AddAppsDialog({ open, onClose, apps, currentWorkspaceAppIds, onAddToWorkspace }: AddAppsDialogProps): JSX.Element {
+export function AddAppsDialog({ open, onClose, apps, currentWorkspaceAppIds, onAddToWorkspace, onRemoveFromWorkspace }: AddAppsDialogProps): JSX.Element {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
@@ -161,6 +162,7 @@ export function AddAppsDialog({ open, onClose, apps, currentWorkspaceAppIds, onA
                       app={app}
                       inWorkspace={workspaceSet.has(app.appId)}
                       onAdd={handleAdd}
+                      onRemove={onRemoveFromWorkspace}
                     />
                   ))}
                 </div>
@@ -177,10 +179,12 @@ function MegaMenuAppCard({
   app,
   inWorkspace,
   onAdd,
+  onRemove,
 }: {
   app: AppEntry;
   inWorkspace: boolean;
   onAdd: (appId: string) => void;
+  onRemove: (appId: string) => void;
 }): JSX.Element {
   const categoryColor = CATEGORY_COLORS[app.category ?? 'Other'] ?? '#8080a0';
   const transport = app.devPort > 0 ? `dev:${app.devPort}` : app.url.startsWith('http') ? 'remote' : 'bundled';
@@ -236,25 +240,42 @@ function MegaMenuAppCard({
       )}
 
       {/* Action */}
-      <Button
-        type="button"
-        size="sm"
-        variant={inWorkspace ? 'secondary' : 'default'}
-        className="h-7 w-full gap-1.5 text-[11px]"
-        onClick={() => onAdd(app.appId)}
-      >
-        {inWorkspace ? (
-          <>
+      {inWorkspace ? (
+        <div className="flex gap-1.5">
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="h-7 flex-1 gap-1 text-[11px]"
+            onClick={() => onAdd(app.appId)}
+          >
             <CheckCircle2 className="size-3.5" />
             Open / Focus
-          </>
-        ) : (
-          <>
-            <Plus className="size-3.5" />
-            Add to Workspace
-          </>
-        )}
-      </Button>
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1 px-2 text-[11px] text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => onRemove(app.appId)}
+            title="Remove from workspace"
+          >
+            <Minus className="size-3.5" />
+            Remove
+          </Button>
+        </div>
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          variant="default"
+          className="h-7 w-full gap-1.5 text-[11px]"
+          onClick={() => onAdd(app.appId)}
+        >
+          <Plus className="size-3.5" />
+          Add to Workspace
+        </Button>
+      )}
     </div>
   );
 }
