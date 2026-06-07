@@ -1119,8 +1119,10 @@ function WorkspaceTabButton({
       onDoubleClick={onDoubleClick}
       type="button"
       className={cn(
-        'flex h-full items-center gap-1.5 border-r px-3 text-xs font-medium outline-none transition-colors select-none',
-        active ? 'bg-background text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        'relative flex h-full items-center gap-1.5 border-r px-3 text-xs font-medium outline-none transition-colors select-none',
+        active
+          ? 'bg-background text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[color:var(--shell-accent)]'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
       )}
     >
       {editing ? (
