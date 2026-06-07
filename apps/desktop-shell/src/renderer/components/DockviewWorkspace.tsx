@@ -5,6 +5,7 @@ import type { AppEntry } from '../App.js';
 import type { UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { ThemeName } from '@fdc3-poc/fdc3-core';
+import { LayoutGrid, Plus } from 'lucide-react';
 import { Button } from './ui/button.js';
 import 'dockview/dist/styles/dockview.css';
 import '../styles/dockview-override.css';
@@ -74,6 +75,36 @@ const WebviewContext = createContext<WebviewContextValue>({
   registerWebview: () => undefined,
   markReady: () => undefined,
 });
+
+const OnAddAppContext = createContext<(() => void) | null>(null);
+
+function WorkspaceWatermark() {
+  const onAddApp = useContext(OnAddAppContext);
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-5 rounded-xl border border-dashed border-border bg-card px-12 py-10">
+        <div
+          className="flex h-14 w-14 items-center justify-center rounded-xl border border-dashed"
+          style={{ borderColor: 'var(--shell-accent)', background: 'color-mix(in srgb, var(--shell-accent) 8%, transparent)' }}
+        >
+          <LayoutGrid className="size-7" style={{ color: 'var(--shell-accent)' }} />
+        </div>
+        <div className="flex flex-col items-center gap-1.5 text-center">
+          <p className="text-sm font-black text-foreground">This workspace has no apps</p>
+          <p className="max-w-[260px] text-[12px] leading-relaxed text-muted-foreground">
+            Add apps to build your layout. Apps share context via FDC3 channels automatically.
+          </p>
+        </div>
+        {onAddApp && (
+          <Button type="button" size="sm" onClick={onAddApp} className="gap-1.5">
+            <Plus className="size-3.5" />
+            Add App
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function appendQuery(url: string, query: string): string {
   const hashIndex = url.indexOf('#');
@@ -505,13 +536,16 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
       )}
 
       <div className="min-h-0 min-w-0 flex-1">
-        <WebviewContext.Provider value={{ registerWebview, markReady }}>
-          <DockviewReact
-            onReady={onReady}
-            components={{ 'app-panel': AppPanelComponent }}
-            className={`${THEMES[theme].dockview} h-full w-full`}
-          />
-        </WebviewContext.Provider>
+        <OnAddAppContext.Provider value={onAddApp ?? null}>
+          <WebviewContext.Provider value={{ registerWebview, markReady }}>
+            <DockviewReact
+              onReady={onReady}
+              components={{ 'app-panel': AppPanelComponent }}
+              watermarkComponent={WorkspaceWatermark}
+              className={`${THEMES[theme].dockview} h-full w-full`}
+            />
+          </WebviewContext.Provider>
+        </OnAddAppContext.Provider>
       </div>
     </div>
   );
