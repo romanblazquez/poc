@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useRef, useState, createContext } from 'react';
+import { useCallback, useContext, useEffect, useImperativeHandle, useRef, useState, createContext, forwardRef } from 'react';
 import type { CSSProperties } from 'react';
 import { DockviewReact, type IDockviewPanelProps, type DockviewApi, type DockviewReadyEvent } from 'dockview';
 import type { AppEntry } from '../App.js';
@@ -24,6 +24,7 @@ interface DockviewWorkspaceProps {
   onLayoutChange?: (layout: unknown) => void;
   onOpenPanelsChange?: (panelIds: string[]) => void;
   onDetachWorkspace?: (payload: DetachedWorkspacePayload) => Promise<void>;
+  onAddApp?: () => void;
   workspaceName?: string;
   theme: ThemeMode;
   detached?: boolean;
@@ -198,7 +199,11 @@ function populatePanels(
   }
 }
 
-export function DockviewWorkspace({
+export interface DockviewWorkspaceHandle {
+  addApp: (app: AppEntry) => void;
+}
+
+export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWorkspaceProps>(function DockviewWorkspace({
   apps,
   currentChannel,
   preloadPath,
@@ -207,12 +212,13 @@ export function DockviewWorkspace({
   onLayoutChange,
   onOpenPanelsChange,
   onDetachWorkspace,
+  onAddApp,
   workspaceName,
   theme,
   detached = false,
   displays = [],
   headersVisible = false,
-}: DockviewWorkspaceProps) {
+}, ref) {
   const channelId = currentChannel?.id ?? null;
   const rootRef = useRef<HTMLDivElement | null>(null);
   const dockApiRef = useRef<DockviewApi | null>(null);
@@ -221,7 +227,6 @@ export function DockviewWorkspace({
   const webviewsRef = useRef(new Map<string, EmbeddedWebview>());
   const readyIdsRef = useRef(new Set<string>());
   const didInitialAutoPopulateRef = useRef(false);
-  const [showAddMenu, setShowAddMenu] = useState(false);
   const [openPanelIds, setOpenPanelIds] = useState<Set<string>>(new Set());
 
   const syncPanelTitles = useCallback((api: DockviewApi) => {
@@ -386,7 +391,6 @@ export function DockviewWorkspace({
     const existing = api.getPanel(app.appId);
     if (existing) {
       existing.focus();
-      setShowAddMenu(false);
       return;
     }
 
@@ -414,12 +418,13 @@ export function DockviewWorkspace({
     if (added) {
       added.focus();
       syncDetachedTabTooltips();
-      setShowAddMenu(false);
       return;
     }
 
     console.warn('[DockviewWorkspace] Failed to add panel', app.appId);
   }, [channelId, preloadPath, syncDetachedTabTooltips, theme]);
+
+  useImperativeHandle(ref, () => ({ addApp: addPanel }), [addPanel]);
 
   const detachToDisplay = useCallback(async (display?: DisplayInfo) => {
     if (!onDetachWorkspace) return;
@@ -441,8 +446,6 @@ export function DockviewWorkspace({
     api.clear();
     syncOpenPanels(api);
   }, [channelId, onDetachWorkspace, openPanelIds, syncOpenPanels, theme, workspaceName]);
-
-  const closedApps = apps.filter((app) => !openPanelIds.has(app.appId));
 
   return (
     <div
@@ -478,29 +481,11 @@ export function DockviewWorkspace({
               </Button>
             )
           )}
-          <div className="relative">
-            <Button onClick={() => setShowAddMenu((value) => !value)} size="sm">
-              Add App
+          {onAddApp && (
+            <Button onClick={onAddApp} size="sm" variant="outline" className="gap-1">
+              + Add App
             </Button>
-            {showAddMenu && (
-              <div className="absolute left-0 top-full z-20 mt-1 flex max-h-80 min-w-56 flex-col overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg scrollbar-thin">
-                {closedApps.length === 0 && (
-                  <div className="px-3 py-2 text-[11px] font-semibold text-muted-foreground">All apps open</div>
-                )}
-                {closedApps.map((app) => (
-                  <Button
-                    key={app.appId}
-                    onClick={() => addPanel(app)}
-                    variant="ghost"
-                    size="sm"
-                    className="justify-start"
-                  >
-                    {app.title}
-                  </Button>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
           <div className="flex-1" />
           <span className="text-[11px] font-extrabold text-muted-foreground">
             {workspaceName ?? 'Workspace'}
@@ -522,7 +507,7 @@ export function DockviewWorkspace({
       </div>
     </div>
   );
-}
+});
 
 const rootStyle: CSSProperties = {
   display: 'flex',

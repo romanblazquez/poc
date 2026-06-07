@@ -10,7 +10,7 @@ import { IntentResolverDialog } from './components/IntentResolverDialog.js';
 import { AppDirectoryEditor } from './components/AppDirectoryEditor.js';
 import { ContextClipboard } from './components/ContextClipboard.js';
 import { DockviewWorkspace } from './components/DockviewWorkspace.js';
-import type { DetachedWorkspacePayload, DisplayInfo } from './components/DockviewWorkspace.js';
+import type { DetachedWorkspacePayload, DisplayInfo, DockviewWorkspaceHandle } from './components/DockviewWorkspace.js';
 import { ControlTower } from './components/ControlTower.js';
 import { Manager } from './components/Manager.js';
 import { Bridge } from './components/Bridge.js';
@@ -26,6 +26,7 @@ import { ShellSidebar } from './components/ShellSidebar.js';
 import { UserProfile } from './components/UserProfile.js';
 import { WorkspaceDashboard } from './components/WorkspaceDashboard.js';
 import { RbacPanel } from './components/RbacPanel.js';
+import { AddAppsDialog } from './components/AddAppsDialog.js';
 import type { Fdc3Context, UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { FlowPolicy, ThemeName } from '@fdc3-poc/fdc3-core';
@@ -277,6 +278,8 @@ export function App() {
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [hotkeysOpen, setHotkeysOpen] = useState(false);
+  const [addAppsOpen, setAddAppsOpen] = useState(false);
+  const dockviewRef = useRef<DockviewWorkspaceHandle>(null);
   const [shellManifest, setShellManifest] = useState<ShellManifestView | null>(null);
 
   const activeWorkspaceTab = workspaceTabs.find((tab) => tab.id === activeWorkspaceId) ?? workspaceTabs[0];
@@ -824,6 +827,7 @@ export function App() {
                 />
               ) : apps.length > 0 && preloadPath ? (
                 <DockviewWorkspace
+                  ref={dockviewRef}
                   key={`${activeWorkspaceTab.id}-${workspaceEpoch}`}
                   apps={apps}
                   currentChannel={currentChannel}
@@ -833,6 +837,7 @@ export function App() {
                   onLayoutChange={handleLayoutChange}
                   onOpenPanelsChange={handleOpenPanelsChange}
                   onDetachWorkspace={handleDetachWorkspace}
+                  onAddApp={() => setAddAppsOpen(true)}
                   workspaceName={activeWorkspaceTab.name}
                   theme={theme}
                   displays={displays}
@@ -916,6 +921,16 @@ export function App() {
       />
       <HotkeyHelp open={hotkeysOpen} onClose={() => setHotkeysOpen(false)} />
       <IntentResolverDialog apps={apps} />
+      <AddAppsDialog
+        open={addAppsOpen}
+        onClose={() => setAddAppsOpen(false)}
+        apps={apps}
+        currentWorkspaceAppIds={activeWorkspaceTab.panelIds}
+        onAddToWorkspace={(appId) => {
+          const app = apps.find((a) => a.appId === appId);
+          if (app) dockviewRef.current?.addApp(app);
+        }}
+      />
     </div>
   );
 }

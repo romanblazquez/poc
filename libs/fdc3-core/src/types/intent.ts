@@ -107,6 +107,16 @@ export const StandardIntents = {
   VIEW_PORTFOLIO: 'ViewPortfolio',
   START_PAYMENT: 'StartPayment',
   VIEW_ACCOUNT: 'ViewAccount',
+  VIEW_CHART: 'ViewChart',
+  VIEW_QUOTE: 'ViewQuote',
+  VIEW_NEWS: 'ViewNews',
+  VIEW_ORDERS: 'ViewOrders',
+  VIEW_ANALYSIS: 'ViewAnalysis',
+  VIEW_HOLDINGS: 'ViewHoldings',
+  VIEW_RESEARCH: 'ViewResearch',
+  START_CHAT: 'StartChat',
+  SEND_CHAT_MESSAGE: 'SendChatMessage',
+  CREATE_INTERACTION: 'CreateInteraction',
 } as const;
 
 export type StandardIntent = (typeof StandardIntents)[keyof typeof StandardIntents];

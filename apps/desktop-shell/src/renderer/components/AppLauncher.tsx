@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type * as React from 'react';
+import { Search, X } from 'lucide-react';
 import type { AppEntry } from '../App.js';
 import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';
 import { Card, CardContent } from './ui/card.js';
+import { Input } from './ui/input.js';
+import { cn } from '../lib/utils.js';
 
 const CATEGORY_COLORS: Record<string, string> = {
   CRM: '#4080e8',
@@ -11,6 +14,9 @@ const CATEGORY_COLORS: Record<string, string> = {
   Markets: '#e8d840',
   Payments: '#e84080',
   Trading: '#91b4ff',
+  Collaboration: '#c084fc',
+  Developer: '#34d399',
+  Cloud: '#60a5fa',
 };
 
 const PIN_STORAGE_KEY = 'fdc3.shell.launcher.pinned.v1';
@@ -50,6 +56,8 @@ export function AppLauncher({ apps, onOpen }: AppLauncherProps): JSX.Element {
   const lifecycleApi = getLifecycleApi();
   const [pinnedIds, setPinnedIds] = useState<string[]>(readPinned);
   const [lifecycle, setLifecycle] = useState<AppLifecycleSnapshot[]>([]);
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   useEffect(() => {
     window.localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify(pinnedIds));
@@ -68,8 +76,30 @@ export function AppLauncher({ apps, onOpen }: AppLauncherProps): JSX.Element {
 
   const pinnedSet = useMemo(() => new Set(pinnedIds), [pinnedIds]);
   const lifecycleByApp = useMemo(() => new Map(lifecycle.map((item) => [item.appId, item])), [lifecycle]);
-  const pinnedApps = apps.filter((app) => pinnedSet.has(app.appId));
-  const regularApps = apps.filter((app) => !pinnedSet.has(app.appId));
+
+  const allCategories = useMemo(
+    () => [...new Set(apps.map((a) => a.category ?? 'Other'))].sort(),
+    [apps],
+  );
+
+  const query = search.toLowerCase().trim();
+  const isFiltering = query.length > 0 || categoryFilter !== null;
+
+  const filteredApps = useMemo(() => {
+    return apps.filter((app) => {
+      const matchesSearch =
+        !query ||
+        app.title.toLowerCase().includes(query) ||
+        app.description?.toLowerCase().includes(query) ||
+        app.category?.toLowerCase().includes(query) ||
+        app.appId.toLowerCase().includes(query);
+      const matchesCategory = !categoryFilter || (app.category ?? 'Other') === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [apps, query, categoryFilter]);
+
+  const pinnedApps = isFiltering ? filteredApps.filter((app) => pinnedSet.has(app.appId)) : apps.filter((app) => pinnedSet.has(app.appId));
+  const regularApps = filteredApps.filter((app) => !pinnedSet.has(app.appId));
   const categories = [...new Set(regularApps.map((a) => a.category ?? 'Other'))];
 
   const togglePin = (appId: string): void => {
@@ -97,40 +127,185 @@ export function AppLauncher({ apps, onOpen }: AppLauncherProps): JSX.Element {
   };
 
   return (
-    <div className="flex flex-col gap-6 pb-6">
-      {pinnedApps.length > 0 && (
-        <AppSection title="Pinned" color="var(--shell-accent)">
-          {pinnedApps.map((app) => (
-            <AppCard
-              key={app.appId}
-              app={app}
-              lifecycle={lifecycleByApp.get(app.appId)}
-              pinned
-              onOpen={openApp}
-              onRestart={restartApp}
-              onTogglePin={togglePin}
+    <div className="flex flex-col gap-4">
+      {/* Search + filter bar */}
+      <div className="flex flex-col gap-2.5">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search apps by name, category, or description…"
+            className="pl-8 pr-8 text-sm"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Category filter pills */}
+        <div className="flex flex-wrap gap-1.5">
+          <CategoryPill
+            label="All"
+            count={apps.length}
+            active={categoryFilter === null}
+            color="var(--shell-accent)"
+            onClick={() => setCategoryFilter(null)}
+          />
+          <CategoryPill
+            label="Pinned"
+            count={pinnedIds.length}
+            active={categoryFilter === '__pinned__'}
+            color="#f59e0b"
+            onClick={() => setCategoryFilter(categoryFilter === '__pinned__' ? null : '__pinned__')}
+          />
+          {allCategories.map((cat) => (
+            <CategoryPill
+              key={cat}
+              label={cat}
+              count={apps.filter((a) => (a.category ?? 'Other') === cat).length}
+              active={categoryFilter === cat}
+              color={CATEGORY_COLORS[cat] ?? '#8080a0'}
+              onClick={() => setCategoryFilter(categoryFilter === cat ? null : cat)}
             />
           ))}
-        </AppSection>
-      )}
+        </div>
 
-      {categories.map((cat) => (
-        <AppSection key={cat} title={cat} color={CATEGORY_COLORS[cat] ?? '#8080a0'}>
-          {regularApps
-            .filter((a) => (a.category ?? 'Other') === cat)
-            .map((app) => (
+        {/* Result count when filtering */}
+        {isFiltering && (
+          <p className="text-[11px] text-muted-foreground">
+            {filteredApps.length === 0
+              ? 'No apps match your search'
+              : `${filteredApps.length} app${filteredApps.length === 1 ? '' : 's'} found`}
+            {(search || categoryFilter) && (
+              <button
+                type="button"
+                onClick={() => { setSearch(''); setCategoryFilter(null); }}
+                className="ml-2 font-semibold text-foreground hover:underline"
+              >
+                Clear
+              </button>
+            )}
+          </p>
+        )}
+      </div>
+
+      {/* App grid */}
+      <div className="flex flex-col gap-6 pb-6">
+        {/* Pinned — only show when not filtering by category */}
+        {categoryFilter !== '__pinned__' && pinnedApps.length > 0 && (
+          <AppSection title="Pinned" color="var(--shell-accent)">
+            {pinnedApps.map((app) => (
               <AppCard
                 key={app.appId}
                 app={app}
                 lifecycle={lifecycleByApp.get(app.appId)}
-                pinned={false}
+                pinned
                 onOpen={openApp}
                 onRestart={restartApp}
                 onTogglePin={togglePin}
               />
             ))}
-        </AppSection>
-      ))}
+          </AppSection>
+        )}
+
+        {/* Pinned-only filter */}
+        {categoryFilter === '__pinned__' && (
+          pinnedIds.length === 0 ? (
+            <EmptyState message="No pinned apps. Click the Pin button on any app card." />
+          ) : (
+            <AppSection title="Pinned" color="#f59e0b">
+              {apps.filter((app) => pinnedSet.has(app.appId)).map((app) => (
+                <AppCard
+                  key={app.appId}
+                  app={app}
+                  lifecycle={lifecycleByApp.get(app.appId)}
+                  pinned
+                  onOpen={openApp}
+                  onRestart={restartApp}
+                  onTogglePin={togglePin}
+                />
+              ))}
+            </AppSection>
+          )
+        )}
+
+        {/* Grouped by category */}
+        {categoryFilter !== '__pinned__' && categories.map((cat) => (
+          <AppSection key={cat} title={cat} color={CATEGORY_COLORS[cat] ?? '#8080a0'}>
+            {regularApps
+              .filter((a) => (a.category ?? 'Other') === cat)
+              .map((app) => (
+                <AppCard
+                  key={app.appId}
+                  app={app}
+                  lifecycle={lifecycleByApp.get(app.appId)}
+                  pinned={false}
+                  onOpen={openApp}
+                  onRestart={restartApp}
+                  onTogglePin={togglePin}
+                />
+              ))}
+          </AppSection>
+        ))}
+
+        {isFiltering && filteredApps.length === 0 && (
+          <EmptyState message={`No apps match "${search || categoryFilter}"`} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CategoryPill({
+  label,
+  count,
+  active,
+  color,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  color: string;
+  onClick: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold transition-colors',
+        active
+          ? 'border-transparent text-background'
+          : 'border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground',
+      )}
+      style={active ? { background: color, borderColor: color } : undefined}
+    >
+      {label}
+      <span
+        className={cn(
+          'rounded-full px-1 text-[10px] font-black tabular-nums',
+          active ? 'bg-background/20 text-background' : 'bg-muted text-muted-foreground',
+        )}
+      >
+        {count}
+      </span>
+    </button>
+  );
+}
+
+function EmptyState({ message }: { message: string }): JSX.Element {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 py-16 text-center">
+      <Search className="size-8 text-muted-foreground/30" />
+      <p className="text-sm text-muted-foreground">{message}</p>
     </div>
   );
 }
