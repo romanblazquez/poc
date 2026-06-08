@@ -1,11 +1,14 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Save } from 'lucide-react';
 import type { InteropConnector, InteropFlowDefinition, ConnectorValidation } from '../model/interop-flow-types.js';
+import { validateConnector } from '../engine/flow-validator.js';
 import { contextLabel, intentLabel } from '../model/fdc3-schema.js';
 import { Badge } from '../../components/ui/badge.js';
 import { Button } from '../../components/ui/button.js';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select.js';
 import { Switch } from '../../components/ui/switch.js';
+import { cn } from '../../lib/utils.js';
 
 interface ConnectorConfigPanelProps {
   connector: InteropConnector;
@@ -16,57 +19,84 @@ interface ConnectorConfigPanelProps {
   onClose: () => void;
 }
 
+type Draft = Pick<InteropConnector, 'mode' | 'contextType' | 'intentName' | 'enabled'>;
+
+function draftFrom(c: InteropConnector): Draft {
+  return { mode: c.mode, contextType: c.contextType, intentName: c.intentName, enabled: c.enabled };
+}
+
+function draftsEqual(a: Draft, b: Draft): boolean {
+  return a.mode === b.mode && a.contextType === b.contextType && a.intentName === b.intentName && a.enabled === b.enabled;
+}
+
 export function ConnectorConfigPanel({
   connector,
-  validation,
   flow,
   onUpdate,
   onDelete,
   onClose,
 }: ConnectorConfigPanelProps) {
+  const [draft, setDraft] = useState<Draft>(() => draftFrom(connector));
+
+  // Reset draft when a different connector is opened
+  useEffect(() => {
+    setDraft(draftFrom(connector));
+  }, [connector.id]);
+
   const sourceNode = flow.nodes.find((n) => n.appId === connector.sourceAppId);
   const targetNode = flow.nodes.find((n) => n.appId === connector.targetAppId);
 
   const availableContextTypes = useMemo(() => {
-    if (connector.mode === 'context' || connector.mode === 'theme' || connector.mode === 'audit') {
-      return sourceNode?.capabilities.broadcasts.map((s) => s.type) ?? [];
-    }
-    if (connector.mode === 'context-to-intent') {
+    if (draft.mode === 'context' || draft.mode === 'theme' || draft.mode === 'audit' || draft.mode === 'context-to-intent') {
       return sourceNode?.capabilities.broadcasts.map((s) => s.type) ?? [];
     }
     return [];
-  }, [connector.mode, sourceNode]);
+  }, [draft.mode, sourceNode]);
 
   const availableIntentNames = useMemo(() => {
-    if (connector.mode === 'intent') {
+    if (draft.mode === 'intent') {
       return sourceNode?.capabilities.raisesIntents.map((s) => s.name) ?? [];
     }
-    if (connector.mode === 'context-to-intent') {
+    if (draft.mode === 'context-to-intent') {
       return targetNode?.capabilities.handlesIntents.map((s) => s.name) ?? [];
     }
     return [];
-  }, [connector.mode, sourceNode, targetNode]);
+  }, [draft.mode, sourceNode, targetNode]);
 
-  const handleToggleEnabled = useCallback((enabled: boolean) => {
-    onUpdate(connector.id, (c) => ({ ...c, enabled }));
-  }, [connector.id, onUpdate]);
+  // Validate the draft in real time
+  const draftValidation = useMemo((): ConnectorValidation => {
+    const provisional: InteropConnector = { ...connector, ...draft };
+    return validateConnector(provisional, flow.nodes);
+  }, [connector, draft, flow.nodes]);
 
-  const handleChangeMode = useCallback((newMode: string) => {
-    onUpdate(connector.id, (c) => ({
-      ...c,
-      mode: newMode as InteropConnector['mode'],
-      contextType: undefined,
-      intentName: undefined,
-    }));
-  }, [connector.id, onUpdate]);
+  const isDirty = !draftsEqual(draft, draftFrom(connector));
+  const canSave = isDirty && draftValidation.valid;
 
-  const handleChangeContextType = useCallback((newType: string) => {
-    onUpdate(connector.id, (c) => ({ ...c, contextType: newType }));
-  }, [connector.id, onUpdate]);
+  const handleChangeMode = (newMode: string) => {
+    setDraft((d) => ({ ...d, mode: newMode as InteropConnector['mode'], contextType: undefined, intentName: undefined }));
+  };
 
-  const handleChangeIntentName = useCallback((newName: string) => {
-    onUpdate(connector.id, (c) => ({ ...c, intentName: newName }));
-  }, [connector.id, onUpdate]);
+  const handleChangeContextType = (newType: string) => {
+    setDraft((d) => ({ ...d, contextType: newType }));
+  };
+
+  const handleChangeIntentName = (newName: string) => {
+    setDraft((d) => ({ ...d, intentName: newName }));
+  };
+
+  const handleToggleEnabled = (enabled: boolean) => {
+    setDraft((d) => ({ ...d, enabled }));
+  };
+
+  const handleSave = useCallback(() => {
+    const saved = { ...draft };
+    onUpdate(connector.id, (c) => ({ ...c, ...saved }));
+    onClose();
+  }, [connector.id, draft, onUpdate, onClose]);
+
+  const handleDiscard = useCallback(() => {
+    onClose();
+  }, [onClose]);
 
   const handleDelete = useCallback(() => {
     if (confirm('Delete this connector?')) {
@@ -81,34 +111,31 @@ export function ConnectorConfigPanel({
       <CardHeader className="flex-row items-center justify-between gap-3 border-b border-border">
         <div className="flex flex-col gap-0.5">
           <CardTitle className="text-xs">Connector Config</CardTitle>
-          <span className="text-[9px] text-muted-foreground">Changes save automatically</span>
+          <span className={cn('text-[9px] font-semibold', isDirty ? 'text-amber-500' : 'text-muted-foreground')}>
+            {isDirty ? 'Unsaved changes' : 'No changes'}
+          </span>
         </div>
-        <Button
-          onClick={onClose}
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-muted-foreground"
+        <button
+          type="button"
+          onClick={handleDiscard}
+          className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           ×
-        </Button>
+        </button>
       </CardHeader>
 
       {/* Content */}
       <CardContent className="flex max-h-[calc(100vh-156px)] flex-col gap-3 overflow-y-auto p-4 scrollbar-thin">
         {/* Source & Target */}
         <div className="rounded-md border border-border bg-secondary/50 p-2 text-[11px] text-foreground">
-          <div>
-            <span className="text-muted-foreground">From:</span> <strong>{sourceNode?.label}</strong>
-          </div>
-          <div>
-            <span className="text-muted-foreground">To:</span> <strong>{targetNode?.label}</strong>
-          </div>
+          <div><span className="text-muted-foreground">From:</span> <strong>{sourceNode?.label}</strong></div>
+          <div><span className="text-muted-foreground">To:</span> <strong>{targetNode?.label}</strong></div>
         </div>
 
         {/* Mode selector */}
         <div>
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Mode</label>
-          <Select value={connector.mode} onValueChange={handleChangeMode}>
+          <Select value={draft.mode} onValueChange={handleChangeMode}>
             <SelectTrigger size="sm" className="w-full">
               <SelectValue />
             </SelectTrigger>
@@ -123,21 +150,16 @@ export function ConnectorConfigPanel({
         </div>
 
         {/* Context type selector */}
-        {(connector.mode === 'context' || connector.mode === 'theme' || connector.mode === 'audit' || connector.mode === 'context-to-intent') && (
+        {(draft.mode === 'context' || draft.mode === 'theme' || draft.mode === 'audit' || draft.mode === 'context-to-intent') && (
           <div>
             <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Context Type</label>
-            <Select
-              value={connector.contextType ?? ''}
-              onValueChange={handleChangeContextType}
-            >
+            <Select value={draft.contextType ?? ''} onValueChange={handleChangeContextType}>
               <SelectTrigger size="sm" className="w-full">
                 <SelectValue placeholder="-- Select context --" />
               </SelectTrigger>
               <SelectContent>
                 {availableContextTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {contextLabel(type)}
-                  </SelectItem>
+                  <SelectItem key={type} value={type}>{contextLabel(type)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -145,56 +167,63 @@ export function ConnectorConfigPanel({
         )}
 
         {/* Intent name selector */}
-        {(connector.mode === 'intent' || connector.mode === 'context-to-intent') && (
+        {(draft.mode === 'intent' || draft.mode === 'context-to-intent') && (
           <div>
             <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Intent</label>
-            <Select
-              value={connector.intentName ?? ''}
-              onValueChange={handleChangeIntentName}
-            >
+            <Select value={draft.intentName ?? ''} onValueChange={handleChangeIntentName}>
               <SelectTrigger size="sm" className="w-full">
                 <SelectValue placeholder="-- Select intent --" />
               </SelectTrigger>
               <SelectContent>
                 {availableIntentNames.map((name) => (
-                  <SelectItem key={name} value={name}>
-                    {intentLabel(name)}
-                  </SelectItem>
+                  <SelectItem key={name} value={name}>{intentLabel(name)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
         )}
 
-        {/* Validation message */}
-        {validation && (
-          <div className={validation.valid
-            ? 'rounded-md border border-emerald-500/45 bg-emerald-500/10 p-2 text-[10px] font-bold text-emerald-500'
-            : 'rounded-md border border-red-500/45 bg-red-500/10 p-2 text-[10px] font-bold text-red-500'}
-          >
-            {validation.valid ? '✓ ' : '⚠ '}
-            {validation.message}
-          </div>
-        )}
+        {/* Live validation feedback */}
+        <div className={cn(
+          'rounded-md border p-2 text-[10px] font-bold',
+          draftValidation.valid
+            ? 'border-emerald-500/45 bg-emerald-500/10 text-emerald-500'
+            : 'border-red-500/45 bg-red-500/10 text-red-500',
+        )}>
+          {draftValidation.valid ? '✓ ' : '⚠ '}
+          {draftValidation.message}
+        </div>
 
         {/* Enabled toggle */}
         <div className="flex items-center gap-2 rounded-md border border-border bg-secondary/50 p-2">
           <label className="flex flex-1 items-center gap-2 text-[11px] font-bold text-foreground">
             <Switch
-              checked={connector.enabled}
+              checked={draft.enabled}
               onCheckedChange={handleToggleEnabled}
               aria-label="Toggle connector"
             />
             <span>Enabled</span>
           </label>
-          <Badge variant={connector.enabled ? 'success' : 'secondary'}>{connector.enabled ? 'Active' : 'Inactive'}</Badge>
+          <Badge variant={draft.enabled ? 'success' : 'secondary'}>{draft.enabled ? 'Active' : 'Inactive'}</Badge>
         </div>
 
         {/* Action buttons */}
         <div className="mt-1 flex gap-2">
-          <Button onClick={onClose} variant="secondary" size="sm" className="flex-1">
-            Close
+          <Button onClick={handleDiscard} variant="secondary" size="sm" className="flex-1">
+            {isDirty ? 'Discard' : 'Close'}
           </Button>
+          {isDirty && (
+            <Button
+              onClick={handleSave}
+              disabled={!canSave}
+              size="sm"
+              className="flex-1 gap-1.5"
+              title={!draftValidation.valid ? 'Fix validation errors before saving' : 'Save and close'}
+            >
+              <Save className="size-3.5" />
+              Save
+            </Button>
+          )}
           <Button onClick={handleDelete} variant="destructive" size="sm">
             Delete
           </Button>
