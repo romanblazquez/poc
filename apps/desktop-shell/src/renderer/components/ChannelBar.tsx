@@ -43,13 +43,13 @@ export function ChannelBar({ currentChannel, onChannelChange, open, onOpenChange
   // Renderer-document fallback for outside clicks above the backdrop.
   useEffect(() => {
     if (!open || locked) return;
-    const onMouseDown = (e: MouseEvent) => {
+    const onPointerDown = (e: PointerEvent) => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         onOpenChange(false);
       }
     };
-    document.addEventListener('mousedown', onMouseDown);
-    return () => document.removeEventListener('mousedown', onMouseDown);
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
   }, [open, locked, onOpenChange]);
 
   const savePosition = (pos: 'left' | 'right' | 'bottom') => {
@@ -89,7 +89,9 @@ export function ChannelBar({ currentChannel, onChannelChange, open, onOpenChange
         event.channelId !== currentChannel.id ||
         !['context.broadcasted', 'context.delivered', 'appChannel.broadcasted'].includes(event.kind)
       ) return;
-      const next = [event, ...historyRef.current].slice(0, HISTORY_LIMIT);
+      const next = [event, ...historyRef.current]
+        .sort((a, b) => b.ts - a.ts)
+        .slice(0, HISTORY_LIMIT);
       historyRef.current = next;
       setHistory(next);
       void refresh();
@@ -155,7 +157,7 @@ export function ChannelBar({ currentChannel, onChannelChange, open, onOpenChange
           {!locked && (
             <div
               aria-hidden="true"
-              onMouseDown={() => onOpenChange(false)}
+              onPointerDown={() => onOpenChange(false)}
               className={cn(
                 'fixed inset-0 z-[9050] bg-black/30 backdrop-blur-[2px] transition-opacity duration-300',
                 open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',

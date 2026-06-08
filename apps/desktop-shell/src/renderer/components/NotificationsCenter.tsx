@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, BellRing, X, CheckCircle2, AlertTriangle, XCircle, Info, Check, Trash2, Lock, LockOpen, PanelLeft, PanelRight, PanelBottom } from 'lucide-react';
 import type { Fdc3Context, NotificationRaiseInput, NotificationsApi, ShellNotification } from '@fdc3-poc/fdc3-core';
 import { Button } from './ui/button.js';
@@ -242,16 +243,16 @@ export function NotificationsCenter({ open, onOpenChange }: NotificationsCenterP
   // Reset lock when drawer closes
   useEffect(() => { if (!open) setLocked(false); }, [open]);
 
-  // Outside-click closes panel (when unlocked) — document listener, not backdrop onMouseDown
+  // Renderer-document fallback for outside clicks above the backdrop.
   useEffect(() => {
     if (!open || locked) return;
-    const onMouseDown = (e: MouseEvent) => {
+    const onPointerDown = (e: PointerEvent) => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         onOpenChange(false);
       }
     };
-    document.addEventListener('mousedown', onMouseDown);
-    return () => document.removeEventListener('mousedown', onMouseDown);
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
   }, [open, locked, onOpenChange]);
 
   const savePosition = (pos: 'left' | 'right' | 'bottom') => {
@@ -300,13 +301,13 @@ export function NotificationsCenter({ open, onOpenChange }: NotificationsCenterP
 
   const openNotification = useCallback(async (notification: ShellNotification) => {
     hideToast(notification.id);
-    onOpenChange(true);
+    if (!open) onOpenChange(true);
     await api?.markRead(notification.id);
     const action = notification.action;
     if (action?.intent) {
       await getFdc3()?.raiseIntent(action.intent, action.context);
     }
-  }, [api, hideToast, onOpenChange]);
+  }, [api, hideToast, onOpenChange, open]);
 
   const dismissNotification = useCallback(async (id: string) => {
     hideToast(id);
@@ -365,49 +366,53 @@ export function NotificationsCenter({ open, onOpenChange }: NotificationsCenterP
         )}
       </button>
 
-      {/* ── Toast stack — floats over everything ── */}
-      <div
-        aria-live="polite"
-        className="fixed z-[9200] flex flex-col-reverse gap-2.5 transition-all duration-300 ease-out"
-        style={{
-          right: '20px',
-          bottom: (position === 'bottom' && open) ? '420px' : '24px',
-        }}
-      >
-        {toastItems.map((n) => (
-          <NotificationToast
-            key={n.id}
-            notification={n}
-            onOpen={(notif) => { void openNotification(notif); }}
-            onDismiss={(id) => { void dismissNotification(id); }}
-          />
-        ))}
-      </div>
+      {createPortal(
+        <>
+          {/* ── Toast stack — floats over everything ── */}
+          <div
+            aria-live="polite"
+            className="fixed z-[9200] flex flex-col-reverse gap-2.5 transition-all duration-300 ease-out"
+            style={{
+              right: '20px',
+              bottom: (position === 'bottom' && open) ? '420px' : '24px',
+            }}
+          >
+            {toastItems.map((n) => (
+              <NotificationToast
+                key={n.id}
+                notification={n}
+                onOpen={(notif) => { void openNotification(notif); }}
+                onDismiss={(id) => { void dismissNotification(id); }}
+              />
+            ))}
+          </div>
 
-      {/* ── Backdrop — visual only, pointer-events-none; closing handled by document mousedown ── */}
-      {!locked && (
-        <div
-          className={cn(
-            'fixed inset-0 z-[9050] bg-black/30 backdrop-blur-[2px] pointer-events-none transition-opacity duration-300',
-            open ? 'opacity-100' : 'opacity-0',
+          {/* Capture outside clicks, including those over Electron webviews. */}
+          {!locked && (
+            <div
+              aria-hidden="true"
+              onPointerDown={() => onOpenChange(false)}
+              className={cn(
+                'fixed inset-0 z-[9050] bg-black/30 backdrop-blur-[2px] transition-opacity duration-300',
+                open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
+              )}
+            />
           )}
-        />
-      )}
 
-      {/* ── Drawer (position: left | right | bottom) ── */}
-      <div
-        ref={panelRef}
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        className={cn(
-          'fixed z-[9100] flex flex-col bg-card shadow-2xl transition-transform duration-300 ease-out',
-          position === 'right'  && 'right-0 top-0 h-screen w-[400px]',
-          position === 'left'   && 'left-0 top-0 h-screen w-[400px]',
-          position === 'bottom' && 'bottom-0 left-0 right-0 h-[400px] w-full',
-          position === 'right'  && (open ? 'translate-x-0' : 'translate-x-full'),
-          position === 'left'   && (open ? 'translate-x-0' : '-translate-x-full'),
-          position === 'bottom' && (open ? 'translate-y-0' : 'translate-y-full'),
-        )}
-      >
+          {/* Render outside the draggable top bar for consistent interaction at every position. */}
+          <div
+            ref={panelRef}
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            className={cn(
+              'fixed z-[9100] flex flex-col bg-card shadow-2xl transition-transform duration-300 ease-out',
+              position === 'right'  && 'right-0 top-0 h-screen w-[400px]',
+              position === 'left'   && 'left-0 top-0 h-screen w-[400px]',
+              position === 'bottom' && 'bottom-0 left-0 right-0 h-[400px] w-full',
+              position === 'right'  && (open ? 'translate-x-0' : 'translate-x-full'),
+              position === 'left'   && (open ? 'translate-x-0' : '-translate-x-full'),
+              position === 'bottom' && (open ? 'translate-y-0' : 'translate-y-full'),
+            )}
+          >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b px-5 py-4">
           <div>
@@ -551,7 +556,10 @@ export function NotificationsCenter({ open, onOpenChange }: NotificationsCenterP
             Notifications are raised via <code className="font-mono">window.notifications.raise()</code>
           </p>
         </div>
-      </div>
+          </div>
+        </>,
+        document.body,
+      )}
     </>
   );
 }
