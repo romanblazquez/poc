@@ -222,11 +222,18 @@ function NotificationRow({
 interface NotificationsCenterProps {
   open: boolean;
   onOpenChange(open: boolean): void;
+  onPositionChange?: (position: 'left' | 'right' | 'bottom') => void;
+  rightSidebarOpen: boolean;
 }
 
 type FilterTab = 'all' | 'unread' | 'error' | 'warning';
 
-export function NotificationsCenter({ open, onOpenChange }: NotificationsCenterProps): JSX.Element | null {
+export function NotificationsCenter({
+  open,
+  onOpenChange,
+  onPositionChange,
+  rightSidebarOpen,
+}: NotificationsCenterProps): JSX.Element | null {
   const api = getNotificationsApi();
   const [items, setItems] = useState<ShellNotification[]>([]);
   const [hiddenToastIds, setHiddenToastIds] = useState<Set<string>>(() => new Set());
@@ -258,6 +265,7 @@ export function NotificationsCenter({ open, onOpenChange }: NotificationsCenterP
   const savePosition = (pos: 'left' | 'right' | 'bottom') => {
     setPosition(pos);
     window.localStorage.setItem('fdc3.shell.notifications-panel.position', pos);
+    onPositionChange?.(pos);
   };
 
   useEffect(() => {
@@ -373,7 +381,7 @@ export function NotificationsCenter({ open, onOpenChange }: NotificationsCenterP
             aria-live="polite"
             className="fixed z-[9200] flex flex-col-reverse gap-2.5 transition-all duration-300 ease-out"
             style={{
-              right: '20px',
+              right: rightSidebarOpen ? '420px' : '20px',
               bottom: (position === 'bottom' && open) ? '420px' : '24px',
             }}
           >

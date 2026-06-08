@@ -83,12 +83,18 @@ export interface AppEntry {
 }
 
 type ThemeMode = ThemeName;
+type SidebarPosition = 'left' | 'right' | 'bottom';
 export type WorkspaceMode = 'launcher' | 'workspace' | 'dashboard' | 'interop-flow' | 'control-tower' | 'manager' | 'bridge' | 'app-directory' | 'rbac';
 
 export interface WorkspaceState {
   channelId: string | null;
   theme: ThemeMode;
   layout: unknown | null;
+}
+
+function readSidebarPosition(storageKey: string): SidebarPosition {
+  const value = window.localStorage.getItem(storageKey);
+  return value === 'left' || value === 'bottom' ? value : 'right';
 }
 
 export interface WorkspaceTab {
@@ -280,6 +286,10 @@ export function App() {
   const [lastBroadcast, setLastBroadcast] = useState<{ contextType: string; sourceAppId: string; ts: number } | null>(null);
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [rightPanel, setRightPanel] = useState<'notifications' | 'channel' | null>(null);
+  const [channelPanelPosition, setChannelPanelPosition] = useState<SidebarPosition>(() =>
+    readSidebarPosition('fdc3.shell.channel-panel.position'));
+  const [notificationsPanelPosition, setNotificationsPanelPosition] = useState<SidebarPosition>(() =>
+    readSidebarPosition('fdc3.shell.notifications-panel.position'));
   const [hotkeysOpen, setHotkeysOpen] = useState(false);
   const [addAppsOpen, setAddAppsOpen] = useState(false);
   const dockviewRef = useRef<DockviewWorkspaceHandle>(null);
@@ -293,6 +303,10 @@ export function App() {
   const activeWorkspaceApps = apps.filter((app) => activeWorkspaceTab.panelIds.includes(app.appId));
   const interopWorkspaceAppIds = activeWorkspaceApps.map((app) => app.appId);
   const detachedWorkspaceId = new URLSearchParams(window.location.search).get('detachedWorkspaceId');
+  const rightSidebarOpen = (
+    (rightPanel === 'channel' && channelPanelPosition === 'right') ||
+    (rightPanel === 'notifications' && notificationsPanelPosition === 'right')
+  );
 
   useEffect(() => {
     if (workspaceTabs.length === 0) {
@@ -766,6 +780,7 @@ export function App() {
               onChannelChange={handleChannelChange}
               open={rightPanel === 'channel'}
               onOpenChange={(v) => setRightPanel(v ? 'channel' : null)}
+              onPositionChange={setChannelPanelPosition}
             />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -792,7 +807,12 @@ export function App() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <NotificationsCenter open={rightPanel === 'notifications'} onOpenChange={(v) => setRightPanel(v ? 'notifications' : null)} />
+            <NotificationsCenter
+              open={rightPanel === 'notifications'}
+              onOpenChange={(v) => setRightPanel(v ? 'notifications' : null)}
+              onPositionChange={setNotificationsPanelPosition}
+              rightSidebarOpen={rightSidebarOpen}
+            />
             <ShellMenu
               theme={theme}
               onThemeChange={(t) => void handleThemeChange(t)}

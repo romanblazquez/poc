@@ -11,6 +11,7 @@ interface ChannelBarProps {
   onChannelChange: (ch: UserChannel | null) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onPositionChange?: (position: 'left' | 'right' | 'bottom') => void;
 }
 
 const HISTORY_LIMIT = 20;
@@ -23,7 +24,13 @@ function copyToClipboard(text: string): void {
   void navigator.clipboard.writeText(text).catch(() => undefined);
 }
 
-export function ChannelBar({ currentChannel, onChannelChange, open, onOpenChange }: ChannelBarProps) {
+export function ChannelBar({
+  currentChannel,
+  onChannelChange,
+  open,
+  onOpenChange,
+  onPositionChange,
+}: ChannelBarProps) {
   const [channels, setChannels] = useState<UserChannel[]>([]);
   const [currentContext, setCurrentContext] = useState<Fdc3Context | null>(null);
   const [history, setHistory] = useState<InteropActivityEvent[]>([]);
@@ -55,6 +62,7 @@ export function ChannelBar({ currentChannel, onChannelChange, open, onOpenChange
   const savePosition = (pos: 'left' | 'right' | 'bottom') => {
     setPosition(pos);
     window.localStorage.setItem('fdc3.shell.channel-panel.position', pos);
+    onPositionChange?.(pos);
   };
 
   useEffect(() => {
