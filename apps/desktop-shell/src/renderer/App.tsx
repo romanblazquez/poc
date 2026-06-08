@@ -18,6 +18,8 @@ import { Button } from './components/ui/button.js';
 import { Card, CardContent } from './components/ui/card.js';
 import { Input } from './components/ui/input.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select.js';
+import { Palette } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './components/ui/dropdown-menu.js';
 import { cn } from './lib/utils.js';
 import { InteropCopilot } from './copilot/InteropCopilot.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
@@ -748,6 +750,31 @@ export function App() {
               onChannelChange={handleChannelChange}
             />
             <WorkspaceToolbar onSave={handleSave} saveStatus={saveStatus} lastSavedAt={lastSavedAt} />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  title="Change theme"
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <Palette className="size-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuLabel>Theme</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {Object.entries(THEMES).map(([key, cfg]) => (
+                  <DropdownMenuItem
+                    key={key}
+                    onClick={() => void handleThemeChange(key as ThemeName)}
+                    className={cn('gap-2', theme === key && 'font-black text-foreground')}
+                  >
+                    {theme === key && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                    {cfg.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <NotificationsCenter open={notificationsOpen} onOpenChange={setNotificationsOpen} />
             <ShellMenu
               theme={theme}
