@@ -71,7 +71,19 @@ interface ShellMenuProps {
 
 export function ShellMenu({ theme, onThemeChange, onOpenHotkeys }: ShellMenuProps) {
   const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [open]);
 
   // Close on Escape
   useEffect(() => {
@@ -120,7 +132,7 @@ export function ShellMenu({ theme, onThemeChange, onOpenHotkeys }: ShellMenuProp
   const pct = Math.round(zoom * 100);
 
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative">
       <Button
         type="button"
         variant="ghost"
@@ -136,13 +148,7 @@ export function ShellMenu({ theme, onThemeChange, onOpenHotkeys }: ShellMenuProp
 
       {open && (
         <>
-          {/* Transparent backdrop — catches outside clicks even over Electron drag regions */}
           <div
-            className="fixed inset-0 z-[9998]"
-            onMouseDown={() => setOpen(false)}
-          />
-          <div
-            ref={menuRef}
             className="absolute right-0 top-full z-[9999] mt-2 w-80 overflow-hidden rounded-lg border border-border bg-card shadow-xl"
             style={{ boxShadow: 'var(--shell-shadow)' }}
           >

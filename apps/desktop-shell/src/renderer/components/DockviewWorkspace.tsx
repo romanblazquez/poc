@@ -1,6 +1,6 @@
 import { useCallback, useContext, useEffect, useImperativeHandle, useRef, useState, createContext, forwardRef } from 'react';
 import type { CSSProperties } from 'react';
-import { DockviewReact, type IDockviewPanelProps, type DockviewApi, type DockviewReadyEvent } from 'dockview';
+import { DockviewReact, type IDockviewPanelProps, type IDockviewPanelHeaderProps, type DockviewApi, type DockviewReadyEvent } from 'dockview';
 import type { AppEntry } from '../App.js';
 import type { UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
@@ -77,6 +77,33 @@ const WebviewContext = createContext<WebviewContextValue>({
 });
 
 const OnAddAppContext = createContext<(() => void) | null>(null);
+const CurrentChannelContext = createContext<UserChannel | null>(null);
+
+function AppTabComponent({ api }: IDockviewPanelHeaderProps<AppPanelParams>) {
+  const channel = useContext(CurrentChannelContext);
+  const color = channel?.displayMetadata.color;
+
+  return (
+    <div className="group flex h-full items-center gap-1.5 px-2.5">
+      {color && (
+        <span
+          className="h-2 w-2 shrink-0 rounded-full ring-1 ring-black/10"
+          style={{ background: color }}
+          title={channel?.displayMetadata.name}
+        />
+      )}
+      <span className="max-w-[120px] truncate text-[12px]">{api.title}</span>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); api.close(); }}
+        className="ml-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded text-[11px] leading-none opacity-0 transition-opacity hover:bg-black/10 group-hover:opacity-60 hover:!opacity-100"
+        title="Close panel"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
 
 function WorkspaceWatermark() {
   const onAddApp = useContext(OnAddAppContext);
@@ -537,14 +564,17 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
 
       <div className="min-h-0 min-w-0 flex-1">
         <OnAddAppContext.Provider value={onAddApp ?? null}>
-          <WebviewContext.Provider value={{ registerWebview, markReady }}>
-            <DockviewReact
-              onReady={onReady}
-              components={{ 'app-panel': AppPanelComponent }}
-              watermarkComponent={WorkspaceWatermark}
-              className={`${THEMES[theme].dockview} h-full w-full`}
-            />
-          </WebviewContext.Provider>
+          <CurrentChannelContext.Provider value={currentChannel}>
+            <WebviewContext.Provider value={{ registerWebview, markReady }}>
+              <DockviewReact
+                onReady={onReady}
+                components={{ 'app-panel': AppPanelComponent }}
+                defaultTabComponent={AppTabComponent}
+                watermarkComponent={WorkspaceWatermark}
+                className={`${THEMES[theme].dockview} h-full w-full`}
+              />
+            </WebviewContext.Provider>
+          </CurrentChannelContext.Provider>
         </OnAddAppContext.Provider>
       </div>
     </div>

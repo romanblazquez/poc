@@ -276,8 +276,10 @@ export function App() {
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
   const [detachedWorkspaces, setDetachedWorkspaces] = useState<Partial<Record<string, DetachedWorkspacePayload>>>({});
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
+  const [channels, setChannels] = useState<UserChannel[]>([]);
+  const [lastBroadcast, setLastBroadcast] = useState<{ contextType: string; sourceAppId: string; ts: number } | null>(null);
   const [copilotOpen, setCopilotOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [rightPanel, setRightPanel] = useState<'notifications' | 'channel' | null>(null);
   const [hotkeysOpen, setHotkeysOpen] = useState(false);
   const [addAppsOpen, setAddAppsOpen] = useState(false);
   const dockviewRef = useRef<DockviewWorkspaceHandle>(null);
@@ -317,7 +319,17 @@ export function App() {
     refreshApps();
     void window.fdc3.getPreloadPath().then(setPreloadPath);
     void window.fdc3.getCurrentChannel().then(setCurrentChannel);
+    void window.fdc3.getUserChannels().then(setChannels);
     void window.fdc3.getDisplays().then(setDisplays);
+
+    const fdc3Extended = window.fdc3 as typeof window.fdc3 & {
+      onInteropActivity?: (handler: (e: { kind: string; contextType?: string; sourceAppId?: string; ts: number }) => void) => () => void;
+    };
+    const unsubActivity = fdc3Extended.onInteropActivity?.((e) => {
+      if (e.kind === 'context.broadcasted' && e.contextType && e.sourceAppId) {
+        setLastBroadcast({ contextType: e.contextType, sourceAppId: e.sourceAppId, ts: e.ts });
+      }
+    }) ?? (() => undefined);
     void window.fdc3.getTheme().then((nextTheme) => {
       setGlobalTheme(nextTheme);
       document.documentElement.dataset.theme = THEMES[nextTheme].dataTheme;
@@ -352,6 +364,7 @@ export function App() {
       unsub();
       unsubAppList();
       unsubTheme();
+      unsubActivity();
     };
   }, []);
 
@@ -401,7 +414,7 @@ export function App() {
       }
       if (key === 'b') {
         event.preventDefault();
-        setNotificationsOpen((prev) => !prev);
+        setRightPanel((prev) => prev === 'notifications' ? null : 'notifications');
         return;
       }
       if (key === 's') {
@@ -432,12 +445,14 @@ export function App() {
   useEffect(() => {
     if (!window.fdc3) return;
     const desiredChannelId = activeWorkspaceState.channelId;
+    // Sync the ChannelBar immediately from the known channels list — don't wait for the FDC3 event
+    setCurrentChannel(channels.find((c) => c.id === desiredChannelId) ?? null);
     if (desiredChannelId) {
       void window.fdc3.joinUserChannel(desiredChannelId);
       return;
     }
     void window.fdc3.leaveCurrentChannel();
-  }, [activeWorkspaceState.channelId, activeWorkspaceId]);
+  }, [activeWorkspaceState.channelId, activeWorkspaceId, channels]);
 
   const handleOpen = useCallback(async (appId: string) => {
     await window.fdc3.open({ appId });
@@ -745,11 +760,13 @@ export function App() {
               ✦ Ask
               <span className="text-[10px] font-semibold opacity-60">⌘K</span>
             </Button>
+            <WorkspaceToolbar onSave={handleSave} saveStatus={saveStatus} lastSavedAt={lastSavedAt} />
             <ChannelBar
               currentChannel={currentChannel}
               onChannelChange={handleChannelChange}
+              open={rightPanel === 'channel'}
+              onOpenChange={(v) => setRightPanel(v ? 'channel' : null)}
             />
-            <WorkspaceToolbar onSave={handleSave} saveStatus={saveStatus} lastSavedAt={lastSavedAt} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -775,7 +792,7 @@ export function App() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <NotificationsCenter open={notificationsOpen} onOpenChange={setNotificationsOpen} />
+            <NotificationsCenter open={rightPanel === 'notifications'} onOpenChange={(v) => setRightPanel(v ? 'notifications' : null)} />
             <ShellMenu
               theme={theme}
               onThemeChange={(t) => void handleThemeChange(t)}
@@ -792,22 +809,29 @@ export function App() {
       {/* Workspace tab bar */}
       <div className="flex h-10 shrink-0 items-stretch border-b">
         <div className="flex min-w-0 items-stretch overflow-x-auto scrollbar-thin">
-          {workspaceTabs.map((tab) => (
-            <WorkspaceTabButton
-              key={tab.id}
-              active={activeWorkspaceTab.id === tab.id}
-              onClick={() => setActiveWorkspaceId(tab.id)}
-              onDoubleClick={() => handleWorkspaceRenameStart(tab.id, tab.name)}
-              onClose={workspaceTabs.length > 1 ? () => handleCloseWorkspace(tab.id) : undefined}
-              editing={editingWorkspaceId === tab.id}
-              editingValue={editingWorkspaceName}
-              onEditingChange={setEditingWorkspaceName}
-              onEditingCommit={() => commitWorkspaceRename(tab.id)}
-              onEditingCancel={cancelWorkspaceRename}
-            >
-              {tab.name}
-            </WorkspaceTabButton>
-          ))}
+          {workspaceTabs.map((tab) => {
+            const tabChannelId = workspaceStates[tab.id]?.channelId ?? null;
+            const tabChannel = channels.find((c) => c.id === tabChannelId) ?? null;
+            return (
+              <WorkspaceTabButton
+                key={tab.id}
+                active={activeWorkspaceTab.id === tab.id}
+                onClick={() => setActiveWorkspaceId(tab.id)}
+                onDoubleClick={() => handleWorkspaceRenameStart(tab.id, tab.name)}
+                onClose={workspaceTabs.length > 1 ? () => handleCloseWorkspace(tab.id) : undefined}
+                editing={editingWorkspaceId === tab.id}
+                editingValue={editingWorkspaceName}
+                onEditingChange={setEditingWorkspaceName}
+                onEditingCommit={() => commitWorkspaceRename(tab.id)}
+                onEditingCancel={cancelWorkspaceRename}
+                channelColor={tabChannel?.displayMetadata.color ?? null}
+                channelName={tabChannel?.displayMetadata.name ?? null}
+                panelCount={tab.panelIds.length}
+              >
+                {tab.name}
+              </WorkspaceTabButton>
+            );
+          })}
           <button
             onClick={handleAddWorkspace}
             title="Add workspace"
@@ -918,8 +942,20 @@ export function App() {
           value={currentChannel?.displayMetadata.name ?? 'None'}
           color={currentChannel?.displayMetadata.color ?? '#555'}
         />
-        <StatusItem label="Bus" value="Electron / FDC3" color="var(--shell-accent)" />
         <StatusItem label="Panels" value={String(openPanelIds.length)} color="var(--shell-positive)" />
+        {lastBroadcast && (
+          <div className="flex items-center gap-1.5 text-[11px]">
+            <span className="animate-pulse h-1.5 w-1.5 rounded-full bg-[color:var(--shell-accent)]" />
+            <span className="text-[color:var(--shell-subtle)]">📡</span>
+            <span className="font-semibold text-[color:var(--shell-accent)]">{lastBroadcast.contextType}</span>
+            <span className="text-muted-foreground/60">from</span>
+            <span className="font-semibold text-muted-foreground">{lastBroadcast.sourceAppId}</span>
+          </div>
+        )}
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--shell-positive)]" />
+          <span className="text-[11px] text-muted-foreground/50">FDC3 · Electron</span>
+        </div>
       </div>
 
       <InteropCopilot
@@ -1137,7 +1173,9 @@ function DetachedWorkspacePlaceholder({
 function WorkspaceTabButton({
   active, onClick, onDoubleClick, onClose,
   editing = false, editingValue = '',
-  onEditingChange, onEditingCommit, onEditingCancel, children,
+  onEditingChange, onEditingCommit, onEditingCancel,
+  channelColor = null, channelName = null, panelCount = 0,
+  children,
 }: {
   active: boolean;
   onClick: () => void;
@@ -1148,6 +1186,9 @@ function WorkspaceTabButton({
   onEditingChange?: (v: string) => void;
   onEditingCommit?: () => void;
   onEditingCancel?: () => void;
+  channelColor?: string | null;
+  channelName?: string | null;
+  panelCount?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -1162,6 +1203,13 @@ function WorkspaceTabButton({
           : 'text-muted-foreground hover:bg-muted hover:text-foreground',
       )}
     >
+      {channelColor && (
+        <span
+          className="h-2 w-2 shrink-0 rounded-full ring-1 ring-black/10"
+          style={{ background: channelColor }}
+          title={channelName ? `Channel: ${channelName}` : 'Channel'}
+        />
+      )}
       {editing ? (
         <Input
           autoFocus
@@ -1179,6 +1227,11 @@ function WorkspaceTabButton({
         />
       ) : (
         <span>{children}</span>
+      )}
+      {panelCount > 0 && (
+        <span className="rounded px-1 text-[9px] font-black tabular-nums opacity-50">
+          {panelCount}
+        </span>
       )}
       {onClose && (
         <span

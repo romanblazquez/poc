@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, BellRing, X, CheckCircle2, AlertTriangle, XCircle, Info, Check, Trash2 } from 'lucide-react';
+import { Bell, BellRing, X, CheckCircle2, AlertTriangle, XCircle, Info, Check, Trash2, Lock, LockOpen, PanelLeft, PanelRight, PanelBottom } from 'lucide-react';
 import type { Fdc3Context, NotificationRaiseInput, NotificationsApi, ShellNotification } from '@fdc3-poc/fdc3-core';
-import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';
 import { cn } from '../lib/utils.js';
 
@@ -232,7 +231,33 @@ export function NotificationsCenter({ open, onOpenChange }: NotificationsCenterP
   const [hiddenToastIds, setHiddenToastIds] = useState<Set<string>>(() => new Set());
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [pulse, setPulse] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [position, setPosition] = useState<'left' | 'right' | 'bottom'>(() => {
+    const s = window.localStorage.getItem('fdc3.shell.notifications-panel.position');
+    return (s === 'left' || s === 'right' || s === 'bottom') ? s : 'right';
+  });
   const prevCountRef = useRef(0);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Reset lock when drawer closes
+  useEffect(() => { if (!open) setLocked(false); }, [open]);
+
+  // Outside-click closes panel (when unlocked) — document listener, not backdrop onMouseDown
+  useEffect(() => {
+    if (!open || locked) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onOpenChange(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [open, locked, onOpenChange]);
+
+  const savePosition = (pos: 'left' | 'right' | 'bottom') => {
+    setPosition(pos);
+    window.localStorage.setItem('fdc3.shell.notifications-panel.position', pos);
+  };
 
   useEffect(() => {
     if (!api) return;
@@ -334,17 +359,20 @@ export function NotificationsCenter({ open, onOpenChange }: NotificationsCenterP
           ? <BellRing className={cn('size-4', pulse && 'animate-bounce')} />
           : <Bell className="size-4" />}
         {unreadCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-black text-white">
-            {unreadCount > 99 ? '99+' : unreadCount}
+          <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-destructive px-0.5 text-[8px] font-black leading-none text-white">
+            {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
-      {/* ── Toast stack — bottom-right, floats over everything ── */}
+      {/* ── Toast stack — floats over everything ── */}
       <div
         aria-live="polite"
-        className="fixed bottom-6 z-[9200] flex flex-col-reverse gap-2.5 transition-[right] duration-300 ease-out"
-        style={{ right: open ? '420px' : '20px' }}
+        className="fixed z-[9200] flex flex-col-reverse gap-2.5 transition-all duration-300 ease-out"
+        style={{
+          right: '20px',
+          bottom: (position === 'bottom' && open) ? '420px' : '24px',
+        }}
       >
         {toastItems.map((n) => (
           <NotificationToast
@@ -356,20 +384,28 @@ export function NotificationsCenter({ open, onOpenChange }: NotificationsCenterP
         ))}
       </div>
 
-      {/* ── Backdrop ── */}
-      <div
-        className={cn(
-          'fixed inset-0 z-[9050] bg-black/30 backdrop-blur-[2px] transition-opacity duration-300',
-          open ? 'opacity-100' : 'opacity-0 pointer-events-none',
-        )}
-        onMouseDown={() => onOpenChange(false)}
-      />
+      {/* ── Backdrop — visual only, pointer-events-none; closing handled by document mousedown ── */}
+      {!locked && (
+        <div
+          className={cn(
+            'fixed inset-0 z-[9050] bg-black/30 backdrop-blur-[2px] pointer-events-none transition-opacity duration-300',
+            open ? 'opacity-100' : 'opacity-0',
+          )}
+        />
+      )}
 
-      {/* ── Right drawer ── */}
+      {/* ── Drawer (position: left | right | bottom) ── */}
       <div
+        ref={panelRef}
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         className={cn(
-          'fixed right-0 top-0 z-[9100] flex h-screen w-[400px] flex-col bg-card shadow-2xl transition-transform duration-300 ease-out',
-          open ? 'translate-x-0' : 'translate-x-full',
+          'fixed z-[9100] flex flex-col bg-card shadow-2xl transition-transform duration-300 ease-out',
+          position === 'right'  && 'right-0 top-0 h-screen w-[400px]',
+          position === 'left'   && 'left-0 top-0 h-screen w-[400px]',
+          position === 'bottom' && 'bottom-0 left-0 right-0 h-[400px] w-full',
+          position === 'right'  && (open ? 'translate-x-0' : 'translate-x-full'),
+          position === 'left'   && (open ? 'translate-x-0' : '-translate-x-full'),
+          position === 'bottom' && (open ? 'translate-y-0' : 'translate-y-full'),
         )}
       >
         {/* Header */}
@@ -382,7 +418,44 @@ export function NotificationsCenter({ open, onOpenChange }: NotificationsCenterP
               {items.filter((n) => !n.dismissed).length} total
             </p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
+            {/* Position picker */}
+            <div className="flex overflow-hidden rounded-md border">
+              {([
+                { pos: 'left',   Icon: PanelLeft   },
+                { pos: 'bottom', Icon: PanelBottom  },
+                { pos: 'right',  Icon: PanelRight   },
+              ] as const).map(({ pos, Icon }) => (
+                <button
+                  key={pos}
+                  type="button"
+                  onClick={() => savePosition(pos)}
+                  title={`Dock ${pos}`}
+                  className={cn(
+                    'flex h-6 w-6 items-center justify-center border-r last:border-r-0 transition-colors',
+                    position === pos
+                      ? 'bg-primary/15 text-primary'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  )}
+                >
+                  <Icon className="size-3" />
+                </button>
+              ))}
+            </div>
+            {/* Lock */}
+            <button
+              type="button"
+              onClick={() => setLocked((v) => !v)}
+              title={locked ? 'Unlock — backdrop and auto-close restored' : 'Lock — keep open, no backdrop'}
+              className={cn(
+                'flex h-7 w-7 items-center justify-center rounded-md transition-colors',
+                locked
+                  ? 'bg-primary/15 text-primary hover:bg-primary/25'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+              )}
+            >
+              {locked ? <Lock className="size-3.5" /> : <LockOpen className="size-3.5" />}
+            </button>
             <Button type="button" onClick={() => { void raiseDemoNotification(); }} size="xs" variant="ghost" title="Raise test notification">
               Test
             </Button>
