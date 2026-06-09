@@ -73,16 +73,23 @@ export function ShellMenu({ theme, onThemeChange, onOpenHotkeys }: ShellMenuProp
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
+  // Close on outside click — but NOT when the click lands inside a Radix UI
+  // portal (e.g. SelectContent, DropdownMenu). Radix portals render to
+  // document.body, so they're outside containerRef even though they belong to
+  // controls inside the menu. Using mousedown means we'd close before the
+  // Radix pointerup/click handler fires and the selection is lost.
   useEffect(() => {
     if (!open) return;
-    const onMouseDown = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (!target) return;
+      if (containerRef.current?.contains(target)) return;
+      // Skip if the click is inside any Radix portal content (Select, DropdownMenu, etc.)
+      if (target.closest('[data-slot="select-content"],[data-radix-popper-content-wrapper],[role="listbox"],[role="option"]')) return;
+      setOpen(false);
     };
-    document.addEventListener('mousedown', onMouseDown);
-    return () => document.removeEventListener('mousedown', onMouseDown);
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
   }, [open]);
 
   // Close on Escape

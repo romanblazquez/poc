@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useImperativeHandle, useRef, useState, createContext, forwardRef } from 'react';
+import { useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState, createContext, forwardRef } from 'react';
 import type { CSSProperties } from 'react';
 import { DockviewReact, type IDockviewPanelProps, type IDockviewPanelHeaderProps, type DockviewApi, type DockviewReadyEvent } from 'dockview';
 import type { AppEntry } from '../App.js';
@@ -12,7 +12,7 @@ import '../styles/dockview-override.css';
 
 type ThemeMode = ThemeName;
 
-type EmbeddedWebview = HTMLWebViewElement & {
+type EmbeddedWebview = HTMLElement & {
   executeJavaScript(script: string): Promise<unknown>;
 };
 
@@ -53,31 +53,33 @@ export interface DisplayInfo {
   scaleFactor: number;
 }
 
+// AppPanelComponent only needs appId — pool creates and positions the webview.
 interface AppPanelParams {
   appId: string;
-  appUrl: string;
-  preloadPath: string;
+  appUrl: string;       // kept for backwards-compat with saved workspace JSON
+  preloadPath: string;  // kept for backwards-compat with saved workspace JSON
   channelId: string | null;
   theme: ThemeMode;
-  // NOTE: registerWebview is intentionally NOT in params — functions cannot be
-  // JSON-serialised by Dockview's fromJSON/toJSON.  It is delivered via context.
 }
 
-type RegisterWebviewFn = (appId: string, node: EmbeddedWebview | null) => void;
-type MarkReadyFn = (appId: string, channelId: string | null, theme: ThemeMode) => void;
+// ─── Webview pool context ─────────────────────────────────────────────────────
+// AppPanelComponent registers its slot div here; the pool repositions the
+// already-loaded webview over it instead of creating a new one.
 
-interface WebviewContextValue {
-  registerWebview: RegisterWebviewFn;
-  markReady: MarkReadyFn;
+interface WebviewPoolContextValue {
+  bindSlot: (appId: string, el: HTMLDivElement) => void;
+  unbindSlot: (appId: string) => void;
 }
 
-const WebviewContext = createContext<WebviewContextValue>({
-  registerWebview: () => undefined,
-  markReady: () => undefined,
+const WebviewPoolContext = createContext<WebviewPoolContextValue>({
+  bindSlot: () => undefined,
+  unbindSlot: () => undefined,
 });
 
 const OnAddAppContext = createContext<(() => void) | null>(null);
 const CurrentChannelContext = createContext<UserChannel | null>(null);
+
+// ─── Tab header ───────────────────────────────────────────────────────────────
 
 function AppTabComponent({ api }: IDockviewPanelHeaderProps<AppPanelParams>) {
   const channel = useContext(CurrentChannelContext);
@@ -104,6 +106,8 @@ function AppTabComponent({ api }: IDockviewPanelHeaderProps<AppPanelParams>) {
     </div>
   );
 }
+
+// ─── Empty workspace watermark ────────────────────────────────────────────────
 
 function WorkspaceWatermark() {
   const onAddApp = useContext(OnAddAppContext);
@@ -133,6 +137,32 @@ function WorkspaceWatermark() {
   );
 }
 
+// ─── App panel — pure slot div ────────────────────────────────────────────────
+// No <webview> here. The pool layer manages the actual webview elements
+// so they survive panel close/reopen without reloading.
+
+function AppPanelComponent({ params }: IDockviewPanelProps<AppPanelParams>) {
+  const { bindSlot, unbindSlot } = useContext(WebviewPoolContext);
+  const slotRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = slotRef.current;
+    if (!el) return;
+    bindSlot(params.appId, el);
+    return () => unbindSlot(params.appId);
+  }, [params.appId, bindSlot, unbindSlot]);
+
+  return (
+    <div
+      ref={slotRef}
+      data-webview-slot={params.appId}
+      style={{ height: '100%', width: '100%' }}
+    />
+  );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function appendQuery(url: string, query: string): string {
   const hashIndex = url.indexOf('#');
   const baseUrl = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
@@ -156,30 +186,6 @@ function syncEmbeddedApp(webview: EmbeddedWebview, channelId: string | null, the
       : 'window.fdc3?.leaveCurrentChannel?.();',
   ].join(' ');
   void webview.executeJavaScript(script);
-}
-
-function AppPanelComponent({ params }: IDockviewPanelProps<AppPanelParams>) {
-  const { registerWebview, markReady } = useContext(WebviewContext);
-  const handleWebviewRef = useCallback((node: HTMLWebViewElement | null) => {
-    const webview = node as EmbeddedWebview | null;
-    registerWebview(params.appId, webview);
-    if (!webview) return;
-    webview.addEventListener('dom-ready', () => {
-      markReady(params.appId, params.channelId, params.theme);
-    }, { once: true });
-  }, [markReady, params.appId, params.channelId, params.theme, registerWebview]);
-
-  return (
-    <div className="h-full w-full bg-[color:var(--shell-bg)]">
-      <webview
-        ref={handleWebviewRef}
-        src={params.appUrl}
-        preload={`file://${params.preloadPath}`}
-        partition={`persist:workspace-${params.appId}`}
-        style={{ height: '100%', width: '100%', border: 'none' } as CSSProperties}
-      />
-    </div>
-  );
 }
 
 function panelTitle(app: AppEntry): string {
@@ -257,6 +263,8 @@ function populatePanels(
   }
 }
 
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export interface DockviewWorkspaceHandle {
   addApp: (app: AppEntry) => void;
   removeApp: (appId: string) => void;
@@ -283,10 +291,140 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
   const dockApiRef = useRef<DockviewApi | null>(null);
   const listenersRef = useRef<Array<{ dispose: () => void }>>([]);
   const tabObserverRef = useRef<MutationObserver | null>(null);
-  const webviewsRef = useRef(new Map<string, EmbeddedWebview>());
-  const readyIdsRef = useRef(new Set<string>());
   const didInitialAutoPopulateRef = useRef(false);
   const [openPanelIds, setOpenPanelIds] = useState<Set<string>>(new Set());
+
+  // ─── Webview pool state ─────────────────────────────────────────────────
+  // webviews survive panel close/reopen — they're repositioned, never destroyed.
+
+  const poolContainerRef = useRef<HTMLDivElement | null>(null);
+  const webviewPoolRef = useRef(new Map<string, EmbeddedWebview>());
+  const readyIdsRef = useRef(new Set<string>());
+  const slotMapRef = useRef(new Map<string, HTMLDivElement>());
+  const slotObserverMapRef = useRef(new Map<string, ResizeObserver>());
+  const rafRef = useRef<number>(-1);
+
+  // Stable refs so pool callbacks never capture stale channel/theme values.
+  const channelIdRef = useRef(channelId);
+  channelIdRef.current = channelId;
+  const themeRef = useRef<ThemeMode>(theme);
+  themeRef.current = theme;
+  const appsRef = useRef(apps);
+  appsRef.current = apps;
+  const preloadPathRef = useRef(preloadPath);
+  preloadPathRef.current = preloadPath;
+
+  // Reposition all pool webviews to match their current slot rects.
+  const syncPositions = useCallback(() => {
+    const pool = poolContainerRef.current;
+    if (!pool) return;
+    const poolRect = pool.getBoundingClientRect();
+
+    for (const [appId, wv] of webviewPoolRef.current) {
+      const slot = slotMapRef.current.get(appId);
+      if (!slot) {
+        wv.style.visibility = 'hidden';
+        wv.style.pointerEvents = 'none';
+        wv.style.width = '1px';
+        wv.style.height = '1px';
+        continue;
+      }
+      const sr = slot.getBoundingClientRect();
+      wv.style.visibility = 'visible';
+      wv.style.pointerEvents = 'auto';
+      wv.style.left = `${sr.left - poolRect.left}px`;
+      wv.style.top = `${sr.top - poolRect.top}px`;
+      wv.style.width = `${sr.width}px`;
+      wv.style.height = `${sr.height}px`;
+    }
+  }, []);
+
+  const scheduleSyncPositions = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(syncPositions);
+  }, [syncPositions]);
+
+  // Create a webview element for appId and append it to the pool container.
+  // Only called once per appId — subsequent panel opens reuse the same element.
+  const createWebview = useCallback((appId: string) => {
+    const pool = poolContainerRef.current;
+    if (!pool || webviewPoolRef.current.has(appId)) return;
+
+    const app = appsRef.current.find((a) => a.appId === appId);
+    if (!app) return;
+
+    const wv = document.createElement('webview') as unknown as EmbeddedWebview;
+    wv.setAttribute('src', resolveEmbeddedAppUrl(app));
+    wv.setAttribute('preload', preloadPathRef.current);
+    wv.setAttribute('partition', `persist:workspace-${appId}`);
+    // Start hidden until bindSlot provides a rect.
+    wv.style.cssText = 'position:absolute;border:none;visibility:hidden;pointer-events:none;width:1px;height:1px;';
+
+    wv.addEventListener('dom-ready', () => {
+      readyIdsRef.current.add(appId);
+      syncEmbeddedApp(wv, channelIdRef.current, themeRef.current);
+    }, { once: true });
+
+    pool.appendChild(wv);
+    webviewPoolRef.current.set(appId, wv);
+  }, [syncPositions]); // syncPositions stable; appsRef/preloadPathRef accessed via ref
+
+  // Bind a slot div: show the webview over it and track resizes.
+  const bindSlot = useCallback((appId: string, el: HTMLDivElement) => {
+    slotMapRef.current.set(appId, el);
+    createWebview(appId);
+
+    const obs = new ResizeObserver(scheduleSyncPositions);
+    obs.observe(el);
+    slotObserverMapRef.current.set(appId, obs);
+    scheduleSyncPositions();
+  }, [createWebview, scheduleSyncPositions]);
+
+  // Unbind a slot div: hide the webview but keep it loaded in the pool.
+  const unbindSlot = useCallback((appId: string) => {
+    slotMapRef.current.delete(appId);
+    slotObserverMapRef.current.get(appId)?.disconnect();
+    slotObserverMapRef.current.delete(appId);
+    scheduleSyncPositions();
+  }, [scheduleSyncPositions]);
+
+  // Re-sync positions when the pool container itself is resized (window resize).
+  useEffect(() => {
+    const pool = poolContainerRef.current;
+    if (!pool) return undefined;
+    const obs = new ResizeObserver(scheduleSyncPositions);
+    obs.observe(pool);
+    return () => obs.disconnect();
+  }, [scheduleSyncPositions]);
+
+  // Tear down all webviews when the workspace unmounts.
+  useEffect(() => {
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      for (const obs of slotObserverMapRef.current.values()) obs.disconnect();
+      slotObserverMapRef.current.clear();
+      for (const wv of webviewPoolRef.current.values()) wv.remove();
+      webviewPoolRef.current.clear();
+      readyIdsRef.current.clear();
+    };
+  }, []);
+
+  // Sync channel + theme to every ready webview whenever either changes.
+  useEffect(() => {
+    for (const [appId, wv] of webviewPoolRef.current) {
+      if (readyIdsRef.current.has(appId)) {
+        syncEmbeddedApp(wv, channelId, theme);
+      }
+    }
+  }, [channelId, theme]);
+
+  // Stable pool context — only changes if bind/unbind change (they don't).
+  const poolContextValue = useMemo(
+    () => ({ bindSlot, unbindSlot }),
+    [bindSlot, unbindSlot],
+  );
+
+  // ─── Dockview layout management (unchanged logic) ───────────────────────
 
   const syncPanelTitles = useCallback((api: DockviewApi) => {
     for (const panel of api.panels) {
@@ -298,7 +436,6 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
 
   const syncDetachedTabTooltips = useCallback(() => {
     if (!detached || !rootRef.current) return;
-
     const tabs = rootRef.current.querySelectorAll<HTMLElement>('.dv-tab, .dockview-tab');
     tabs.forEach((tab) => {
       const label = tab.querySelector<HTMLElement>('.dv-tab-label, .dockview-tab-label');
@@ -309,22 +446,6 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
     });
   }, [detached]);
 
-  const registerWebview = useCallback((appId: string, node: EmbeddedWebview | null) => {
-    if (node) {
-      webviewsRef.current.set(appId, node);
-      // Do NOT call syncEmbeddedApp here — dom-ready has not fired yet.
-      return;
-    }
-    webviewsRef.current.delete(appId);
-    readyIdsRef.current.delete(appId);
-  }, []);
-
-  const markReady = useCallback((appId: string, channelId: string | null, theme: ThemeMode) => {
-    readyIdsRef.current.add(appId);
-    const webview = webviewsRef.current.get(appId);
-    if (webview) syncEmbeddedApp(webview, channelId, theme);
-  }, []);
-
   const syncOpenPanels = useCallback((api: DockviewApi) => {
     const knownIds = new Set(apps.map((app) => app.appId));
     const panelIds = api.panels.map((panel) => panel.id).filter((id) => knownIds.has(id));
@@ -333,9 +454,7 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
   }, [apps, onOpenPanelsChange]);
 
   const clearListeners = useCallback(() => {
-    for (const disposable of listenersRef.current) {
-      disposable.dispose();
-    }
+    for (const disposable of listenersRef.current) disposable.dispose();
     listenersRef.current = [];
   }, []);
 
@@ -351,7 +470,6 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
   const resetLayout = useCallback(() => {
     const api = dockApiRef.current;
     if (!api) return;
-
     const panelApps = resolveInitialApps();
     api.clear();
     populatePanels(api, panelApps, preloadPath, channelId, theme);
@@ -390,10 +508,12 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
     listenersRef.current.push(api.onDidLayoutChange(() => {
       onLayoutChange?.(api.toJSON());
       syncDetachedTabTooltips();
+      // Re-sync positions when panels are dragged/resized within Dockview.
+      scheduleSyncPositions();
     }));
     syncOpenPanels(api);
     syncDetachedTabTooltips();
-  }, [clearListeners, initialLayout, onLayoutChange, resetLayout, syncDetachedTabTooltips, syncOpenPanels, syncPanelTitles]);
+  }, [clearListeners, initialLayout, onLayoutChange, resetLayout, scheduleSyncPositions, syncDetachedTabTooltips, syncOpenPanels, syncPanelTitles]);
 
   useEffect(() => clearListeners, [clearListeners]);
 
@@ -402,12 +522,9 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
     tabObserverRef.current = null;
     if (!detached || !rootRef.current) return;
 
-    const observer = new MutationObserver(() => {
-      syncDetachedTabTooltips();
-    });
+    const observer = new MutationObserver(() => syncDetachedTabTooltips());
     observer.observe(rootRef.current, { childList: true, subtree: true });
     tabObserverRef.current = observer;
-
     syncDetachedTabTooltips();
     return () => {
       observer.disconnect();
@@ -415,33 +532,18 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
     };
   }, [detached, syncDetachedTabTooltips]);
 
-  // If onReady fired before apps were available (e.g. apps loaded async after mount),
-  // populate panels once the app list arrives.
   useEffect(() => {
     if (didInitialAutoPopulateRef.current) return;
     if (apps.length === 0) return;
-
-    // If initialPanelIds is an explicit empty array, keep workspace empty.
     if (Array.isArray(initialPanelIds) && initialPanelIds.length === 0) {
       didInitialAutoPopulateRef.current = true;
       return;
     }
-
     const api = dockApiRef.current;
     if (!api) return;
-    if (api.panels.length === 0) {
-      resetLayout();
-    }
+    if (api.panels.length === 0) resetLayout();
     didInitialAutoPopulateRef.current = true;
   }, [apps, initialPanelIds, resetLayout]);
-
-  useEffect(() => {
-    for (const [appId, webview] of webviewsRef.current) {
-      if (readyIdsRef.current.has(appId)) {
-        syncEmbeddedApp(webview, channelId, theme);
-      }
-    }
-  }, [channelId, theme]);
 
   const addPanel = useCallback((app: AppEntry) => {
     const api = dockApiRef.current;
@@ -466,8 +568,6 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
       },
     });
 
-    // In some empty-layout states Dockview can ignore the first addPanel call.
-    // If that happens, clear state and seed layout explicitly with the chosen app.
     if (!api.getPanel(app.appId)) {
       api.clear();
       populatePanels(api, [app], preloadPath, channelId, theme);
@@ -512,6 +612,8 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
     api.clear();
     syncOpenPanels(api);
   }, [channelId, onDetachWorkspace, openPanelIds, syncOpenPanels, theme, workspaceName]);
+
+  // ─── Render ─────────────────────────────────────────────────────────────
 
   return (
     <div
@@ -562,10 +664,11 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
         </div>
       )}
 
-      <div className="min-h-0 min-w-0 flex-1">
+      {/* Dockview + persistent webview pool share the same space */}
+      <div style={contentAreaStyle}>
         <OnAddAppContext.Provider value={onAddApp ?? null}>
           <CurrentChannelContext.Provider value={currentChannel}>
-            <WebviewContext.Provider value={{ registerWebview, markReady }}>
+            <WebviewPoolContext.Provider value={poolContextValue}>
               <DockviewReact
                 onReady={onReady}
                 components={{ 'app-panel': AppPanelComponent }}
@@ -573,9 +676,17 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
                 watermarkComponent={WorkspaceWatermark}
                 className={`${THEMES[theme].dockview} h-full w-full`}
               />
-            </WebviewContext.Provider>
+            </WebviewPoolContext.Provider>
           </CurrentChannelContext.Provider>
         </OnAddAppContext.Provider>
+
+        {/*
+          Webview pool layer — sits above Dockview panel content but below its
+          tab strips (which use position:relative z-index from dockview-override.css).
+          pointer-events:none on the container lets Dockview chrome pass through;
+          individual webviews restore pointer-events:auto only over their own rect.
+        */}
+        <div ref={poolContainerRef} style={poolLayerStyle} />
       </div>
     </div>
   );
@@ -587,4 +698,21 @@ const rootStyle: CSSProperties = {
   flexDirection: 'column',
   minHeight: 0,
   width: '100%',
+};
+
+const contentAreaStyle: CSSProperties = {
+  position: 'relative',
+  flex: 1,
+  minHeight: 0,
+  minWidth: 0,
+};
+
+const poolLayerStyle: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  overflow: 'hidden',
+  pointerEvents: 'none',
+  // No explicit z-index — DOM order (after DockviewReact) is enough for
+  // content-area stacking. Tab strips and resizers in dockview-override.css
+  // use position:relative z-index:1 to stay above this layer.
 };

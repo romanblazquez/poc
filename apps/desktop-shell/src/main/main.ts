@@ -13,11 +13,11 @@
  *   9. Optional workspace restore
  */
 
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, session } from 'electron';
 import fs from 'fs';
 import path from 'path';
 
-import { setupSecurity } from './security.js';
+import { setupSecurity, configureSession } from './security.js';
 import { AppRegistryLoader } from './app-registry-loader.js';
 import { WindowManager } from './window-manager.js';
 import { IpcRouter } from './ipc-router.js';
@@ -55,6 +55,15 @@ async function bootstrap(): Promise<void> {
 
   const appDefs = AppRegistryLoader.load(configPath);
   const shellManifest = ShellAssetsLoader.load(shellManifestPath, app.getVersion());
+
+  // Pre-warm the persistent session for every known app so that Electron
+  // initialises the disk cache before any webview requests it. Also applies
+  // cache-friendly headers (critical in dev where the Angular dev server
+  // sends Cache-Control: no-store for every request).
+  for (const appDef of appDefs) {
+    const ses = session.fromPartition(`persist:workspace-${appDef.appId}`);
+    configureSession(ses, isDev);
+  }
 
   // Build the full AppDirectoryFile shape ManagerService needs so it can read
   // optional directoryVersion / directoryLabel; falls back to a minimal

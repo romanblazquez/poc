@@ -1004,7 +1004,12 @@ export class IpcRouter {
 
   private handleGetPreloadPath(): void {
     ipcMain.handle(IpcEvents.GET_PRELOAD_PATH, () => {
-      return this.windowManager.getPreloadPath();
+      // Return as a file:// URL so renderers can use it in webview preload= directly
+      // on both Mac (forward slashes) and Windows (backslashes need conversion).
+      const rawPath = this.windowManager.getPreloadPath();
+      const normalized = rawPath.replace(/\\/g, '/');
+      const withLeadingSlash = normalized.startsWith('/') ? normalized : `/${normalized}`;
+      return `file://${withLeadingSlash}`;
     });
   }
 

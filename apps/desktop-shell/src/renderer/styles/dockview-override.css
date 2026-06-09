@@ -184,3 +184,26 @@
   display: none !important;
 }
 
+/*
+  Ensure Dockview chrome (tab strips, resize handles, drag overlays) appears
+  above the webview pool layer which is a positioned sibling rendered after
+  DockviewReact in DOM order. Without these rules the pool's stacking context
+  would cover tabs and make them unclickable.
+*/
+.dv-tabs-and-actions-container,
+.tabs-and-actions-container {
+  position: relative;
+  z-index: 2;
+}
+
+.dv-resize-container,
+.dockview-resizer {
+  position: relative;
+  z-index: 3;
+}
+
+.dv-overlay,
+.dv-drop-target {
+  z-index: 4;
+}
+
