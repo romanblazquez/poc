@@ -9,6 +9,7 @@ import {
   BookOpen,
   Grid3x3,
   ShieldCheck,
+  ScanLine,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -22,6 +23,7 @@ type WorkspaceMode =
   | 'dashboard'
   | 'interop-flow'
   | 'control-tower'
+  | 'inspector'
   | 'manager'
   | 'bridge'
   | 'app-directory'
@@ -44,6 +46,7 @@ const MODE_ITEMS: Array<{
   { mode: 'dashboard',     label: 'WS Dashboard',  icon: BarChart3 },
   { mode: 'interop-flow',  label: 'Flow Designer',  icon: Workflow,        shortcut: '⌘2' },
   { mode: 'control-tower', label: 'Control Tower', icon: Radio,           shortcut: '⌘3' },
+  { mode: 'inspector',     label: 'Inspector',      icon: ScanLine,        shortcut: '⌘6' },
   { mode: 'manager',       label: 'Manager',        icon: CloudDownload,   shortcut: '⌘4' },
   { mode: 'bridge',        label: 'Bridge',         icon: Network,         shortcut: '⌘5' },
   { mode: 'app-directory', label: 'App Directory',  icon: BookOpen },

@@ -1,7 +1,8 @@
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import type { BridgeSettings } from '@fdc3-poc/fdc3-core';
+import { randomUUID } from 'crypto';
+import type { BridgeProfile, BridgeSettings } from '@fdc3-poc/fdc3-core';
 
 const SETTINGS_FILE = 'bridge-settings.json';
 
@@ -27,19 +28,75 @@ export class BridgeSettingsStore {
   }
 
   update(patch: Partial<BridgeSettings>): BridgeSettings {
-    this.settings = normalizeSettings({ ...this.settings, ...patch });
+    const { profiles, activeProfileId } = this.settings;
+    const normalized = normalizeSettings({ ...this.settings, ...patch });
+    this.settings = { ...normalized, profiles, activeProfileId };
+    this.write(this.settings);
+    return this.get();
+  }
+
+  getProfiles(): BridgeProfile[] {
+    return Array.isArray(this.settings.profiles) ? [...this.settings.profiles] : [];
+  }
+
+  addProfile(data: Omit<BridgeProfile, 'id'>): BridgeProfile {
+    const profile: BridgeProfile = { id: randomUUID(), ...data };
+    const profiles = this.getProfiles();
+    profiles.push(profile);
+    this.settings = { ...this.settings, profiles };
+    this.write(this.settings);
+    return { ...profile };
+  }
+
+  updateProfile(id: string, patch: Partial<Omit<BridgeProfile, 'id'>>): BridgeProfile | null {
+    const profiles = this.getProfiles();
+    const idx = profiles.findIndex((p) => p.id === id);
+    if (idx < 0) return null;
+    profiles[idx] = { ...profiles[idx], ...patch };
+    this.settings = { ...this.settings, profiles };
+    this.write(this.settings);
+    return { ...profiles[idx] };
+  }
+
+  deleteProfile(id: string): boolean {
+    const profiles = this.getProfiles();
+    const idx = profiles.findIndex((p) => p.id === id);
+    if (idx < 0) return false;
+    profiles.splice(idx, 1);
+    const activeProfileId = this.settings.activeProfileId === id ? null : this.settings.activeProfileId;
+    this.settings = { ...this.settings, profiles, activeProfileId };
+    this.write(this.settings);
+    return true;
+  }
+
+  activateProfile(id: string): BridgeSettings | null {
+    const profiles = this.getProfiles();
+    const profile = profiles.find((p) => p.id === id);
+    if (!profile) return null;
+    const normalized = normalizeSettings({
+      ...this.settings,
+      host: profile.host,
+      portStart: profile.portStart,
+      portEnd: profile.portEnd,
+      endpointUrl: profile.endpointUrl,
+    });
+    this.settings = { ...normalized, profiles, activeProfileId: id };
     this.write(this.settings);
     return this.get();
   }
 
   private read(): BridgeSettings {
     try {
-      if (!fs.existsSync(this.filePath)) return { ...DEFAULT_BRIDGE_SETTINGS };
+      if (!fs.existsSync(this.filePath)) return { ...DEFAULT_BRIDGE_SETTINGS, profiles: [], activeProfileId: null };
       const parsed = JSON.parse(fs.readFileSync(this.filePath, 'utf-8')) as Partial<BridgeSettings>;
-      return normalizeSettings({ ...DEFAULT_BRIDGE_SETTINGS, ...parsed });
+      const normalized = normalizeSettings({ ...DEFAULT_BRIDGE_SETTINGS, ...parsed });
+      // Restore optional fields that normalizeSettings strips (it only returns the 6 core fields).
+      const profiles = Array.isArray(parsed.profiles) ? parsed.profiles : [];
+      const activeProfileId = typeof parsed.activeProfileId === 'string' ? parsed.activeProfileId : null;
+      return { ...normalized, profiles, activeProfileId };
     } catch (error) {
       console.warn(`[bridge-settings] failed to read settings: ${(error as Error).message}`);
-      return { ...DEFAULT_BRIDGE_SETTINGS };
+      return { ...DEFAULT_BRIDGE_SETTINGS, profiles: [], activeProfileId: null };
     }
   }
 

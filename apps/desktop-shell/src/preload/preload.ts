@@ -19,7 +19,7 @@
 
 import { contextBridge, ipcRenderer, webFrame } from 'electron';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
-import type { AppIntent, AppLogEvent, AppLogLevel, BridgeSettings, BridgeStatus, Channel, ChannelDisplayMetadata, ChannelListener, ContextMetadata, Fdc3Context, Fdc3EventHandler, Fdc3EventType, FlowPolicy, ImplementationMetadata, IntentInvocationMetadata, IntentResolution, InteropActivityEvent, InteropSnapshot, NotificationRaiseInput, ShellNotification, PrivateChannel, PrivateChannelEventListener, PrivateChannelMarker, UserChannel, ThemeName } from '@fdc3-poc/fdc3-core';
+import type { AppIntent, AppLogEvent, AppLogLevel, BridgeProfile, BridgeSettings, BridgeStatus, Channel, ChannelDisplayMetadata, ChannelListener, ContextMetadata, Fdc3Context, Fdc3EventHandler, Fdc3EventType, FlowPolicy, ImplementationMetadata, IntentInvocationMetadata, IntentResolution, InteropActivityEvent, InteropSnapshot, NotificationRaiseInput, ShellNotification, PrivateChannel, PrivateChannelEventListener, PrivateChannelMarker, UserChannel, ThemeName } from '@fdc3-poc/fdc3-core';
 import { isPrivateChannelMarker } from '@fdc3-poc/fdc3-core';
 
 // ─── Handler registries (live in preload isolate, not renderer) ────────────
@@ -631,6 +631,21 @@ contextBridge.exposeInMainWorld('shellChrome', {
     onStatusChanged(handler: (status: BridgeStatus) => void): () => void {
       bridgeStatusHandlers.add(handler);
       return () => bridgeStatusHandlers.delete(handler);
+    },
+    getProfiles(): Promise<BridgeProfile[]> {
+      return ipcRenderer.invoke(IpcEvents.BRIDGE_GET_PROFILES) as Promise<BridgeProfile[]>;
+    },
+    addProfile(data: Omit<BridgeProfile, 'id'>): Promise<BridgeProfile> {
+      return ipcRenderer.invoke(IpcEvents.BRIDGE_ADD_PROFILE, data) as Promise<BridgeProfile>;
+    },
+    updateProfile(id: string, patch: Partial<Omit<BridgeProfile, 'id'>>): Promise<BridgeProfile | null> {
+      return ipcRenderer.invoke(IpcEvents.BRIDGE_UPDATE_PROFILE, { id, patch }) as Promise<BridgeProfile | null>;
+    },
+    deleteProfile(id: string): Promise<boolean> {
+      return ipcRenderer.invoke(IpcEvents.BRIDGE_DELETE_PROFILE, id) as Promise<boolean>;
+    },
+    activateProfile(id: string): Promise<BridgeSettings | null> {
+      return ipcRenderer.invoke(IpcEvents.BRIDGE_ACTIVATE_PROFILE, id) as Promise<BridgeSettings | null>;
     },
   },
   apps: {

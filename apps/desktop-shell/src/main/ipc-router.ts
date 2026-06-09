@@ -14,7 +14,7 @@ import type { IntentResolverCandidate } from '@fdc3-poc/intent-engine';
 import { AppRegistry } from '@fdc3-poc/app-registry';
 import { IntentResolverWindowManager } from './intent-resolver-window.js';
 import type { ManagerService } from './manager-service.js';
-import type { BridgeSettings, ManagerSettings, NotificationRaiseInput } from '@fdc3-poc/fdc3-core';
+import type { BridgeProfile, BridgeSettings, ManagerSettings, NotificationRaiseInput } from '@fdc3-poc/fdc3-core';
 import type { BridgeService } from './bridge-service.js';
 import { NotificationStore } from './notification-store.js';
 import { resolveAppIdentityFromUrl, type WindowManager } from './window-manager.js';
@@ -375,6 +375,11 @@ export class IpcRouter {
     this.handleBridgeGetStatus();
     this.handleBridgeScan();
     this.handleBridgeUpdateSettings();
+    this.handleBridgeGetProfiles();
+    this.handleBridgeAddProfile();
+    this.handleBridgeUpdateProfile();
+    this.handleBridgeDeleteProfile();
+    this.handleBridgeActivateProfile();
     this.handleGetAppLifecycle();
     this.handleRestartApp();
     this.handleAppDirectorySave();
@@ -397,6 +402,38 @@ export class IpcRouter {
     ipcMain.handle(IpcEvents.BRIDGE_UPDATE_SETTINGS, (_event, patch: Partial<BridgeSettings>) => {
       if (!this.bridgeService) return null;
       return this.bridgeService.updateSettings(patch ?? {});
+    });
+  }
+
+  private handleBridgeGetProfiles(): void {
+    ipcMain.handle(IpcEvents.BRIDGE_GET_PROFILES, () => this.bridgeService?.getProfiles() ?? []);
+  }
+
+  private handleBridgeAddProfile(): void {
+    ipcMain.handle(IpcEvents.BRIDGE_ADD_PROFILE, (_event, data: Omit<BridgeProfile, 'id'>) => {
+      if (!this.bridgeService) return null;
+      return this.bridgeService.addProfile(data);
+    });
+  }
+
+  private handleBridgeUpdateProfile(): void {
+    ipcMain.handle(IpcEvents.BRIDGE_UPDATE_PROFILE, (_event, { id, patch }: { id: string; patch: Partial<Omit<BridgeProfile, 'id'>> }) => {
+      if (!this.bridgeService) return null;
+      return this.bridgeService.updateProfile(id, patch ?? {});
+    });
+  }
+
+  private handleBridgeDeleteProfile(): void {
+    ipcMain.handle(IpcEvents.BRIDGE_DELETE_PROFILE, (_event, id: string) => {
+      if (!this.bridgeService) return false;
+      return this.bridgeService.deleteProfile(id);
+    });
+  }
+
+  private handleBridgeActivateProfile(): void {
+    ipcMain.handle(IpcEvents.BRIDGE_ACTIVATE_PROFILE, (_event, id: string) => {
+      if (!this.bridgeService) return null;
+      return this.bridgeService.activateProfile(id);
     });
   }
 

@@ -14,11 +14,15 @@ type ThemeMode = ThemeName;
 
 type EmbeddedWebview = HTMLElement & {
   executeJavaScript(script: string): Promise<unknown>;
+  loadURL(url: string): Promise<void>;
+  reload(): void;
 };
 
 interface DockviewWorkspaceProps {
   apps: AppEntry[];
   currentChannel: UserChannel | null;
+  /** Authoritative channel ID from workspace state — updated synchronously, used for webview sync. */
+  channelId: string | null;
   preloadPath: string;
   initialPanelIds?: string[];
   initialLayout?: unknown;
@@ -273,6 +277,7 @@ export interface DockviewWorkspaceHandle {
 export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWorkspaceProps>(function DockviewWorkspace({
   apps,
   currentChannel,
+  channelId,
   preloadPath,
   initialPanelIds,
   initialLayout,
@@ -286,7 +291,6 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
   displays = [],
   headersVisible = false,
 }, ref) {
-  const channelId = currentChannel?.id ?? null;
   const rootRef = useRef<HTMLDivElement | null>(null);
   const dockApiRef = useRef<DockviewApi | null>(null);
   const listenersRef = useRef<Array<{ dispose: () => void }>>([]);
@@ -303,6 +307,8 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
   const slotMapRef = useRef(new Map<string, HTMLDivElement>());
   const slotObserverMapRef = useRef(new Map<string, ResizeObserver>());
   const rafRef = useRef<number>(-1);
+  // True while a Dockview resize drag or tab drag is in progress; syncPositions reads this.
+  const poolBlockedRef = useRef(false);
 
   // Stable refs so pool callbacks never capture stale channel/theme values.
   const channelIdRef = useRef(channelId);
@@ -315,27 +321,31 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
   preloadPathRef.current = preloadPath;
 
   // Reposition all pool webviews to match their current slot rects.
+  // Reads all rects first (avoids layout thrashing), then writes all styles in one pass.
   const syncPositions = useCallback(() => {
     const pool = poolContainerRef.current;
     if (!pool) return;
     const poolRect = pool.getBoundingClientRect();
 
+    // Read phase
+    const updates: Array<{ wv: EmbeddedWebview; css: string }> = [];
     for (const [appId, wv] of webviewPoolRef.current) {
       const slot = slotMapRef.current.get(appId);
       if (!slot) {
-        wv.style.visibility = 'hidden';
-        wv.style.pointerEvents = 'none';
-        wv.style.width = '1px';
-        wv.style.height = '1px';
+        updates.push({ wv, css: 'position:absolute;border:none;visibility:hidden;pointer-events:none;width:1px;height:1px;' });
         continue;
       }
       const sr = slot.getBoundingClientRect();
-      wv.style.visibility = 'visible';
-      wv.style.pointerEvents = 'auto';
-      wv.style.left = `${sr.left - poolRect.left}px`;
-      wv.style.top = `${sr.top - poolRect.top}px`;
-      wv.style.width = `${sr.width}px`;
-      wv.style.height = `${sr.height}px`;
+      const pe = poolBlockedRef.current ? 'none' : 'auto';
+      updates.push({
+        wv,
+        css: `position:absolute;border:none;visibility:visible;pointer-events:${pe};left:${sr.left - poolRect.left}px;top:${sr.top - poolRect.top}px;width:${sr.width}px;height:${sr.height}px;`,
+      });
+    }
+
+    // Write phase
+    for (const { wv, css } of updates) {
+      (wv as HTMLElement).style.cssText = css;
     }
   }, []);
 
@@ -349,6 +359,7 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
   const createWebview = useCallback((appId: string) => {
     const pool = poolContainerRef.current;
     if (!pool || webviewPoolRef.current.has(appId)) return;
+    if (!preloadPathRef.current) return; // preload not ready yet — bindSlot will retry
 
     const app = appsRef.current.find((a) => a.appId === appId);
     if (!app) return;
@@ -364,6 +375,29 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
       readyIdsRef.current.add(appId);
       syncEmbeddedApp(wv, channelIdRef.current, themeRef.current);
     }, { once: true });
+
+    const originalUrl = resolveEmbeddedAppUrl(app);
+
+    const buildCrashPage = (title: string, detail: string): string => {
+      const escaped = originalUrl.replace(/'/g, '%27');
+      return `data:text/html;charset=utf-8,<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0f0f1a;color:#e2e8f0;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}.card{background:#161625;border:1px solid #2a2a45;border-radius:12px;padding:36px 44px;max-width:480px;text-align:center}.eyebrow{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;margin-bottom:12px}.title{font-size:20px;font-weight:900;color:#f1f5f9;margin-bottom:8px}.detail{font-size:13px;color:#94a3b8;margin-bottom:24px;line-height:1.5}button{background:#4f6ef7;color:#fff;border:none;border-radius:7px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s}button:hover{opacity:.85}</style></head><body><div class="card"><div class="eyebrow">FDC3 Desktop Shell</div><div class="title">${title}</div><div class="detail">${detail}</div><button onclick="window.location.href='${escaped}'">Retry</button></div></body></html>`;
+    };
+
+    wv.addEventListener('did-fail-load', (event: Event & { isMainFrame?: boolean; errorCode?: number; errorDescription?: string }) => {
+      if (!event.isMainFrame || event.errorCode === -3) return;
+      void wv.loadURL(buildCrashPage(
+        'Page failed to load',
+        `Error ${event.errorCode ?? ''}: ${event.errorDescription ?? 'The app could not be reached.'}`,
+      ));
+    });
+
+    wv.addEventListener('render-process-gone', (event: Event & { reason?: string }) => {
+      console.warn(`[DockviewWorkspace] Renderer process gone for ${appId}:`, event.reason);
+      void wv.loadURL(buildCrashPage(
+        'App crashed',
+        'The renderer process for this app has stopped unexpectedly.',
+      ));
+    });
 
     pool.appendChild(wv);
     webviewPoolRef.current.set(appId, wv);
@@ -408,6 +442,58 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
       readyIdsRef.current.clear();
     };
   }, []);
+
+  // Disable webview pointer events during Dockview tab drag-and-drop and resize drags,
+  // then restore. This prevents the webview GPU surfaces from swallowing drop events
+  // and interrupting resize mousemove tracking.
+  useEffect(() => {
+    const blockPool = () => {
+      poolBlockedRef.current = true;
+      for (const wv of webviewPoolRef.current.values()) {
+        (wv as HTMLElement).style.pointerEvents = 'none';
+      }
+    };
+    const unblockPool = () => {
+      poolBlockedRef.current = false;
+      for (const [appId, wv] of webviewPoolRef.current) {
+        (wv as HTMLElement).style.pointerEvents = slotMapRef.current.has(appId) ? 'auto' : 'none';
+      }
+    };
+
+    // HTML5 drag: Dockview uses drag API to move tabs
+    const onDragStart = () => blockPool();
+    const onDragEnd = () => unblockPool();
+
+    // Resize: only block when the exact sash handle is pressed, not on every click
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      if (target?.closest('.sash')) blockPool();
+    };
+    const onMouseUp = () => unblockPool();
+
+    document.addEventListener('dragstart', onDragStart);
+    document.addEventListener('dragend', onDragEnd);
+    document.addEventListener('drop', onDragEnd);
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      document.removeEventListener('dragstart', onDragStart);
+      document.removeEventListener('dragend', onDragEnd);
+      document.removeEventListener('drop', onDragEnd);
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  // If preloadPath arrives after some slots are already bound (e.g. detached window),
+  // create the webviews now.
+  useEffect(() => {
+    if (!preloadPath) return;
+    for (const [appId] of slotMapRef.current) {
+      createWebview(appId);
+    }
+    scheduleSyncPositions();
+  }, [preloadPath, createWebview, scheduleSyncPositions]);
 
   // Sync channel + theme to every ready webview whenever either changes.
   useEffect(() => {
@@ -508,7 +594,6 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
     listenersRef.current.push(api.onDidLayoutChange(() => {
       onLayoutChange?.(api.toJSON());
       syncDetachedTabTooltips();
-      // Re-sync positions when panels are dragged/resized within Dockview.
       scheduleSyncPositions();
     }));
     syncOpenPanels(api);

@@ -10,6 +10,15 @@ export type BridgeProvider = 'finos-backplane';
 
 export type BridgeStatusState = 'disabled' | 'scanning' | 'available' | 'unavailable' | 'error';
 
+export interface BridgeProfile {
+  id: string;
+  name: string;
+  host: string;
+  portStart: number;
+  portEnd: number;
+  endpointUrl: string;
+}
+
 export interface BridgeSettings {
   enabled: boolean;
   provider: BridgeProvider;
@@ -17,6 +26,8 @@ export interface BridgeSettings {
   portStart: number;
   portEnd: number;
   endpointUrl: string;
+  profiles?: BridgeProfile[];
+  activeProfileId?: string | null;
 }
 
 export interface BridgeCandidate {

@@ -1,5 +1,5 @@
 import net from 'net';
-import type { BridgeCandidate, BridgeSettings, BridgeStatus } from '@fdc3-poc/fdc3-core';
+import type { BridgeCandidate, BridgeProfile, BridgeSettings, BridgeStatus } from '@fdc3-poc/fdc3-core';
 import { BridgeSettingsStore } from './bridge-settings.js';
 
 type BridgeStatusListener = (status: BridgeStatus) => void;
@@ -26,6 +26,43 @@ export class BridgeService {
   subscribe(listener: BridgeStatusListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  getProfiles(): BridgeProfile[] {
+    return this.store.getProfiles();
+  }
+
+  addProfile(data: Omit<BridgeProfile, 'id'>): BridgeProfile {
+    const profile = this.store.addProfile(data);
+    this.emit();
+    return profile;
+  }
+
+  updateProfile(id: string, patch: Partial<Omit<BridgeProfile, 'id'>>): BridgeProfile | null {
+    const profile = this.store.updateProfile(id, patch);
+    this.emit();
+    return profile;
+  }
+
+  deleteProfile(id: string): boolean {
+    const result = this.store.deleteProfile(id);
+    this.emit();
+    return result;
+  }
+
+  activateProfile(id: string): BridgeSettings | null {
+    const settings = this.store.activateProfile(id);
+    if (!settings) return null;
+    this.status = this.makeStatus(settings.enabled ? 'unavailable' : 'disabled', {
+      lastCheckedAt: this.status.lastCheckedAt,
+      lastError: null,
+      notes: this.defaultNotes(),
+    });
+    this.emit();
+    if (settings.enabled) {
+      void this.scan();
+    }
+    return settings;
   }
 
   updateSettings(patch: Partial<BridgeSettings>): BridgeStatus {

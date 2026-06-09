@@ -24,6 +24,7 @@ import { cn } from './lib/utils.js';
 import { InteropCopilot } from './copilot/InteropCopilot.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
 import { ShellSidebar } from './components/ShellSidebar.js';
+import { ContextInspector } from './components/ContextInspector.js';
 import { WorkspaceDashboard } from './components/WorkspaceDashboard.js';
 import { RbacPanel } from './components/RbacPanel.js';
 import { AddAppsDialog } from './components/AddAppsDialog.js';
@@ -84,7 +85,7 @@ export interface AppEntry {
 
 type ThemeMode = ThemeName;
 type SidebarPosition = 'left' | 'right' | 'bottom';
-export type WorkspaceMode = 'launcher' | 'workspace' | 'dashboard' | 'interop-flow' | 'control-tower' | 'manager' | 'bridge' | 'app-directory' | 'rbac';
+export type WorkspaceMode = 'launcher' | 'workspace' | 'dashboard' | 'interop-flow' | 'control-tower' | 'inspector' | 'manager' | 'bridge' | 'app-directory' | 'rbac';
 
 export interface WorkspaceState {
   channelId: string | null;
@@ -413,6 +414,7 @@ export function App() {
         '3': 'control-tower',
         '4': 'manager',
         '5': 'bridge',
+        '6': 'inspector',
         '0': 'launcher',
       };
       const mode = modeByKey[key];
@@ -884,6 +886,7 @@ export function App() {
                   key={`${activeWorkspaceTab.id}-${workspaceEpoch}`}
                   apps={apps}
                   currentChannel={currentChannel}
+                  channelId={activeWorkspaceState.channelId}
                   preloadPath={preloadPath}
                   initialPanelIds={activeWorkspaceTab.panelIds}
                   initialLayout={activeWorkspaceState.layout}
@@ -929,6 +932,8 @@ export function App() {
                 onOpen={handleOpen}
                 onComposeWorkspace={handleComposeWorkspace}
               />
+            ) : activeMode === 'inspector' ? (
+              <ContextInspector />
             ) : activeMode === 'manager' ? (
               <Manager apps={apps} />
             ) : activeMode === 'bridge' ? (
@@ -1150,6 +1155,7 @@ function DetachedWorkspaceShell({
         <DockviewWorkspace
           apps={apps}
           currentChannel={currentChannel}
+          channelId={payload.channelId}
           preloadPath={preloadPath}
           initialPanelIds={payload.panelIds}
           initialLayout={payload.layout}

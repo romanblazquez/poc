@@ -236,6 +236,7 @@ export function WorkspaceBuilder({
           key={activeTab.id}
           apps={apps}
           currentChannel={activeChannel}
+          channelId={activeChannel?.id ?? null}
           preloadPath={preloadPath}
           initialPanelIds={activeTab.initialPanelIds}
           initialLayout={activeTab.layoutJson}
