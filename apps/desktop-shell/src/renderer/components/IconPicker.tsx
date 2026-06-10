@@ -303,10 +303,9 @@ function UploadTab({ onSelect }: { onSelect: (val: string) => void }) {
 // ─── Color picker strip ───────────────────────────────────────────────────────
 
 const COLOR_PRESETS = [
-  '#ffffff', '#94a3b8', '#64748b',
   '#ef4444', '#f97316', '#eab308',
   '#22c55e', '#14b8a6', '#3b82f6',
-  '#8b5cf6', '#ec4899', '#f43f5e',
+  '#8b5cf6', '#ec4899', '#94a3b8',
 ];
 
 interface ColorStripProps {
@@ -318,6 +317,18 @@ function ColorStrip({ color, onChange }: ColorStripProps) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', borderTop: '1px solid var(--shell-border)', flexShrink: 0 }}>
       <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--shell-muted)', textTransform: 'uppercase', marginRight: 4 }}>Color</span>
+      {/* Default = inherit from theme */}
+      <button
+        onClick={() => onChange('')}
+        title="Default (theme color)"
+        style={{
+          width: 18, height: 18, borderRadius: '50%', border: '1.5px solid var(--shell-border)',
+          background: 'var(--shell-panel)', cursor: 'pointer', flexShrink: 0, fontSize: 9,
+          color: 'var(--shell-text)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          outline: !color ? '2px solid var(--shell-accent)' : '2px solid transparent',
+          outlineOffset: 1,
+        }}
+      >A</button>
       {COLOR_PRESETS.map((c) => (
         <button
           key={c}
@@ -347,15 +358,6 @@ function ColorStrip({ color, onChange }: ColorStripProps) {
           style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
         />
       </label>
-      {color && (
-        <button
-          onClick={() => onChange('')}
-          title="Remove color"
-          style={{ fontSize: 10, color: 'var(--shell-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px' }}
-        >
-          ✕
-        </button>
-      )}
       {/* Live preview */}
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ fontSize: 10, color: 'var(--shell-muted)' }}>Preview</span>

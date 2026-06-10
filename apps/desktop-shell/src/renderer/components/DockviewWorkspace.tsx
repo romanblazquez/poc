@@ -625,6 +625,13 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
 
   useEffect(() => clearListeners, [clearListeners]);
 
+  // Push icon/iconColor updates to existing panels whenever apps definition changes.
+  useEffect(() => {
+    const api = dockApiRef.current;
+    if (!api) return;
+    syncPanelTitles(api);
+  }, [apps, syncPanelTitles]);
+
   useEffect(() => {
     tabObserverRef.current?.disconnect();
     tabObserverRef.current = null;

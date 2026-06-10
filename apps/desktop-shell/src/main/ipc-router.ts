@@ -1037,6 +1037,7 @@ export class IpcRouter {
         title: a.title,
         description: a.description,
         icon: a.icon,
+        iconColor: a.iconColor,
         category: a.category,
         url: a.url,
         devPort: a.devPort,
