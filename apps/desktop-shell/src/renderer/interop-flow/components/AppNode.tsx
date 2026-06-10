@@ -3,6 +3,7 @@ import { contextInPort, contextOutPort, intentInPort, intentOutPort } from '../m
 import type { InteropAppNode } from '../model/interop-flow-types.js';
 import { ContextPort } from './ContextPort.js';
 import { IntentPort } from './IntentPort.js';
+import { AppIcon } from '../../components/AppIcon.js';
 
 type AppNodeData = InteropAppNode & Record<string, unknown>;
 type AppFlowNode = Node<AppNodeData, 'app'>;
@@ -11,7 +12,7 @@ export function AppNode({ data }: NodeProps<AppFlowNode>) {
   return (
     <div className="interop-app-node">
       <div className="interop-app-node-title">
-        <span className="interop-app-node-icon">{data.icon ?? data.label.slice(0, 2).toUpperCase()}</span>
+        <span className="interop-app-node-icon"><AppIcon icon={data.icon} fallback={data.label.slice(0, 2).toUpperCase()} size={16} /></span>
         <strong>{data.label}</strong>
       </div>
       <div className="interop-app-node-grid">

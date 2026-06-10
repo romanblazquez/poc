@@ -7,6 +7,7 @@ import { Button } from './ui/button.js';
 import { Card, CardContent } from './ui/card.js';
 import { Input } from './ui/input.js';
 import { cn } from '../lib/utils.js';
+import { AppIcon } from './AppIcon.js';
 
 const CATEGORY_COLORS: Record<string, string> = {
   CRM: '#4080e8',
@@ -381,7 +382,7 @@ function AppCard({
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-2xl"
             style={{ background: `${categoryColor}20`, borderColor: `${categoryColor}55`, color: categoryColor }}
           >
-            {app.icon ?? app.title.slice(0, 1)}
+            <AppIcon icon={app.icon} fallback={app.title.slice(0, 1)} size={24} />
           </div>
           <div className="flex min-w-0 flex-col gap-0.5">
             <div className="truncate text-sm font-black text-foreground">{app.title}</div>

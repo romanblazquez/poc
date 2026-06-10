@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppEntry } from '../App.js';
 import { cn } from '../lib/utils.js';
+import { AppIcon } from './AppIcon.js';
 import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';
 import {
@@ -169,7 +170,7 @@ export function IntentResolverDialog({ apps }: IntentResolverDialogProps): JSX.E
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-xl"
                   style={{ background: `${categoryColor}20`, borderColor: `${categoryColor}50`, color: categoryColor }}
                 >
-                  {candidate.icon ?? (candidate.title ?? candidate.appId).slice(0, 1)}
+                  <AppIcon icon={candidate.icon} fallback={(candidate.title ?? candidate.appId).slice(0, 1)} size={22} />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="truncate text-sm font-black text-foreground">

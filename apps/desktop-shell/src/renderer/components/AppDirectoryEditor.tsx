@@ -5,6 +5,8 @@ import { Button } from './ui/button.js';
 import { Card, CardContent } from './ui/card.js';
 import { Input } from './ui/input.js';
 import { cn } from '../lib/utils.js';
+import { IconPicker } from './IconPicker.js';
+import { AppIcon } from './AppIcon.js';
 
 interface AppDirectoryEditorProps {
   apps: AppEntry[];
@@ -89,11 +91,10 @@ function AppForm({
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-[10px] font-black uppercase tracking-[0.07em] text-muted-foreground">Icon</label>
-          <Input
+          <IconPicker
             value={draft.icon ?? ''}
-            onChange={(e) => set('icon', e.target.value)}
-            placeholder="📊"
-            className="h-7 text-xs"
+            onChange={(val) => set('icon', val)}
+            fallback={draft.title.slice(0, 1) || '?'}
           />
         </div>
         <div className="col-span-2 flex flex-col gap-1">
@@ -282,7 +283,7 @@ function AppRow({ app, onEdit, onDelete }: { app: AppEntry; onEdit: () => void; 
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-lg"
           style={{ background: `${color}18`, borderColor: `${color}40`, color }}
         >
-          {app.icon ?? app.title.slice(0, 1)}
+          <AppIcon icon={app.icon} fallback={app.title.slice(0, 1)} size={22} />
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex items-center gap-2">

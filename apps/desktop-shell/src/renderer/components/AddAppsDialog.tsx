@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { AppIcon } from './AppIcon.js';
 import { Search, X, CheckCircle2, Plus, Minus } from 'lucide-react';
 import type { AppEntry } from '../App.js';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog.js';
@@ -204,7 +205,7 @@ function MegaMenuAppCard({
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-xl"
           style={{ background: `${categoryColor}20`, borderColor: `${categoryColor}55` }}
         >
-          {app.icon ?? app.title.slice(0, 1)}
+          <AppIcon icon={app.icon} fallback={app.title.slice(0, 1)} size={22} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[12px] font-black text-foreground">{app.title}</div>

@@ -10,6 +10,7 @@ import { cn } from '../lib/utils.js';
 import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';
 import { Switch } from './ui/switch.js';
+import { AppIcon } from './AppIcon.js';
 
 interface WorkspaceLayoutItem {
   appId: string;
@@ -120,7 +121,7 @@ export function WorkspaceRuntimeWindow({
                   editing ? 'cursor-move' : 'cursor-default',
                 )}
               >
-                <span>{app.icon ?? '□'}</span>
+                <AppIcon icon={app.icon} fallback="□" size={14} />
                 <strong className="truncate text-xs font-black">{app.title}</strong>
               </div>
               {preloadPath && (

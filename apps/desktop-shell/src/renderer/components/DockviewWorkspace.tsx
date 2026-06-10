@@ -7,6 +7,7 @@ import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { ThemeName } from '@fdc3-poc/fdc3-core';
 import { LayoutGrid, Plus } from 'lucide-react';
 import { Button } from './ui/button.js';
+import { AppIcon } from './AppIcon.js';
 import 'dockview/dist/styles/dockview.css';
 import '../styles/dockview-override.css';
 
@@ -64,6 +65,7 @@ interface AppPanelParams {
   preloadPath: string;  // kept for backwards-compat with saved workspace JSON
   channelId: string | null;
   theme: ThemeMode;
+  icon?: string | null;
 }
 
 // ─── Webview pool context ─────────────────────────────────────────────────────
@@ -85,20 +87,27 @@ const CurrentChannelContext = createContext<UserChannel | null>(null);
 
 // ─── Tab header ───────────────────────────────────────────────────────────────
 
-function AppTabComponent({ api }: IDockviewPanelHeaderProps<AppPanelParams>) {
+function AppTabComponent({ api, params }: IDockviewPanelHeaderProps<AppPanelParams>) {
   const channel = useContext(CurrentChannelContext);
   const color = channel?.displayMetadata.color;
+  const icon = params?.icon;
+  // Only render AppIcon for structured formats; emoji is already in the title string via panelTitle().
+  const showIconComponent = !!icon && (icon.startsWith('lucide:') || icon.startsWith('data:'));
+  const rawTitle = api.title ?? '';
+  const titleText = rawTitle.trim() || api.id;
 
   return (
-    <div className="group flex h-full items-center gap-1.5 px-2.5">
-      {color && (
-        <span
-          className="h-2 w-2 shrink-0 rounded-full ring-1 ring-black/10"
-          style={{ background: color }}
-          title={channel?.displayMetadata.name}
-        />
+    <div
+      className="group flex h-full min-w-0 items-center gap-1.5 px-2.5"
+      style={color ? { borderTop: `2px solid ${color}` } : { borderTop: '2px solid transparent' }}
+      title={color ? channel?.displayMetadata.name : undefined}
+    >
+      {showIconComponent && (
+        <span className="flex shrink-0 items-center" style={{ lineHeight: 1 }}>
+          <AppIcon icon={icon} size={13} />
+        </span>
       )}
-      <span className="max-w-[120px] truncate text-[12px]">{api.title}</span>
+      <span className="min-w-0 flex-1 truncate text-[12px]">{titleText}</span>
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); api.close(); }}
@@ -193,7 +202,9 @@ function syncEmbeddedApp(webview: EmbeddedWebview, channelId: string | null, the
 }
 
 function panelTitle(app: AppEntry): string {
-  return app.icon ? `${app.icon} ${app.title}` : app.title;
+  // Only emit emoji/text icons in the tab title string; lucide: and data: are not renderable as text.
+  const icon = app.icon && !app.icon.startsWith('lucide:') && !app.icon.startsWith('data:') ? app.icon : null;
+  return icon ? `${icon} ${app.title}` : app.title;
 }
 
 function populatePanels(
@@ -215,6 +226,7 @@ function populatePanels(
       preloadPath,
       channelId,
       theme,
+      icon: panelApps[0].icon,
     },
   });
 
@@ -229,6 +241,7 @@ function populatePanels(
         preloadPath,
         channelId,
         theme,
+        icon: panelApps[1].icon,
       },
       position: { referencePanel: panelApps[0].appId, direction: 'right' },
     });
@@ -245,6 +258,7 @@ function populatePanels(
         preloadPath,
         channelId,
         theme,
+        icon: panelApps[2].icon,
       },
       position: { referencePanel: panelApps[1]?.appId ?? panelApps[0].appId, direction: 'below' },
     });
@@ -262,6 +276,7 @@ function populatePanels(
         preloadPath,
         channelId,
         theme,
+        icon: app.icon,
       },
     });
   }
@@ -516,7 +531,9 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
     for (const panel of api.panels) {
       const app = apps.find((entry) => entry.appId === panel.id);
       if (!app) continue;
-      (panel as { api?: { setTitle?: (title: string) => void } }).api?.setTitle?.(panelTitle(app));
+      const p = panel as { api?: { setTitle?: (t: string) => void; updateParameters?: (p: Partial<AppPanelParams>) => void } };
+      p.api?.setTitle?.(panelTitle(app));
+      p.api?.updateParameters?.({ icon: app.icon });
     }
   }, [apps]);
 
@@ -650,6 +667,7 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
         preloadPath,
         channelId,
         theme,
+        icon: app.icon,
       },
     });
 

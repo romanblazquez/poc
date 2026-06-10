@@ -839,7 +839,7 @@ export function App() {
               <WorkspaceTabButton
                 key={tab.id}
                 active={activeWorkspaceTab.id === tab.id}
-                onClick={() => setActiveWorkspaceId(tab.id)}
+                onClick={() => { setActiveWorkspaceId(tab.id); setActiveMode('workspace'); }}
                 onDoubleClick={() => handleWorkspaceRenameStart(tab.id, tab.name)}
                 onClose={workspaceTabs.length > 1 ? () => handleCloseWorkspace(tab.id) : undefined}
                 editing={editingWorkspaceId === tab.id}
