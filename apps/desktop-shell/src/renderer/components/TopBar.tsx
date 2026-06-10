@@ -67,11 +67,15 @@ export function TopBar({ title, subtitle, mark, leftActions, actions, sidebarOpe
     WebkitAppRegion: 'no-drag',
   };
 
+  // macOS: 36px matches traffic light zone. Windows: 38px matches titleBarOverlay height (Win11 feels).
+  const barHeight = isMac ? 36 : 38;
+
   return (
     <div
-      className="flex h-9 shrink-0 select-none items-center justify-between border-b bg-card"
+      className="flex shrink-0 select-none items-center justify-between border-b bg-card"
       style={{
         ...dragStyle,
+        height: barHeight,
         paddingLeft: isMac ? MAC_TRAFFIC_LIGHT_WIDTH : 14,
         paddingRight: isMac ? 14 : WIN_CONTROLS_WIDTH,
       }}

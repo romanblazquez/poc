@@ -104,7 +104,7 @@ export interface DetachedWorkspacePayload {
 const SNAP_THRESHOLD = 18;
 const ATTACH_THRESHOLD = 6;
 const SNAP_DEBOUNCE_MS = 120;
-const CUSTOM_TITLE_BAR_HEIGHT = 36; // matches h-9; Windows 11 native controls are 32px
+const CUSTOM_TITLE_BAR_HEIGHT = 38; // Windows titleBarOverlay height; macOS uses trafficLightPosition (height ignored)
 
 function customTitleBarOptions(backgroundColor: string): Partial<BrowserWindowConstructorOptions> {
   return {
