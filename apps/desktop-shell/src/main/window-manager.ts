@@ -160,6 +160,7 @@ export class WindowManager {
       minWidth: 900,
       minHeight: 600,
       ...customTitleBarOptions('#0f0f1a'),
+      autoHideMenuBar: true,
       webPreferences: {
         preload: this.preloadPath,
         contextIsolation: true,
@@ -212,6 +213,7 @@ export class WindowManager {
       minWidth: 1100,
       minHeight: 700,
       ...customTitleBarOptions('#090916'),
+      autoHideMenuBar: true,
       webPreferences: {
         preload: this.preloadPath,
         contextIsolation: true,
@@ -231,6 +233,9 @@ export class WindowManager {
         win.setPosition(payload.targetX, payload.targetY);
       }
       win.show();
+      // On Windows, show() alone may not bring the window to the foreground
+      // if Windows' focus-stealing prevention is active.
+      if (process.platform === 'win32') win.focus();
     });
     this.register(win, `workspace:${payload.id}`);
     win.on('closed', () => this.returnDetachedWorkspace(payload.id));

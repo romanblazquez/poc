@@ -725,7 +725,12 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
       targetX: display ? display.workArea.x + 40 : undefined,
       targetY: display ? display.workArea.y + 40 : undefined,
     };
-    await onDetachWorkspace(payload);
+    try {
+      await onDetachWorkspace(payload);
+    } catch (err) {
+      console.error('[DockviewWorkspace] detach failed:', err);
+      return;
+    }
     api.clear();
     syncOpenPanels(api);
   }, [channelId, onDetachWorkspace, openPanelIds, syncOpenPanels, theme, workspaceName]);
