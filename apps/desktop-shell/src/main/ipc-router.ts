@@ -14,8 +14,9 @@ import type { IntentResolverCandidate } from '@fdc3-poc/intent-engine';
 import { AppRegistry } from '@fdc3-poc/app-registry';
 import { IntentResolverWindowManager } from './intent-resolver-window.js';
 import type { ManagerService } from './manager-service.js';
-import type { BridgeProfile, BridgeSettings, ManagerSettings, NotificationRaiseInput } from '@fdc3-poc/fdc3-core';
+import type { BridgeProfile, BridgeSettings, EnvironmentProfile, ManagerSettings, NotificationRaiseInput } from '@fdc3-poc/fdc3-core';
 import type { BridgeService } from './bridge-service.js';
+import type { EnvironmentStore } from './environment-store.js';
 import { NotificationStore } from './notification-store.js';
 import { resolveAppIdentityFromUrl, type WindowManager } from './window-manager.js';
 import type { DetachedWorkspacePayload } from './window-manager.js';
@@ -77,6 +78,7 @@ export class IpcRouter {
     private readonly appDirectory: AppDefinition[],
     private readonly managerService?: ManagerService,
     private readonly bridgeService?: BridgeService,
+    private readonly environmentStore?: EnvironmentStore,
   ) {
     this.intentResolver = new IntentResolver();
     this.appRegistry = new AppRegistry(appDirectory);
@@ -383,6 +385,12 @@ export class IpcRouter {
     this.handleGetAppLifecycle();
     this.handleRestartApp();
     this.handleAppDirectorySave();
+    this.handleEnvList();
+    this.handleEnvAdd();
+    this.handleEnvUpdate();
+    this.handleEnvDelete();
+    this.handleEnvActivate();
+    this.handleEnvGetActive();
   }
 
   // ─── FINOS bridge readiness (non-experimental Backplane discovery) ───────
@@ -1539,7 +1547,49 @@ export class IpcRouter {
   private handleAppDirectorySave(): void {
     ipcMain.handle(IpcEvents.APP_DIRECTORY_SAVE, (_event, apps: AppDefinition[]) => {
       this.replaceRuntimeAppDirectory(apps);
+      this.environmentStore?.saveAppDirectory(apps);
       return { ok: true, count: apps.length };
+    });
+  }
+
+  private handleEnvList(): void {
+    ipcMain.handle(IpcEvents.ENV_LIST, () => this.environmentStore?.getAll() ?? []);
+  }
+
+  private handleEnvGetActive(): void {
+    ipcMain.handle(IpcEvents.ENV_GET_ACTIVE, () => this.environmentStore?.getActiveId() ?? null);
+  }
+
+  private handleEnvAdd(): void {
+    ipcMain.handle(IpcEvents.ENV_ADD, (_event, data: Omit<EnvironmentProfile, 'id'>) => {
+      if (!this.environmentStore) return null;
+      return this.environmentStore.add(data);
+    });
+  }
+
+  private handleEnvUpdate(): void {
+    ipcMain.handle(IpcEvents.ENV_UPDATE, (_event, { id, patch }: { id: string; patch: Partial<Omit<EnvironmentProfile, 'id'>> }) => {
+      if (!this.environmentStore) return null;
+      return this.environmentStore.update(id, patch ?? {});
+    });
+  }
+
+  private handleEnvDelete(): void {
+    ipcMain.handle(IpcEvents.ENV_DELETE, (_event, id: string) => {
+      if (!this.environmentStore) return false;
+      return this.environmentStore.delete(id);
+    });
+  }
+
+  private handleEnvActivate(): void {
+    ipcMain.handle(IpcEvents.ENV_ACTIVATE, (_event, id: string) => {
+      if (!this.environmentStore) return null;
+      const profile = this.environmentStore.activate(id);
+      if (!profile) return null;
+      // Hot-swap the runtime app directory with the env's persisted copy (if any).
+      const envApps = this.environmentStore.loadAppDirectoryForId(id);
+      if (envApps) this.replaceRuntimeAppDirectory(envApps);
+      return { profile, appCount: envApps?.length ?? null };
     });
   }
 

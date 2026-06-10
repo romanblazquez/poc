@@ -7,6 +7,7 @@ import {
   CloudDownload,
   Network,
   BookOpen,
+  Globe,
   Grid3x3,
   ShieldCheck,
   ScanLine,
@@ -27,6 +28,7 @@ type WorkspaceMode =
   | 'manager'
   | 'bridge'
   | 'app-directory'
+  | 'environment'
   | 'rbac';
 
 interface ShellSidebarProps {
@@ -50,6 +52,7 @@ const MODE_ITEMS: Array<{
   { mode: 'manager',       label: 'Manager',        icon: CloudDownload,   shortcut: '⌘4' },
   { mode: 'bridge',        label: 'Bridge',         icon: Network,         shortcut: '⌘5' },
   { mode: 'app-directory', label: 'App Directory',  icon: BookOpen },
+  { mode: 'environment',   label: 'Environments',   icon: Globe },
   { mode: 'launcher',      label: 'App Launcher',   icon: Grid3x3,         shortcut: '⌘0' },
   { mode: 'rbac',          label: 'RBAC',           icon: ShieldCheck },
 ];

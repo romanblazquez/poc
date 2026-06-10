@@ -13,6 +13,7 @@ import type { DetachedWorkspacePayload, DisplayInfo, DockviewWorkspaceHandle } f
 import { ControlTower } from './components/ControlTower.js';
 import { Manager } from './components/Manager.js';
 import { Bridge } from './components/Bridge.js';
+import { Environments } from './components/Environments.js';
 import { Badge } from './components/ui/badge.js';
 import { Button } from './components/ui/button.js';
 import { Card, CardContent } from './components/ui/card.js';
@@ -85,7 +86,7 @@ export interface AppEntry {
 
 type ThemeMode = ThemeName;
 type SidebarPosition = 'left' | 'right' | 'bottom';
-export type WorkspaceMode = 'launcher' | 'workspace' | 'dashboard' | 'interop-flow' | 'control-tower' | 'inspector' | 'manager' | 'bridge' | 'app-directory' | 'rbac';
+export type WorkspaceMode = 'launcher' | 'workspace' | 'dashboard' | 'interop-flow' | 'control-tower' | 'inspector' | 'manager' | 'bridge' | 'app-directory' | 'environment' | 'rbac';
 
 export interface WorkspaceState {
   channelId: string | null;
@@ -940,6 +941,8 @@ export function App() {
               <Bridge />
             ) : activeMode === 'app-directory' ? (
               <AppDirectoryEditor apps={apps} onAppsChanged={setApps} />
+            ) : activeMode === 'environment' ? (
+              <Environments />
             ) : activeMode === 'rbac' ? (
               <RbacPanel apps={apps} />
             ) : (

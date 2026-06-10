@@ -675,6 +675,26 @@ contextBridge.exposeInMainWorld('shellChrome', {
       return ipcRenderer.invoke(IpcEvents.APP_DIRECTORY_SAVE, apps) as Promise<{ ok: boolean; count: number }>;
     },
   },
+  environment: {
+    list(): Promise<import('@fdc3-poc/fdc3-core').EnvironmentProfile[]> {
+      return ipcRenderer.invoke(IpcEvents.ENV_LIST) as Promise<import('@fdc3-poc/fdc3-core').EnvironmentProfile[]>;
+    },
+    getActiveId(): Promise<string | null> {
+      return ipcRenderer.invoke(IpcEvents.ENV_GET_ACTIVE) as Promise<string | null>;
+    },
+    add(data: Omit<import('@fdc3-poc/fdc3-core').EnvironmentProfile, 'id'>): Promise<import('@fdc3-poc/fdc3-core').EnvironmentProfile | null> {
+      return ipcRenderer.invoke(IpcEvents.ENV_ADD, data) as Promise<import('@fdc3-poc/fdc3-core').EnvironmentProfile | null>;
+    },
+    update(id: string, patch: Partial<Omit<import('@fdc3-poc/fdc3-core').EnvironmentProfile, 'id'>>): Promise<import('@fdc3-poc/fdc3-core').EnvironmentProfile | null> {
+      return ipcRenderer.invoke(IpcEvents.ENV_UPDATE, { id, patch }) as Promise<import('@fdc3-poc/fdc3-core').EnvironmentProfile | null>;
+    },
+    delete(id: string): Promise<boolean> {
+      return ipcRenderer.invoke(IpcEvents.ENV_DELETE, id) as Promise<boolean>;
+    },
+    activate(id: string): Promise<{ profile: import('@fdc3-poc/fdc3-core').EnvironmentProfile; appCount: number | null } | null> {
+      return ipcRenderer.invoke(IpcEvents.ENV_ACTIVATE, id) as Promise<{ profile: import('@fdc3-poc/fdc3-core').EnvironmentProfile; appCount: number | null } | null>;
+    },
+  },
 });
 
 // ─── window.fdc3 surface ──────────────────────────────────────────────────
