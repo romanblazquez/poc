@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React from 'react';
 import {
   LayoutDashboard,
   BarChart3,
@@ -11,11 +11,8 @@ import {
   Grid3x3,
   ShieldCheck,
   ScanLine,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 import { cn } from '../lib/utils.js';
-import { Button } from './ui/button.js';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js';
 
 type WorkspaceMode =
@@ -34,9 +31,9 @@ type WorkspaceMode =
 interface ShellSidebarProps {
   activeMode: WorkspaceMode;
   onModeChange: (mode: WorkspaceMode) => void;
+  expanded: boolean;
+  onToggleExpanded: () => void;
 }
-
-const SIDEBAR_STORAGE_KEY = 'fdc3.shell.sidebar.expanded';
 
 const MODE_ITEMS: Array<{
   mode: WorkspaceMode;
@@ -57,35 +54,13 @@ const MODE_ITEMS: Array<{
   { mode: 'rbac',          label: 'RBAC',           icon: ShieldCheck },
 ];
 
-export function ShellSidebar({ activeMode, onModeChange }: ShellSidebarProps) {
-  const [expanded, setExpanded] = useState<boolean>(() => {
-    try { return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true'; }
-    catch { return false; }
-  });
-
-  useEffect(() => {
-    try { window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(expanded)); }
-    catch { /* ignore */ }
-  }, [expanded]);
-
+export function ShellSidebar({ activeMode, onModeChange, expanded }: ShellSidebarProps) {
   return (
     <TooltipProvider delayDuration={300}>
       <aside className={cn(
         'flex shrink-0 flex-col border-r bg-card transition-all duration-200',
         expanded ? 'w-48' : 'w-12',
       )}>
-        {/* Toggle */}
-        <div className="flex h-9 shrink-0 items-center justify-end border-b px-1">
-          <Button
-            variant="ghost" size="sm" type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="h-7 w-7 p-0"
-            title={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
-          >
-            {expanded ? <ChevronLeft className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-          </Button>
-        </div>
-
         {/* Mode list */}
         <nav className="flex flex-1 flex-col overflow-y-auto py-1.5">
           {MODE_ITEMS.map(({ mode, label, icon: Icon, shortcut }) => {

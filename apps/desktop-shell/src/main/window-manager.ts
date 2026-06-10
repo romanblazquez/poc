@@ -104,13 +104,13 @@ export interface DetachedWorkspacePayload {
 const SNAP_THRESHOLD = 18;
 const ATTACH_THRESHOLD = 6;
 const SNAP_DEBOUNCE_MS = 120;
-const CUSTOM_TITLE_BAR_HEIGHT = 30;
+const CUSTOM_TITLE_BAR_HEIGHT = 36; // matches h-9; Windows 11 native controls are 32px
 
 function customTitleBarOptions(backgroundColor: string): Partial<BrowserWindowConstructorOptions> {
   return {
     titleBarStyle: 'hidden',
     ...(process.platform === 'darwin'
-      ? { trafficLightPosition: { x: 12, y: 8 } }
+      ? { trafficLightPosition: { x: 6, y: 12 } } // x:6 = VS Code pattern; y=(36-12)/2=12 centers 12px circles
       : {
           titleBarOverlay: {
             color: backgroundColor,

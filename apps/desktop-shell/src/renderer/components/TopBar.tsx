@@ -1,6 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { PanelLeft, PanelLeftClose } from 'lucide-react';
 import { Badge } from './ui/badge.js';
 import { cn } from '../lib/utils.js';
+
+// macOS: x:6, 3 circles × ~20px hitbox each → right edge ~66px + 8px gap = 74px
+const MAC_TRAFFIC_LIGHT_WIDTH = 74;
+// Windows 11: 3 buttons × ~46px each (minimize/maximize/close at 32px height)
+const WIN_CONTROLS_WIDTH = 138;
 
 type AppRegionStyle = React.CSSProperties & {
   WebkitAppRegion?: 'drag' | 'no-drag';
@@ -17,6 +23,8 @@ export interface TopBarProps {
   mark?: React.ReactNode;
   leftActions?: React.ReactNode;
   actions?: React.ReactNode;
+  sidebarOpen?: boolean;
+  onSidebarToggle?: () => void;
 }
 
 function getShellChrome(): ShellChromeFullscreenAPI | undefined {
@@ -43,7 +51,7 @@ function useWindowFullscreen(): boolean {
   return fullscreen;
 }
 
-export function TopBar({ title, subtitle, mark, leftActions, actions }: TopBarProps): React.JSX.Element | null {
+export function TopBar({ title, subtitle, mark, leftActions, actions, sidebarOpen, onSidebarToggle }: TopBarProps): React.JSX.Element | null {
   const fullscreen = useWindowFullscreen();
   const isMac = useMemo(() => {
     if (typeof navigator === 'undefined') return false;
@@ -61,14 +69,25 @@ export function TopBar({ title, subtitle, mark, leftActions, actions }: TopBarPr
 
   return (
     <div
-      className="flex h-12 shrink-0 select-none items-center justify-between border-b bg-card"
+      className="flex h-9 shrink-0 select-none items-center justify-between border-b bg-card"
       style={{
         ...dragStyle,
-        paddingLeft: isMac ? 86 : 14,
-        paddingRight: isMac ? 14 : 152,
+        paddingLeft: isMac ? MAC_TRAFFIC_LIGHT_WIDTH : 14,
+        paddingRight: isMac ? 14 : WIN_CONTROLS_WIDTH,
       }}
     >
       <div className="flex min-w-0 items-center gap-2.5">
+        {onSidebarToggle && (
+          <button
+            type="button"
+            onClick={onSidebarToggle}
+            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            style={noDragStyle}
+          >
+            {sidebarOpen ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
+          </button>
+        )}
         {leftActions && (
           <div className="flex flex-shrink-0 items-center gap-1.5" style={noDragStyle}>
             {leftActions}

@@ -271,6 +271,10 @@ export function App() {
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(initialWorkspaceStore.savedAt);
   const [showRestoreBanner, setShowRestoreBanner] = useState<boolean>(initialWorkspaceStore.savedAt != null);
   const [activeMode, setActiveMode] = useState<WorkspaceMode>('workspace');
+  const [sidebarExpanded, setSidebarExpanded] = useState<boolean>(() => {
+    try { return window.localStorage.getItem('fdc3.shell.sidebar.expanded') === 'true'; }
+    catch { return false; }
+  });
   const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceTab[]>(initialWorkspaceStore.tabs);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(initialWorkspaceStore.activeWorkspaceId);
   const [workspaceStates, setWorkspaceStates] = useState<Record<string, WorkspaceState>>(initialWorkspaceStore.states);
@@ -310,6 +314,11 @@ export function App() {
     (rightPanel === 'channel' && channelPanelPosition === 'right') ||
     (rightPanel === 'notifications' && notificationsPanelPosition === 'right')
   );
+
+  useEffect(() => {
+    try { window.localStorage.setItem('fdc3.shell.sidebar.expanded', String(sidebarExpanded)); }
+    catch { /* ignore */ }
+  }, [sidebarExpanded]);
 
   useEffect(() => {
     if (workspaceTabs.length === 0) {
@@ -767,6 +776,8 @@ export function App() {
       <TopBar
         title={shellManifest?.title ?? 'FDC3 Desktop Shell'}
         subtitle={shellManifest?.subtitle ?? 'TRADER WORKSTATION'}
+        sidebarOpen={sidebarExpanded}
+        onSidebarToggle={() => setSidebarExpanded((v) => !v)}
         actions={
           <>
             <Button
@@ -871,6 +882,8 @@ export function App() {
         <ShellSidebar
           activeMode={activeMode}
           onModeChange={setActiveMode}
+          expanded={sidebarExpanded}
+          onToggleExpanded={() => setSidebarExpanded((v) => !v)}
         />
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
