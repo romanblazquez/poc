@@ -82,7 +82,7 @@ export interface AppEntry {
   devPort: number;
   capabilities?: AppCapabilityConfig;
   listensForContexts?: string[];
-  intents?: Array<{ intent: string; contextTypes: string[]; appId?: string; displayName?: string }>;
+  intents?: Array<{ intent: string; contextTypes: string[] | null; appId?: string; displayName?: string }>;
 }
 
 type ThemeMode = ThemeName;

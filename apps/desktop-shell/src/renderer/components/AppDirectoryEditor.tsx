@@ -7,6 +7,7 @@ import { Input } from './ui/input.js';
 import { cn } from '../lib/utils.js';
 import { IconPicker } from './IconPicker.js';
 import { AppIcon } from './AppIcon.js';
+import { X } from 'lucide-react';
 
 interface AppDirectoryEditorProps {
   apps: AppEntry[];
@@ -23,6 +24,17 @@ function getApi(): AppDirectoryApi | undefined {
 
 const CATEGORIES = ['CRM', 'Investments', 'Markets', 'Payments', 'Trading', 'Operations', 'Analytics'];
 
+const STANDARD_INTENTS = [
+  'ViewInstrument', 'ViewChart', 'ViewQuote', 'ViewNews', 'ViewAnalysis', 'ViewResearch',
+  'ViewContact', 'ViewPortfolio', 'ViewAccount', 'ViewOrders', 'ViewHoldings',
+  'StartPayment', 'StartChat', 'SendChatMessage', 'CreateInteraction',
+];
+
+const STANDARD_CONTEXT_TYPES = [
+  'fdc3.instrument', 'fdc3.contact', 'fdc3.portfolio', 'fdc3.order',
+  'fdc3.account', 'fdc3.position', 'fdc3.chart', 'fdc3.organization',
+];
+
 const BLANK_APP: AppEntry = {
   appId: '',
   title: '',
@@ -32,6 +44,20 @@ const BLANK_APP: AppEntry = {
   category: '',
   url: '',
   devPort: 0,
+};
+
+type IntentDraft = {
+  intent: string;
+  customIntent: string;
+  contextTypes: string;
+  displayName: string;
+};
+
+const BLANK_INTENT: IntentDraft = {
+  intent: '',
+  customIntent: '',
+  contextTypes: '',
+  displayName: '',
 };
 
 function AppForm({
@@ -44,9 +70,69 @@ function AppForm({
   onCancel: () => void;
 }) {
   const [draft, setDraft] = useState<AppEntry>(initial);
+  const [newIntent, setNewIntent] = useState<IntentDraft>(BLANK_INTENT);
+  const [ctxInput, setCtxInput] = useState('');
 
   const set = (key: keyof AppEntry, value: string | number) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
+
+  const resolvedIntentName = newIntent.intent === '__custom__'
+    ? newIntent.customIntent.trim()
+    : newIntent.intent.trim();
+
+  const addIntent = () => {
+    const name = resolvedIntentName;
+    if (!name) return;
+    if ((draft.intents ?? []).some((entry) => entry.intent === name)) return;
+
+    const contextTypes = [...new Set(
+      newIntent.contextTypes.split(',').map((value) => value.trim()).filter(Boolean),
+    )];
+    const entry = {
+      intent: name,
+      contextTypes: contextTypes.length > 0 ? contextTypes : null,
+      appId: draft.appId,
+      ...(newIntent.displayName.trim() ? { displayName: newIntent.displayName.trim() } : {}),
+    };
+    setDraft((prev) => ({ ...prev, intents: [...(prev.intents ?? []), entry] }));
+    setNewIntent(BLANK_INTENT);
+  };
+
+  const removeIntent = (idx: number) =>
+    setDraft((prev) => ({ ...prev, intents: (prev.intents ?? []).filter((_, i) => i !== idx) }));
+
+  const commitCtxInput = (raw: string) => {
+    const types = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    if (!types.length) return;
+    setDraft((prev) => ({
+      ...prev,
+      listensForContexts: [...new Set([...(prev.listensForContexts ?? []), ...types])],
+    }));
+    setCtxInput('');
+  };
+
+  const removeCtx = (type: string) =>
+    setDraft((prev) => ({ ...prev, listensForContexts: (prev.listensForContexts ?? []).filter((t) => t !== type) }));
+
+  const saveDraft = () => {
+    const normalizedIntents = draft.intents?.map((intent) => ({
+      ...intent,
+      appId: draft.appId.trim(),
+      contextTypes: intent.contextTypes?.length ? [...new Set(intent.contextTypes)] : null,
+    }));
+
+    onSave({
+      ...draft,
+      appId: draft.appId.trim(),
+      title: draft.title.trim(),
+      url: draft.url.trim(),
+      intents: normalizedIntents,
+      capabilities: {
+        ...draft.capabilities,
+        handlesIntents: normalizedIntents?.map((intent) => intent.intent) ?? [],
+      },
+    });
+  };
 
   const valid = draft.appId.trim().length > 0 && draft.title.trim().length > 0 && draft.url.trim().length > 0;
 
@@ -119,10 +205,159 @@ function AppForm({
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
+
+        {/* ── Intents handled ─────────────────────────────────────── */}
+        <div className="col-span-2 flex flex-col gap-2">
+          <label className="text-[10px] font-black uppercase tracking-[0.07em] text-muted-foreground">
+            Intents handled
+            <span className="ml-1 font-normal normal-case text-muted-foreground/60">(FDC3 intent routing)</span>
+          </label>
+
+          {/* Existing intent rows */}
+          {(draft.intents ?? []).map((intent, i) => (
+            <div key={i} className="flex items-center gap-2 rounded-md border bg-background px-2.5 py-1.5 text-xs">
+              <span className="font-mono font-bold text-foreground">{intent.intent}</span>
+              {(intent.contextTypes?.length ?? 0) > 0 && (
+                <span className="text-muted-foreground">→ {intent.contextTypes?.join(', ')}</span>
+              )}
+              {!intent.contextTypes?.length && (
+                <span className="italic text-muted-foreground/60">any context</span>
+              )}
+              {intent.displayName && intent.displayName !== intent.intent && (
+                <span className="ml-auto mr-2 text-[10px] text-muted-foreground">"{intent.displayName}"</span>
+              )}
+              <button
+                type="button"
+                onClick={() => removeIntent(i)}
+                className="ml-auto flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              >
+                <X size={10} />
+              </button>
+            </div>
+          ))}
+
+          {/* Add new intent row */}
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <select
+              value={newIntent.intent}
+              onChange={(e) => setNewIntent((prev) => ({
+                ...prev,
+                intent: e.target.value,
+                customIntent: e.target.value === '__custom__' ? prev.customIntent : '',
+              }))}
+              className="h-7 min-w-0 rounded-md border bg-background px-2 font-mono text-xs font-semibold text-foreground"
+            >
+              <option value="">— Select intent —</option>
+              {STANDARD_INTENTS.map((n) => <option key={n} value={n}>{n}</option>)}
+              <option value="__custom__">Custom…</option>
+            </select>
+            {newIntent.intent === '__custom__' && (
+              <Input
+                value={newIntent.customIntent}
+                onChange={(e) => setNewIntent((prev) => ({ ...prev, customIntent: e.target.value }))}
+                placeholder="MyCustomIntent"
+                className="h-7 font-mono text-xs"
+              />
+            )}
+            <Input
+              value={newIntent.displayName}
+              onChange={(e) => setNewIntent((prev) => ({ ...prev, displayName: e.target.value }))}
+              placeholder="Display label (optional)"
+              className="h-7 text-xs"
+            />
+            <div className="flex min-w-0 gap-2 md:col-span-2">
+              <Input
+                value={newIntent.contextTypes}
+                onChange={(e) => setNewIntent((prev) => ({ ...prev, contextTypes: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === 'Enter') addIntent(); }}
+                placeholder="fdc3.instrument, fdc3.contact"
+                className="h-7 min-w-0 flex-1 font-mono text-xs"
+                title="Comma-separated context types. Leave empty to accept any."
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 shrink-0 text-xs"
+                disabled={!resolvedIntentName || (draft.intents ?? []).some((entry) => entry.intent === resolvedIntentName)}
+                onClick={addIntent}
+              >
+                Add
+              </Button>
+            </div>
+          </div>
+          {(draft.intents ?? []).some((entry) => entry.intent === resolvedIntentName) && resolvedIntentName && (
+            <span className="text-[10px] font-semibold text-destructive">
+              This app already declares {resolvedIntentName}.
+            </span>
+          )}
+        </div>
+
+        {/* ── Listens for contexts ─────────────────────────────────── */}
+        <div className="col-span-2 flex flex-col gap-2">
+          <label className="text-[10px] font-black uppercase tracking-[0.07em] text-muted-foreground">
+            Listens for contexts
+            <span className="ml-1 font-normal normal-case text-muted-foreground/60">(passive subscriptions)</span>
+          </label>
+
+          {/* Tag chips */}
+          {(draft.listensForContexts ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {(draft.listensForContexts ?? []).map((ctx) => (
+                <span
+                  key={ctx}
+                  className="flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 font-mono text-[10px] text-foreground"
+                >
+                  {ctx}
+                  <button
+                    type="button"
+                    onClick={() => removeCtx(ctx)}
+                    className="flex h-3 w-3 items-center justify-center rounded-full text-muted-foreground hover:text-destructive"
+                  >
+                    <X size={8} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Context type input */}
+          <div className="flex items-center gap-2">
+            <select
+              value=""
+              onChange={(e) => { if (e.target.value) { commitCtxInput(e.target.value); e.target.value = ''; } }}
+              className="h-7 min-w-0 flex-1 rounded-md border bg-background px-2 font-mono text-xs text-foreground"
+            >
+              <option value="">— Quick add —</option>
+              {STANDARD_CONTEXT_TYPES
+                .filter((t) => !(draft.listensForContexts ?? []).includes(t))
+                .map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <Input
+              value={ctxInput}
+              onChange={(e) => setCtxInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); commitCtxInput(ctxInput); }
+              }}
+              placeholder="fdc3.instrument or custom.type"
+              className="h-7 flex-[2] font-mono text-xs"
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 shrink-0 text-xs"
+              disabled={!ctxInput.trim()}
+              onClick={() => commitCtxInput(ctxInput)}
+            >
+              Add
+            </Button>
+          </div>
+        </div>
       </div>
       <div className="flex justify-end gap-2 border-t pt-3">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
-        <Button type="button" size="sm" disabled={!valid} onClick={() => onSave(draft)}>
+        <Button type="button" size="sm" disabled={!valid} onClick={saveDraft}>
           Save App
         </Button>
       </div>
@@ -143,8 +378,12 @@ export function AppDirectoryEditor({ apps, onAppsChanged }: AppDirectoryEditorPr
     setDirty(true);
   }, []);
 
-  const handleEdit = useCallback((updated: AppEntry) => {
-    applyDraft(draft.map((a) => (a.appId === updated.appId ? updated : a)));
+  const handleEdit = useCallback((originalAppId: string, updated: AppEntry) => {
+    if (updated.appId !== originalAppId && draft.some((app) => app.appId === updated.appId)) {
+      alert(`App ID "${updated.appId}" already exists.`);
+      return;
+    }
+    applyDraft(draft.map((app) => (app.appId === originalAppId ? updated : app)));
     setEditingId(null);
   }, [draft, applyDraft]);
 
@@ -243,7 +482,7 @@ export function AppDirectoryEditor({ apps, onAppsChanged }: AppDirectoryEditorPr
             <AppForm
               key={app.appId}
               initial={app}
-              onSave={handleEdit}
+              onSave={(updated) => handleEdit(app.appId, updated)}
               onCancel={() => setEditingId(null)}
             />
           ) : (
@@ -308,6 +547,18 @@ function AppRow({ app, onEdit, onDelete }: { app: AppEntry; onEdit: () => void; 
           {app.description && (
             <span className="line-clamp-1 text-[11px] text-muted-foreground">{app.description}</span>
           )}
+          <div className="flex flex-wrap gap-1 pt-1">
+            {(app.intents?.length ?? 0) > 0 && (
+              <Badge variant="secondary" className="h-4 px-1.5 text-[9px]">
+                {app.intents?.length} intent{app.intents?.length === 1 ? '' : 's'}
+              </Badge>
+            )}
+            {(app.listensForContexts?.length ?? 0) > 0 && (
+              <Badge variant="secondary" className="h-4 px-1.5 text-[9px]">
+                {app.listensForContexts?.length} context{app.listensForContexts?.length === 1 ? '' : 's'}
+              </Badge>
+            )}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <Button type="button" size="xs" variant="ghost" onClick={onEdit}>Edit</Button>
