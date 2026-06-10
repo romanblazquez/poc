@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, webContents, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, net, webContents, screen } from 'electron';
 import type { WebContents } from 'electron';
 import { randomUUID } from 'crypto';
 import path from 'path';
@@ -24,6 +24,55 @@ import type { WorkspaceManager } from './workspace-manager.js';
 import type { ThemeManager } from './theme-manager.js';
 import type { AppDefinition } from '@fdc3-poc/fdc3-core';
 import { ShellAssetsLoader } from './shell-assets-loader.js';
+
+// ─── FDC3 AppD v2 response mapper ─────────────────────────────────────────────
+
+interface AppDv2Intent { contexts?: string[]; displayName?: string }
+interface AppDv2App {
+  appId?: string; name?: string; title?: string; description?: string; type?: string;
+  details?: { url?: string };
+  categories?: string[];
+  icons?: Array<{ src?: string }>;
+  interop?: { intents?: { listensFor?: Record<string, AppDv2Intent>; raises?: Record<string, AppDv2Intent> } };
+}
+
+function mapAppDResponseToDefinitions(raw: unknown): AppDefinition[] {
+  // Accepts: FDC3 AppD v2 `{ applications: [...] }`, plain array, or our native format.
+  let rows: unknown[] = [];
+  if (Array.isArray(raw)) {
+    rows = raw;
+  } else if (raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>).applications)) {
+    rows = (raw as { applications: unknown[] }).applications;
+  }
+
+  return rows.flatMap((item): AppDefinition[] => {
+    if (!item || typeof item !== 'object') return [];
+    const a = item as AppDv2App & Partial<AppDefinition>;
+
+    // Native format passthrough: already has appId + url as top-level fields.
+    if (a.url && a.appId) return [a as AppDefinition];
+
+    const appId = a.appId ?? a.name ?? '';
+    const url = a.details?.url ?? '';
+    if (!appId || !url) return [];
+
+    const intents: AppDefinition['intents'] = [];
+    for (const [intentName, def] of Object.entries(a.interop?.intents?.listensFor ?? {})) {
+      intents.push({ intent: intentName, contextTypes: def.contexts ?? [], appId, displayName: def.displayName });
+    }
+
+    return [{
+      appId,
+      title: a.title ?? a.name ?? appId,
+      description: a.description,
+      url,
+      devPort: 0,
+      category: a.categories?.[0],
+      icon: a.icons?.[0]?.src,
+      intents: intents.length ? intents : undefined,
+    }];
+  });
+}
 
 /**
  * IpcRouter — the heart of the FDC3 main-process implementation.
@@ -385,6 +434,7 @@ export class IpcRouter {
     this.handleGetAppLifecycle();
     this.handleRestartApp();
     this.handleAppDirectorySave();
+    this.handleAppDirectoryFetchRemote();
     this.handleEnvList();
     this.handleEnvAdd();
     this.handleEnvUpdate();
@@ -1550,6 +1600,20 @@ export class IpcRouter {
       this.replaceRuntimeAppDirectory(apps);
       this.environmentStore?.saveAppDirectory(apps);
       return { ok: true, count: apps.length };
+    });
+  }
+
+  private handleAppDirectoryFetchRemote(): void {
+    ipcMain.handle(IpcEvents.APP_DIRECTORY_FETCH_REMOTE, async (_event, url: string) => {
+      try {
+        const res = await net.fetch(url);
+        if (!res.ok) return { ok: false, apps: [], error: `HTTP ${res.status}` };
+        const json = await res.json() as unknown;
+        const apps = mapAppDResponseToDefinitions(json);
+        return { ok: true, apps };
+      } catch (e) {
+        return { ok: false, apps: [], error: e instanceof Error ? e.message : String(e) };
+      }
     });
   }
 

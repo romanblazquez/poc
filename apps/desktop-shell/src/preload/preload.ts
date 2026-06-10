@@ -674,6 +674,9 @@ contextBridge.exposeInMainWorld('shellChrome', {
     save(apps: unknown[]): Promise<{ ok: boolean; count: number }> {
       return ipcRenderer.invoke(IpcEvents.APP_DIRECTORY_SAVE, apps) as Promise<{ ok: boolean; count: number }>;
     },
+    fetchRemote(url: string): Promise<{ ok: boolean; apps: unknown[]; error?: string }> {
+      return ipcRenderer.invoke(IpcEvents.APP_DIRECTORY_FETCH_REMOTE, url) as Promise<{ ok: boolean; apps: unknown[]; error?: string }>;
+    },
   },
   environment: {
     list(): Promise<import('@fdc3-poc/fdc3-core').EnvironmentProfile[]> {

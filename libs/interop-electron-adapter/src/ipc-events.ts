@@ -84,6 +84,7 @@ export const IpcEvents = {
   GET_SHELL_MANIFEST: 'shell:getManifest',
   INTENT_RESOLVER_RESPOND: 'fdc3:intentResolverRespond',
   APP_DIRECTORY_SAVE: 'shell:appDirectorySave',
+  APP_DIRECTORY_FETCH_REMOTE: 'shell:appDirectoryFetchRemote',
   ENV_LIST: 'env:list',
   ENV_ADD: 'env:add',
   ENV_UPDATE: 'env:update',
