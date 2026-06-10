@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type * as React from 'react';
 import type { AppEntry } from '../App.js';
+import { cn } from '../lib/utils.js';
 import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js';
@@ -78,6 +79,15 @@ function getManagerApi(): ManagerApi | undefined {
   return api;
 }
 
+type ManagerSection = 'directory' | 'updates' | 'settings' | 'entitlements';
+
+const NAV: { id: ManagerSection; label: string }[] = [
+  { id: 'directory',    label: 'Directory' },
+  { id: 'updates',      label: 'Updates' },
+  { id: 'settings',     label: 'Settings' },
+  { id: 'entitlements', label: 'Entitlements' },
+];
+
 const REFRESH_INTERVAL_OPTIONS = [
   { value: 0,        label: 'Off' },
   { value: 30_000,   label: '30 sec' },
@@ -132,6 +142,7 @@ interface ManagerProps {
 
 export function Manager({ apps }: ManagerProps): React.JSX.Element {
   const api = getManagerApi();
+  const [section, setSection] = useState<ManagerSection>('directory');
   const [status, setStatus] = useState<ManagerStatus | null>(null);
   const [busy, setBusy] = useState<'check' | 'apply' | 'dismiss' | 'save' | null>(null);
   const [actionMessage, setActionMessage] = useState<{ text: string; kind: 'ok' | 'error' } | null>(null);
@@ -258,228 +269,287 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
   }
 
   const isRemote = status.source === 'remote' || status.source === 'cached';
+  const hasUpdate = !!status.available;
 
   return (
-    <div className="scrollbar-thin flex h-full flex-col gap-3 overflow-auto pr-1">
-      <div className="flex shrink-0 flex-wrap items-center gap-3">
-        <div className="min-w-0">
-          <div className="text-base font-black text-foreground">Manager Console</div>
-          <div className="text-xs font-bold text-muted-foreground">
-          io.Manager-class central distribution · {status.identity.user}@{status.identity.host} · shell v{status.identity.appVersion}
+    <div className="flex h-full min-h-0 overflow-hidden">
+      {/* Left sidebar */}
+      <nav className="flex w-44 shrink-0 flex-col gap-0.5 overflow-y-auto border-r bg-card p-1.5">
+        <div className="px-2 pb-1 pt-2">
+          <div className="text-xs font-black text-foreground">Manager Console</div>
+          <div className="truncate text-[10px] text-muted-foreground">
+            v{status.identity.appVersion} · {status.identity.user}
           </div>
         </div>
-        <div className="flex-1" />
-        <Button onClick={handleCheck} disabled={busy === 'check'} type="button" variant="outline" size="sm">
-          {busy === 'check' ? 'Checking…' : 'Check for updates'}
-        </Button>
-      </div>
 
-      {actionMessage && (
-        <Card className={actionMessage.kind === 'ok'
-          ? 'border-[color:var(--shell-positive)] p-3 text-sm font-bold text-[color:var(--shell-positive)]'
-          : 'border-[color:var(--shell-negative)] p-3 text-sm font-bold text-[color:var(--shell-negative)]'}
-        >
-          {actionMessage.text}
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader className="flex-row items-center justify-between gap-3 border-b">
-          <CardTitle>Applied directory</CardTitle>
-          <Badge variant={status.source === 'remote' ? 'success' : status.source === 'cached' ? 'warning' : status.source === 'embedded' ? 'destructive' : 'secondary'}>
-            <span className="mr-1.5 h-2 w-2 rounded-full" style={{ background: sourceAccent(status.source) }} />
-            {sourceLabel(status.source)}
-          </Badge>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <dl className="grid gap-x-3 gap-y-1 text-sm [grid-template-columns:140px_1fr]">
-            <dt className="text-muted-foreground">Source</dt>
-            <dd className="m-0 font-bold text-foreground">{sourceLabel(status.source)}</dd>
-            <dt className="text-muted-foreground">Directory URL</dt>
-            <dd className="m-0 break-all font-bold text-foreground">{status.directoryUrl || '(local bundle)'}</dd>
-            <dt className="text-muted-foreground">Version</dt>
-            <dd className="m-0 font-bold text-foreground">{status.currentVersion ?? '—'}{status.directoryLabel ? ` · ${status.directoryLabel}` : ''}</dd>
-            <dt className="text-muted-foreground">App count</dt>
-            <dd className="m-0 font-bold tabular-nums text-foreground">{status.currentAppCount}</dd>
-            <dt className="text-muted-foreground">ETag</dt>
-            <dd className="m-0 font-mono font-bold text-foreground">{shortEtag(status.currentEtag)}</dd>
-            <dt className="text-muted-foreground">Last fetched</dt>
-            <dd className="m-0 font-bold text-foreground">{formatTime(status.lastFetchedAt)}</dd>
-            <dt className="text-muted-foreground">Last checked</dt>
-            <dd className="m-0 font-bold text-foreground">{formatTime(status.lastCheckedAt)}</dd>
-            {status.lastFetchError && (
-              <>
-                <dt className="text-muted-foreground">Last error</dt>
-                <dd className="m-0 font-bold text-[color:var(--shell-negative)]">{status.lastFetchError}</dd>
-              </>
+        {NAV.map(({ id, label }) => (
+          <Button
+            key={id}
+            type="button"
+            variant={section === id ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setSection(id)}
+            className={cn('w-full justify-start gap-2', section !== id && 'text-muted-foreground')}
+          >
+            <span className="flex-1 text-left">{label}</span>
+            {id === 'updates' && hasUpdate && (
+              <span className={cn(
+                'h-1.5 w-1.5 shrink-0 rounded-full',
+                section === id ? 'bg-white/70' : 'bg-[color:var(--shell-accent)]',
+              )} />
             )}
-          </dl>
-          {!isRemote && !status.directoryUrl && (
-            <div className="mt-2 rounded-md border bg-[color:rgba(255,255,255,0.02)] p-3 text-xs font-bold leading-relaxed text-muted-foreground">
-              Running the bundled local directory. Configure a <strong>Directory URL</strong> below to start centrally
-              distributing your app catalogue. The shell will fetch it over HTTPS, validate it against the schema,
-              cache a copy on disk for offline use, and surface any change as a pending update.
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {status.available && (
-        <Card className="border-[color:var(--shell-accent)]">
-          <CardHeader className="flex-row items-center justify-between gap-3 border-b">
-            <CardTitle className="text-[color:var(--shell-accent)]">Update available</CardTitle>
-            <Badge variant="default">{status.available.version ?? 'no version tag'}{status.available.label ? ` · ${status.available.label}` : ''}</Badge>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4 pt-4">
-            <div className="grid gap-3 md:grid-cols-3">
-              <DiffTile tone="success" label="Added" ids={status.available.diff.addedApps} />
-              <DiffTile tone="destructive" label="Removed" ids={status.available.diff.removedApps} />
-              <DiffTile tone="warning" label="Changed" ids={status.available.diff.changedApps} />
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold text-muted-foreground">
-                Fetched {formatTime(status.available.fetchedAt)} · {status.available.appCount} apps · etag {shortEtag(status.available.etag)}
+            {id === 'settings' && settingsDirty && (
+              <span className={cn(
+                'h-1.5 w-1.5 shrink-0 rounded-full',
+                section === id ? 'bg-white/70' : 'bg-amber-400',
+              )} />
+            )}
+            {id === 'entitlements' && (
+              <span className={cn(
+                'ml-auto shrink-0 tabular-nums text-[10px] font-bold',
+                section === id ? 'opacity-70' : 'text-muted-foreground',
+              )}>
+                {apps.length}
               </span>
-              <div className="flex-1" />
-              <Button onClick={handleDismiss} disabled={busy === 'dismiss'} type="button" variant="outline">
-                Dismiss
-              </Button>
-              <Button onClick={handleApply} disabled={busy === 'apply'} type="button">
-                {busy === 'apply' ? 'Applying…' : 'Apply update'}
+            )}
+          </Button>
+        ))}
+      </nav>
+
+      {/* Right content */}
+      <div className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4">
+        {actionMessage && (
+          <Card className={actionMessage.kind === 'ok'
+            ? 'border-[color:var(--shell-positive)] p-3 text-sm font-bold text-[color:var(--shell-positive)]'
+            : 'border-[color:var(--shell-negative)] p-3 text-sm font-bold text-[color:var(--shell-negative)]'}
+          >
+            {actionMessage.text}
+          </Card>
+        )}
+
+        {section === 'directory' && (
+          <Card>
+            <CardHeader className="flex-row items-center justify-between gap-3 border-b">
+              <CardTitle>Applied directory</CardTitle>
+              <Badge variant={status.source === 'remote' ? 'success' : status.source === 'cached' ? 'warning' : status.source === 'embedded' ? 'destructive' : 'secondary'}>
+                <span className="mr-1.5 h-2 w-2 rounded-full" style={{ background: sourceAccent(status.source) }} />
+                {sourceLabel(status.source)}
+              </Badge>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <dl className="grid gap-x-3 gap-y-1 text-sm [grid-template-columns:140px_1fr]">
+                <dt className="text-muted-foreground">Source</dt>
+                <dd className="m-0 font-bold text-foreground">{sourceLabel(status.source)}</dd>
+                <dt className="text-muted-foreground">Directory URL</dt>
+                <dd className="m-0 break-all font-bold text-foreground">{status.directoryUrl || '(local bundle)'}</dd>
+                <dt className="text-muted-foreground">Version</dt>
+                <dd className="m-0 font-bold text-foreground">{status.currentVersion ?? '—'}{status.directoryLabel ? ` · ${status.directoryLabel}` : ''}</dd>
+                <dt className="text-muted-foreground">App count</dt>
+                <dd className="m-0 font-bold tabular-nums text-foreground">{status.currentAppCount}</dd>
+                <dt className="text-muted-foreground">ETag</dt>
+                <dd className="m-0 font-mono font-bold text-foreground">{shortEtag(status.currentEtag)}</dd>
+                <dt className="text-muted-foreground">Last fetched</dt>
+                <dd className="m-0 font-bold text-foreground">{formatTime(status.lastFetchedAt)}</dd>
+                <dt className="text-muted-foreground">Last checked</dt>
+                <dd className="m-0 font-bold text-foreground">{formatTime(status.lastCheckedAt)}</dd>
+                {status.lastFetchError && (
+                  <>
+                    <dt className="text-muted-foreground">Last error</dt>
+                    <dd className="m-0 font-bold text-[color:var(--shell-negative)]">{status.lastFetchError}</dd>
+                  </>
+                )}
+              </dl>
+              {!isRemote && !status.directoryUrl && (
+                <div className="mt-2 rounded-md border bg-[color:rgba(255,255,255,0.02)] p-3 text-xs font-bold leading-relaxed text-muted-foreground">
+                  Running the bundled local directory. Configure a <strong>Directory URL</strong> in Settings to start centrally
+                  distributing your app catalogue. The shell will fetch it over HTTPS, validate it, cache it for offline
+                  use, and surface any change as a pending update.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {section === 'updates' && (
+          <>
+            <div className="flex shrink-0 items-center gap-3">
+              <div className="flex-1 text-xs text-muted-foreground">
+                {status.available
+                  ? 'A new version of the app directory is available.'
+                  : 'No pending update. Last checked: ' + formatTime(status.lastCheckedAt)}
+              </div>
+              <Button onClick={handleCheck} disabled={busy === 'check'} type="button" variant="outline" size="sm">
+                {busy === 'check' ? 'Checking…' : 'Check for updates'}
               </Button>
             </div>
-            <p className="text-xs font-bold text-muted-foreground">
-              Applying swaps the in-memory directory used for new launches. Windows opened from this point on use the
-              new catalogue; in-flight windows reflect the previous version until reopened.
-            </p>
-          </CardContent>
-        </Card>
-      )}
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between gap-3 border-b">
-          <CardTitle>Settings</CardTitle>
-          <Badge variant={settingsDirty ? 'warning' : 'secondary'}>{settingsDirty ? 'Unsaved changes' : 'In sync'}</Badge>
-        </CardHeader>
-        <CardContent className="grid gap-4 pt-4 md:grid-cols-2">
-          <Field label="Directory URL" description="HTTPS endpoint returning a JSON app-directory file. Leave empty to use the local bundle.">
-            <Input
-              type="text"
-              placeholder="https://directory.example.com/app-directory.json"
-              value={draftUrl}
-              onChange={(e) => setDraftUrl(e.target.value)}
-            />
-          </Field>
+            {status.available ? (
+              <Card className="border-[color:var(--shell-accent)]">
+                <CardHeader className="flex-row items-center justify-between gap-3 border-b">
+                  <CardTitle className="text-[color:var(--shell-accent)]">Update available</CardTitle>
+                  <Badge variant="default">{status.available.version ?? 'no version tag'}{status.available.label ? ` · ${status.available.label}` : ''}</Badge>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4 pt-4">
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <DiffTile tone="success" label="Added" ids={status.available.diff.addedApps} />
+                    <DiffTile tone="destructive" label="Removed" ids={status.available.diff.removedApps} />
+                    <DiffTile tone="warning" label="Changed" ids={status.available.diff.changedApps} />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-muted-foreground">
+                      Fetched {formatTime(status.available.fetchedAt)} · {status.available.appCount} apps · etag {shortEtag(status.available.etag)}
+                    </span>
+                    <div className="flex-1" />
+                    <Button onClick={handleDismiss} disabled={busy === 'dismiss'} type="button" variant="outline">
+                      Dismiss
+                    </Button>
+                    <Button onClick={handleApply} disabled={busy === 'apply'} type="button">
+                      {busy === 'apply' ? 'Applying…' : 'Apply update'}
+                    </Button>
+                  </div>
+                  <p className="text-xs font-bold text-muted-foreground">
+                    Applying swaps the in-memory directory used for new launches. Windows opened from this point on use the
+                    new catalogue; in-flight windows reflect the previous version until reopened.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="p-6 text-center text-sm text-muted-foreground">
+                Directory is up to date.
+              </Card>
+            )}
+          </>
+        )}
 
-          <Field label="Refresh interval" description="How often to poll the remote. 'Off' = manual only.">
-            <Select
-              value={String(draftInterval)}
-              onValueChange={(v) => setDraftInterval(Number(v))}
-            >
-              <SelectTrigger size="sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {REFRESH_INTERVAL_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+        {section === 'settings' && (
+          <Card>
+            <CardHeader className="flex-row items-center justify-between gap-3 border-b">
+              <CardTitle>Settings</CardTitle>
+              <Badge variant={settingsDirty ? 'warning' : 'secondary'}>{settingsDirty ? 'Unsaved changes' : 'In sync'}</Badge>
+            </CardHeader>
+            <CardContent className="grid gap-4 pt-4 md:grid-cols-2">
+              <Field label="Directory URL" description="HTTPS endpoint returning a JSON app-directory file. Leave empty to use the local bundle.">
+                <Input
+                  type="text"
+                  placeholder="https://directory.example.com/app-directory.json"
+                  value={draftUrl}
+                  onChange={(e) => setDraftUrl(e.target.value)}
+                />
+              </Field>
 
-          <Field label="Current user role" description="Drives the entitlement filter. Apps with no roles[] are visible to everyone.">
-            <Select value={draftRole} onValueChange={setDraftRole}>
-              <SelectTrigger size="sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ROLE_OPTIONS.map((r) => (<SelectItem key={r} value={r}>{r}</SelectItem>))}
-              </SelectContent>
-            </Select>
-          </Field>
+              <Field label="Refresh interval" description="How often to poll the remote. 'Off' = manual only.">
+                <Select
+                  value={String(draftInterval)}
+                  onValueChange={(v) => setDraftInterval(Number(v))}
+                >
+                  <SelectTrigger size="sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {REFRESH_INTERVAL_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
 
-          <Field label="Telemetry endpoint" description="Reserved — Control Tower export target for future SaaS rollups.">
-            <Input
-              type="text"
-              placeholder="https://telemetry.example.com/v1/events"
-              value={draftTelemetry}
-              onChange={(e) => setDraftTelemetry(e.target.value)}
-            />
-          </Field>
-          <div className="flex justify-end gap-2 md:col-span-2">
-            <Button
-              onClick={() => {
-                if (!status) return;
-                setDraftUrl(status.settings.directoryUrl);
-                setDraftInterval(status.settings.refreshIntervalMs);
-                setDraftRole(status.settings.currentRole);
-                setDraftTelemetry(status.settings.telemetryEndpoint);
-              }}
-              disabled={!settingsDirty || busy === 'save'}
-              type="button"
-              variant="outline"
-            >
-              Reset
-            </Button>
-            <Button onClick={handleSave} disabled={!settingsDirty || busy === 'save'} type="button">
-              {busy === 'save' ? 'Saving…' : 'Save'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              <Field label="Current user role" description="Drives the entitlement filter. Apps with no roles[] are visible to everyone.">
+                <Select value={draftRole} onValueChange={setDraftRole}>
+                  <SelectTrigger size="sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLE_OPTIONS.map((r) => (<SelectItem key={r} value={r}>{r}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </Field>
 
-      <Card className="min-h-0">
-        <CardHeader className="flex-row items-center justify-between gap-3 border-b">
-          <CardTitle>Entitlements ({entitlementsSummary.role})</CardTitle>
-          <Badge variant="outline">
-            {entitlementsSummary.visible} visible · {entitlementsSummary.restricted} restricted
-          </Badge>
-        </CardHeader>
-        <div className="scrollbar-thin overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead className="bg-secondary">
-              <tr>
-                {['App', 'Roles allowed', 'Effective'].map((h) => (
-                  <th key={h} className="border-b px-3 py-2 text-left text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {apps.map((app) => {
-                const roles = (app as unknown as { roles?: string[] }).roles ?? [];
-                const allowed = isAllowedForRole(roles, entitlementsSummary.role);
-                return (
-                  <tr key={app.appId} className="border-b">
-                    <td className="px-3 py-2 font-black text-foreground">
-                      <div className="flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: allowed ? 'var(--shell-positive)' : 'var(--shell-muted)' }} />
-                        {app.title}
-                        <span className="text-xs font-medium text-muted-foreground">{app.appId}</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {roles.length === 0 ? (
-                        <span className="italic">everyone</span>
-                      ) : (
-                        roles.map((r) => (
-                          <Badge key={r} className="mr-1" variant={r === entitlementsSummary.role ? 'default' : 'secondary'}>{r}</Badge>
-                        ))
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Badge variant={allowed ? 'success' : 'destructive'}>{allowed ? 'Visible' : 'Restricted'}</Badge>
-                    </td>
+              <Field label="Telemetry endpoint" description="Reserved — Control Tower export target for future SaaS rollups.">
+                <Input
+                  type="text"
+                  placeholder="https://telemetry.example.com/v1/events"
+                  value={draftTelemetry}
+                  onChange={(e) => setDraftTelemetry(e.target.value)}
+                />
+              </Field>
+              <div className="flex justify-end gap-2 md:col-span-2">
+                <Button
+                  onClick={() => {
+                    if (!status) return;
+                    setDraftUrl(status.settings.directoryUrl);
+                    setDraftInterval(status.settings.refreshIntervalMs);
+                    setDraftRole(status.settings.currentRole);
+                    setDraftTelemetry(status.settings.telemetryEndpoint);
+                  }}
+                  disabled={!settingsDirty || busy === 'save'}
+                  type="button"
+                  variant="outline"
+                >
+                  Reset
+                </Button>
+                <Button onClick={handleSave} disabled={!settingsDirty || busy === 'save'} type="button">
+                  {busy === 'save' ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {section === 'entitlements' && (
+          <Card className="min-h-0">
+            <CardHeader className="flex-row items-center justify-between gap-3 border-b">
+              <CardTitle>Entitlements ({entitlementsSummary.role})</CardTitle>
+              <Badge variant="outline">
+                {entitlementsSummary.visible} visible · {entitlementsSummary.restricted} restricted
+              </Badge>
+            </CardHeader>
+            <div className="scrollbar-thin overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead className="bg-secondary">
+                  <tr>
+                    {['App', 'Roles allowed', 'Effective'].map((h) => (
+                      <th key={h} className="border-b px-3 py-2 text-left text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">{h}</th>
+                    ))}
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        <div className="border-t px-3 py-2 text-xs font-bold text-muted-foreground">
-          Roles are a <strong>UI surface</strong> only — FDC3 routing, contexts and intents are unaffected.
-          Apps with no <code>roles[]</code> are visible to every role.
-        </div>
-      </Card>
+                </thead>
+                <tbody>
+                  {apps.map((app) => {
+                    const roles = (app as unknown as { roles?: string[] }).roles ?? [];
+                    const allowed = isAllowedForRole(roles, entitlementsSummary.role);
+                    return (
+                      <tr key={app.appId} className="border-b">
+                        <td className="px-3 py-2 font-black text-foreground">
+                          <div className="flex items-center gap-2">
+                            <span className="h-1.5 w-1.5 rounded-full" style={{ background: allowed ? 'var(--shell-positive)' : 'var(--shell-muted)' }} />
+                            {app.title}
+                            <span className="text-xs font-medium text-muted-foreground">{app.appId}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground">
+                          {roles.length === 0 ? (
+                            <span className="italic">everyone</span>
+                          ) : (
+                            roles.map((r) => (
+                              <Badge key={r} className="mr-1" variant={r === entitlementsSummary.role ? 'default' : 'secondary'}>{r}</Badge>
+                            ))
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Badge variant={allowed ? 'success' : 'destructive'}>{allowed ? 'Visible' : 'Restricted'}</Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="border-t px-3 py-2 text-xs font-bold text-muted-foreground">
+              Roles are a <strong>UI surface</strong> only — FDC3 routing, contexts and intents are unaffected.
+              Apps with no <code>roles[]</code> are visible to every role.
+            </div>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

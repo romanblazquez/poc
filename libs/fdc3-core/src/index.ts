@@ -11,6 +11,7 @@ export * from './types/manager.js';
 export * from './types/notifications.js';
 export * from './types/bridge.js';
 export * from './types/environment.js';
+export * from './types/rbac.js';
 
 // Contracts
 export * from './contracts/interop-adapter.js';

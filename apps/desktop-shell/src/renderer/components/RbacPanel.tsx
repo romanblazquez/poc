@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
+import type { RbacConfig, RolePermissions, UserRecord } from '@fdc3-poc/fdc3-core';
 import { cn } from '../lib/utils.js';
 import { Button } from './ui/button.js';
 import { Badge } from './ui/badge.js';
@@ -21,27 +22,6 @@ interface RbacPanelProps {
 }
 
 type RoleName = 'Admin' | 'Trader' | 'Compliance' | 'ReadOnly';
-
-interface RolePermissions {
-  allowedApps: string[];
-  blockedApps: string[];
-  allowedChannels: string[];
-  blockedIntentRaise: string[];
-  blockedIntentHandle: string[];
-}
-
-interface UserRecord {
-  id: string;
-  name: string;
-  role: string;
-}
-
-interface RbacConfig {
-  roles: Record<string, RolePermissions>;
-  users: UserRecord[];
-}
-
-const RBAC_STORAGE_KEY = 'fdc3.shell.rbac.v1';
 
 const ROLE_COLORS: Record<RoleName, string> = {
   Admin: '#e84080',
@@ -74,68 +54,33 @@ const ALL_INTENTS = [
 
 const BUILT_IN_ROLES: RoleName[] = ['Admin', 'Trader', 'Compliance', 'ReadOnly'];
 
-const DEFAULT_RBAC: RbacConfig = {
-  roles: {
-    Admin: {
-      allowedApps: [],
-      blockedApps: [],
-      allowedChannels: ALL_CHANNELS.map((c) => c.id),
-      blockedIntentRaise: [],
-      blockedIntentHandle: [],
-    },
-    Trader: {
-      allowedApps: [],
-      blockedApps: [],
-      allowedChannels: ALL_CHANNELS.map((c) => c.id),
-      blockedIntentRaise: [],
-      blockedIntentHandle: ['SendOrder'],
-    },
-    Compliance: {
-      allowedApps: [],
-      blockedApps: [],
-      allowedChannels: ALL_CHANNELS.map((c) => c.id),
-      blockedIntentRaise: ['SendOrder'],
-      blockedIntentHandle: ['SendOrder'],
-    },
-    ReadOnly: {
-      allowedApps: [],
-      blockedApps: [],
-      allowedChannels: [],
-      blockedIntentRaise: ALL_INTENTS,
-      blockedIntentHandle: ALL_INTENTS,
-    },
-  },
-  users: [{ id: '1', name: 'Demo User', role: 'Trader' }],
-};
-
-function readRbac(): RbacConfig {
-  try {
-    const raw = window.localStorage.getItem(RBAC_STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as RbacConfig;
-  } catch {
-    // ignore
-  }
-  return DEFAULT_RBAC;
+interface RbacApi {
+  get(): Promise<RbacConfig | null>;
+  save(config: RbacConfig): Promise<RbacConfig>;
 }
 
-function saveRbac(config: RbacConfig): void {
-  try {
-    window.localStorage.setItem(RBAC_STORAGE_KEY, JSON.stringify(config));
-  } catch {
-    // ignore
-  }
+function getRbacApi(): RbacApi | undefined {
+  return (window as unknown as { shellChrome?: { rbac?: RbacApi } }).shellChrome?.rbac;
 }
+
+const EMPTY_RBAC: RbacConfig = { roles: {}, users: [] };
 
 export function RbacPanel({ apps }: RbacPanelProps) {
-  const [config, setConfig] = useState<RbacConfig>(readRbac);
+  const [config, setConfig] = useState<RbacConfig>(EMPTY_RBAC);
   const [selectedRole, setSelectedRole] = useState<string>('Trader');
   const [addingUser, setAddingUser] = useState(false);
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState<string>('Trader');
 
+  useEffect(() => {
+    void getRbacApi()?.get().then((loaded) => {
+      if (loaded) setConfig(loaded);
+    });
+  }, []);
+
   function updateConfig(next: RbacConfig) {
     setConfig(next);
-    saveRbac(next);
+    void getRbacApi()?.save(next);
   }
 
   function getRolePerms(role: string): RolePermissions {

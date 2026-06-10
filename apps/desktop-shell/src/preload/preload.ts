@@ -678,6 +678,14 @@ contextBridge.exposeInMainWorld('shellChrome', {
       return ipcRenderer.invoke(IpcEvents.APP_DIRECTORY_FETCH_REMOTE, url) as Promise<{ ok: boolean; apps: unknown[]; error?: string }>;
     },
   },
+  rbac: {
+    get(): Promise<import('@fdc3-poc/fdc3-core').RbacConfig | null> {
+      return ipcRenderer.invoke(IpcEvents.RBAC_GET) as Promise<import('@fdc3-poc/fdc3-core').RbacConfig | null>;
+    },
+    save(config: import('@fdc3-poc/fdc3-core').RbacConfig): Promise<import('@fdc3-poc/fdc3-core').RbacConfig> {
+      return ipcRenderer.invoke(IpcEvents.RBAC_SAVE, config) as Promise<import('@fdc3-poc/fdc3-core').RbacConfig>;
+    },
+  },
   environment: {
     list(): Promise<import('@fdc3-poc/fdc3-core').EnvironmentProfile[]> {
       return ipcRenderer.invoke(IpcEvents.ENV_LIST) as Promise<import('@fdc3-poc/fdc3-core').EnvironmentProfile[]>;

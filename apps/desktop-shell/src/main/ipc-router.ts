@@ -17,6 +17,7 @@ import type { ManagerService } from './manager-service.js';
 import type { BridgeProfile, BridgeSettings, EnvironmentProfile, ManagerSettings, NotificationRaiseInput } from '@fdc3-poc/fdc3-core';
 import type { BridgeService } from './bridge-service.js';
 import type { EnvironmentStore } from './environment-store.js';
+import type { RbacStore } from './rbac-store.js';
 import { NotificationStore } from './notification-store.js';
 import { resolveAppIdentityFromUrl, type WindowManager } from './window-manager.js';
 import type { DetachedWorkspacePayload } from './window-manager.js';
@@ -128,6 +129,7 @@ export class IpcRouter {
     private readonly managerService?: ManagerService,
     private readonly bridgeService?: BridgeService,
     private readonly environmentStore?: EnvironmentStore,
+    private readonly rbacStore?: RbacStore,
   ) {
     this.intentResolver = new IntentResolver();
     this.appRegistry = new AppRegistry(appDirectory);
@@ -435,6 +437,8 @@ export class IpcRouter {
     this.handleRestartApp();
     this.handleAppDirectorySave();
     this.handleAppDirectoryFetchRemote();
+    this.handleRbacGet();
+    this.handleRbacSave();
     this.handleEnvList();
     this.handleEnvAdd();
     this.handleEnvUpdate();
@@ -1615,6 +1619,16 @@ export class IpcRouter {
         return { ok: false, apps: [], error: e instanceof Error ? e.message : String(e) };
       }
     });
+  }
+
+  private handleRbacGet(): void {
+    ipcMain.handle(IpcEvents.RBAC_GET, () => this.rbacStore?.get() ?? null);
+  }
+
+  private handleRbacSave(): void {
+    ipcMain.handle(IpcEvents.RBAC_SAVE, (_event, config: import('@fdc3-poc/fdc3-core').RbacConfig) =>
+      this.rbacStore?.save(config) ?? config,
+    );
   }
 
   private handleEnvList(): void {

@@ -27,6 +27,7 @@ import { ShellAssetsLoader } from './shell-assets-loader.js';
 import { ManagerService } from './manager-service.js';
 import { BridgeService } from './bridge-service.js';
 import { EnvironmentStore } from './environment-store.js';
+import { RbacStore } from './rbac-store.js';
 import { ChannelManager } from '@fdc3-poc/channel-engine';
 import { IntentRegistry } from '@fdc3-poc/intent-engine';
 import type { AppDirectoryFile } from '@fdc3-poc/app-registry';
@@ -90,6 +91,7 @@ async function bootstrap(): Promise<void> {
   const managerService = new ManagerService(initialDirectoryFile, 'local');
   const bridgeService = new BridgeService();
   const environmentStore = new EnvironmentStore();
+  const rbacStore = new RbacStore();
 
   // Apply the active env's persisted app directory (overrides bundled config).
   const envApps = environmentStore.loadActiveAppDirectory();
@@ -130,6 +132,7 @@ async function bootstrap(): Promise<void> {
     managerService,
     bridgeService,
     environmentStore,
+    rbacStore,
   );
   ipcRouter.register();
 
