@@ -286,7 +286,7 @@ export function App() {
     ?? initialWorkspaceStore.tabs[0]?.panelIds
     ?? [],
   );
-  const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
+  const [workspaceResetKeys, setWorkspaceResetKeys] = useState<Record<string, string>>({});
   const [detachedWorkspaces, setDetachedWorkspaces] = useState<Partial<Record<string, DetachedWorkspacePayload>>>({});
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
   const [channels, setChannels] = useState<UserChannel[]>([]);
@@ -301,11 +301,13 @@ export function App() {
   const [addAppsOpen, setAddAppsOpen] = useState(false);
   const dockviewRef = useRef<DockviewWorkspaceHandle>(null);
   const [shellManifest, setShellManifest] = useState<ShellManifestView | null>(null);
+  // Stable ref so handlers that must stay stable can still read the current active workspace.
+  const activeWorkspaceIdRef = useRef(activeWorkspaceId);
+  activeWorkspaceIdRef.current = activeWorkspaceId;
 
   const activeWorkspaceTab = workspaceTabs.find((tab) => tab.id === activeWorkspaceId) ?? workspaceTabs[0];
   const activeWorkspaceState = workspaceStates[activeWorkspaceTab.id]
     ?? { channelId: null, theme: globalTheme, layout: null };
-  const activeDetachedWorkspace = detachedWorkspaces[activeWorkspaceTab.id];
   const theme = globalTheme;
   const activeWorkspaceApps = apps.filter((app) => activeWorkspaceTab.panelIds.includes(app.appId));
   const interopWorkspaceAppIds = activeWorkspaceApps.map((app) => app.appId);
@@ -541,25 +543,27 @@ export function App() {
     }));
   }, [activeWorkspaceId]);
 
-  const handleLayoutChange = useCallback((layout: unknown) => {
+  const handleLayoutChange = useCallback((workspaceId: string, layout: unknown) => {
     setWorkspaceStates((prev) => ({
       ...prev,
-      [activeWorkspaceId]: {
-        ...prev[activeWorkspaceId],
+      [workspaceId]: {
+        ...prev[workspaceId],
         layout,
       },
     }));
-  }, [activeWorkspaceId]);
+  }, []);
 
-  const handleOpenPanelsChange = useCallback((panelIds: string[]) => {
+  const handleOpenPanelsChange = useCallback((workspaceId: string, panelIds: string[]) => {
     const nextPanelIds = uniquePanelIds(panelIds);
-    setOpenPanelIds(nextPanelIds);
     setWorkspaceTabs((prev) => prev.map((tab) => (
-      tab.id === activeWorkspaceId
+      tab.id === workspaceId
         ? { ...tab, panelIds: nextPanelIds }
         : tab
     )));
-  }, [activeWorkspaceId]);
+    if (workspaceId === activeWorkspaceIdRef.current) {
+      setOpenPanelIds(nextPanelIds);
+    }
+  }, []);
 
   const handleDetachWorkspace = useCallback(async (payload: DetachedWorkspacePayload) => {
     const nextPayload = {
@@ -599,7 +603,6 @@ export function App() {
     setActiveWorkspaceId(nextId);
     setActiveMode('workspace');
     setOpenPanelIds(panelIds);
-    setWorkspaceEpoch((value) => value + 1);
   }, [activeWorkspaceState.channelId, activeWorkspaceState.theme, workspaceTabs.length]);
 
   const handleComposeWorkspace = useCallback(async (template: SmartWorkspaceTemplate) => {
@@ -628,7 +631,7 @@ export function App() {
     setActiveWorkspaceId(template.id);
     setActiveMode('workspace');
     setOpenPanelIds(uniquePanelIds(template.panelIds));
-    setWorkspaceEpoch((value) => value + 1);
+    setWorkspaceResetKeys((prev) => ({ ...prev, [template.id]: Date.now().toString() }));
 
     if (template.channelId) {
       await window.fdc3.joinUserChannel(template.channelId);
@@ -681,7 +684,6 @@ export function App() {
     setActiveWorkspaceId(nextId);
     setActiveMode('workspace');
     setOpenPanelIds(panelIds);
-    setWorkspaceEpoch((value) => value + 1);
   }, [globalTheme, workspaceTabs, workspaceStates]);
 
   const handleCloseWorkspace = useCallback((workspaceId: string) => {
@@ -708,7 +710,6 @@ export function App() {
       if (activeWorkspaceId === workspaceId) {
         const fallback = nextTabs[Math.min(closingIndex, nextTabs.length - 1)]?.id ?? nextTabs[0].id;
         setActiveWorkspaceId(fallback);
-        setWorkspaceEpoch((value) => value + 1);
       }
 
       return nextTabs;
@@ -755,7 +756,6 @@ export function App() {
         return next;
       });
       setOpenPanelIds(payload.panelIds);
-      setWorkspaceEpoch((value) => value + 1);
     });
   }, [activeWorkspaceTab.id, detachedWorkspaceId]);
 
@@ -889,30 +889,51 @@ export function App() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
             {activeMode === 'workspace' ? (
-              activeDetachedWorkspace ? (
-                <DetachedWorkspacePlaceholder
-                  workspaceName={activeWorkspaceTab.name}
-                  panelCount={activeDetachedWorkspace.panelIds.length}
-                  onRecall={() => void handleRecallWorkspace(activeWorkspaceTab.id)}
-                />
-              ) : apps.length > 0 && preloadPath ? (
-                <DockviewWorkspace
-                  ref={dockviewRef}
-                  key={`${activeWorkspaceTab.id}-${workspaceEpoch}`}
-                  apps={apps}
-                  currentChannel={currentChannel}
-                  channelId={activeWorkspaceState.channelId}
-                  preloadPath={preloadPath}
-                  initialPanelIds={activeWorkspaceTab.panelIds}
-                  initialLayout={activeWorkspaceState.layout}
-                  onLayoutChange={handleLayoutChange}
-                  onOpenPanelsChange={handleOpenPanelsChange}
-                  onDetachWorkspace={handleDetachWorkspace}
-                  onAddApp={() => setAddAppsOpen(true)}
-                  workspaceName={activeWorkspaceTab.name}
-                  theme={theme}
-                  displays={displays}
-                />
+              apps.length > 0 && preloadPath ? (
+                <>
+                  {workspaceTabs.map((tab) => {
+                    const tabState = workspaceStates[tab.id] ?? { channelId: null, theme: globalTheme, layout: null };
+                    const isActive = tab.id === activeWorkspaceTab.id;
+                    const tabDetached = detachedWorkspaces[tab.id];
+
+                    if (tabDetached) {
+                      return isActive ? (
+                        <DetachedWorkspacePlaceholder
+                          key={tab.id}
+                          workspaceName={tab.name}
+                          panelCount={tabDetached.panelIds.length}
+                          onRecall={() => void handleRecallWorkspace(tab.id)}
+                        />
+                      ) : null;
+                    }
+
+                    return (
+                      <div
+                        key={tab.id}
+                        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                        style={{ display: isActive ? '' : 'none' }}
+                      >
+                        <DockviewWorkspace
+                          ref={isActive ? dockviewRef : null}
+                          resetKey={workspaceResetKeys[tab.id]}
+                          apps={apps}
+                          currentChannel={currentChannel}
+                          channelId={tabState.channelId}
+                          preloadPath={preloadPath}
+                          initialPanelIds={tab.panelIds}
+                          initialLayout={tabState.layout}
+                          onLayoutChange={(layout) => handleLayoutChange(tab.id, layout)}
+                          onOpenPanelsChange={(panelIds) => handleOpenPanelsChange(tab.id, panelIds)}
+                          onDetachWorkspace={handleDetachWorkspace}
+                          onAddApp={() => setAddAppsOpen(true)}
+                          workspaceName={tab.name}
+                          theme={theme}
+                          displays={displays}
+                        />
+                      </div>
+                    );
+                  })}
+                </>
               ) : (
                 <div className="flex flex-1 items-center justify-center text-xs tracking-wide text-muted-foreground">
                   Connecting to FDC3 bus…

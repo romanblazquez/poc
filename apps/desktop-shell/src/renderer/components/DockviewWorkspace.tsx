@@ -36,6 +36,8 @@ interface DockviewWorkspaceProps {
   detached?: boolean;
   displays?: DisplayInfo[];
   headersVisible?: boolean;
+  /** When changed, forces the workspace to re-initialize from initialLayout/initialPanelIds. */
+  resetKey?: string | number;
 }
 
 export interface DetachedWorkspacePayload {
@@ -311,6 +313,7 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
   detached = false,
   displays = [],
   headersVisible = false,
+  resetKey,
 }, ref) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const dockApiRef = useRef<DockviewApi | null>(null);
@@ -340,6 +343,11 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
   appsRef.current = apps;
   const preloadPathRef = useRef(preloadPath);
   preloadPathRef.current = preloadPath;
+  // Callback refs — let stable Dockview listeners always call the latest prop functions.
+  const onLayoutChangeRef = useRef(onLayoutChange);
+  onLayoutChangeRef.current = onLayoutChange;
+  const onOpenPanelsChangeRef = useRef(onOpenPanelsChange);
+  onOpenPanelsChangeRef.current = onOpenPanelsChange;
 
   // Reposition all pool webviews to match their current slot rects.
   // Reads all rects first (avoids layout thrashing), then writes all styles in one pass.
@@ -556,11 +564,11 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
   }, [detached]);
 
   const syncOpenPanels = useCallback((api: DockviewApi) => {
-    const knownIds = new Set(apps.map((app) => app.appId));
+    const knownIds = new Set(appsRef.current.map((app) => app.appId));
     const panelIds = api.panels.map((panel) => panel.id).filter((id) => knownIds.has(id));
     setOpenPanelIds(new Set(panelIds));
-    onOpenPanelsChange?.(panelIds);
-  }, [apps, onOpenPanelsChange]);
+    onOpenPanelsChangeRef.current?.(panelIds);
+  }, []); // stable — reads latest values from refs at call time
 
   const clearListeners = useCallback(() => {
     for (const disposable of listenersRef.current) disposable.dispose();
@@ -615,15 +623,29 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
       syncDetachedTabTooltips();
     }));
     listenersRef.current.push(api.onDidLayoutChange(() => {
-      onLayoutChange?.(api.toJSON());
+      onLayoutChangeRef.current?.(api.toJSON());
       syncDetachedTabTooltips();
       scheduleSyncPositions();
     }));
     syncOpenPanels(api);
     syncDetachedTabTooltips();
-  }, [clearListeners, initialLayout, onLayoutChange, resetLayout, scheduleSyncPositions, syncDetachedTabTooltips, syncOpenPanels, syncPanelTitles]);
+  }, [clearListeners, initialLayout, resetLayout, scheduleSyncPositions, syncDetachedTabTooltips, syncOpenPanels, syncPanelTitles]);
 
   useEffect(() => clearListeners, [clearListeners]);
+
+  // Stable ref so the resetKey effect always calls the latest resetLayout without
+  // needing it in the effect deps (which would cause extra re-runs on prop changes).
+  const resetLayoutRef = useRef(resetLayout);
+  resetLayoutRef.current = resetLayout;
+
+  // Force re-initialize this workspace (used when composing over an existing tab).
+  useEffect(() => {
+    if (resetKey === undefined) return;
+    const api = dockApiRef.current;
+    if (!api) return;
+    resetLayoutRef.current();
+    syncOpenPanels(api);
+  }, [resetKey, syncOpenPanels]);
 
   // Push icon/iconColor updates to existing panels whenever apps definition changes.
   useEffect(() => {
