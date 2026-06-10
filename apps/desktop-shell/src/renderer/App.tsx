@@ -915,6 +915,7 @@ export function App() {
                       >
                         <DockviewWorkspace
                           ref={isActive ? dockviewRef : null}
+                          hidden={!isActive}
                           resetKey={workspaceResetKeys[tab.id]}
                           apps={apps}
                           currentChannel={currentChannel}

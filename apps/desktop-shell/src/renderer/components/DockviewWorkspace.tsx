@@ -38,6 +38,12 @@ interface DockviewWorkspaceProps {
   headersVisible?: boolean;
   /** When changed, forces the workspace to re-initialize from initialLayout/initialPanelIds. */
   resetKey?: string | number;
+  /**
+   * When true, forcibly hides all webviews in the pool regardless of slot positions.
+   * Required for inactive workspace instances on Windows where Electron webviews are native
+   * HWNDs that do not respect CSS display:none on ancestor elements.
+   */
+  hidden?: boolean;
 }
 
 export interface DetachedWorkspacePayload {
@@ -314,6 +320,7 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
   displays = [],
   headersVisible = false,
   resetKey,
+  hidden = false,
 }, ref) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const dockApiRef = useRef<DockviewApi | null>(null);
@@ -343,6 +350,8 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
   appsRef.current = apps;
   const preloadPathRef = useRef(preloadPath);
   preloadPathRef.current = preloadPath;
+  const hiddenRef = useRef(hidden);
+  hiddenRef.current = hidden;
   // Callback refs — let stable Dockview listeners always call the latest prop functions.
   const onLayoutChangeRef = useRef(onLayoutChange);
   onLayoutChangeRef.current = onLayoutChange;
@@ -354,6 +363,16 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
   const syncPositions = useCallback(() => {
     const pool = poolContainerRef.current;
     if (!pool) return;
+
+    // When hidden (inactive workspace instance), forcibly hide all webviews so that
+    // Electron's native HWND windows don't appear at coordinate (0,0) on Windows.
+    if (hiddenRef.current) {
+      for (const [, wv] of webviewPoolRef.current) {
+        (wv as HTMLElement).style.cssText = 'position:absolute;border:none;visibility:hidden;pointer-events:none;width:1px;height:1px;';
+      }
+      return;
+    }
+
     const poolRect = pool.getBoundingClientRect();
 
     // Read phase
@@ -459,6 +478,11 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
     obs.observe(pool);
     return () => obs.disconnect();
   }, [scheduleSyncPositions]);
+
+  // Hide/show all webviews immediately when the workspace becomes inactive/active.
+  useEffect(() => {
+    scheduleSyncPositions();
+  }, [hidden, scheduleSyncPositions]);
 
   // Tear down all webviews when the workspace unmounts.
   useEffect(() => {
