@@ -6,12 +6,15 @@ import type { BridgeProfile, BridgeSettings } from '@fdc3-poc/fdc3-core';
 
 const SETTINGS_FILE = 'bridge-settings.json';
 
+// Well-known FDC3 Desktop Agent Bridge ports: FINOS default, io.Connect/Glue42, generic fallback.
+export const WELL_KNOWN_BRIDGE_PORTS = [4475, 9090, 8080] as const;
+
 export const DEFAULT_BRIDGE_SETTINGS: BridgeSettings = {
   enabled: false,
   provider: 'finos-backplane',
   host: '127.0.0.1',
   portStart: 4475,
-  portEnd: 4575,
+  portEnd: 4475,
   endpointUrl: '',
 };
 

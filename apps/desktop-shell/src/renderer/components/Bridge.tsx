@@ -68,7 +68,7 @@ const DEFAULT_SETTINGS: BridgeSettings = {
   provider: 'finos-backplane',
   host: '127.0.0.1',
   portStart: 4475,
-  portEnd: 4575,
+  portEnd: 4475,
   endpointUrl: '',
 };
 
@@ -76,7 +76,7 @@ const EMPTY_PROFILE_FORM: Omit<BridgeProfile, 'id'> = {
   name: '',
   host: '127.0.0.1',
   portStart: 4475,
-  portEnd: 4575,
+  portEnd: 4475,
   endpointUrl: '',
 };
 

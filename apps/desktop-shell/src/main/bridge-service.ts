@@ -1,11 +1,11 @@
 import net from 'net';
 import type { BridgeCandidate, BridgeProfile, BridgeSettings, BridgeStatus } from '@fdc3-poc/fdc3-core';
-import { BridgeSettingsStore } from './bridge-settings.js';
+import { BridgeSettingsStore, WELL_KNOWN_BRIDGE_PORTS } from './bridge-settings.js';
 
 type BridgeStatusListener = (status: BridgeStatus) => void;
 
 const PROBE_TIMEOUT_MS = 250;
-const MAX_RANGE_SIZE = 256;
+const MAX_RANGE_SIZE = 32;
 
 export class BridgeService {
   private readonly store = new BridgeSettingsStore();
@@ -129,6 +129,11 @@ export class BridgeService {
   private buildTargets(settings: BridgeSettings): Array<{ host: string; port: number }> {
     const explicit = parseEndpoint(settings.endpointUrl);
     if (explicit) return [explicit];
+
+    // When the range is a single port (default), probe well-known FDC3 bridge ports.
+    if (settings.portStart === settings.portEnd) {
+      return WELL_KNOWN_BRIDGE_PORTS.map((port) => ({ host: settings.host, port }));
+    }
 
     const count = Math.min(MAX_RANGE_SIZE, settings.portEnd - settings.portStart + 1);
     return Array.from({ length: count }, (_value, idx) => ({
