@@ -12,6 +12,7 @@ export interface IntentResolverCandidate {
   title?: string;
   description?: string;
   icon?: string;
+  iconColor?: string;
   /** True when an instance is already running and will receive the intent directly. */
   isRunning: boolean;
   /** webContentsId of the running instance, when isRunning is true. */
@@ -98,6 +99,7 @@ export class IntentResolver {
         title: def?.title ?? appId,
         description: def?.description,
         icon: def?.icon,
+        iconColor: def?.iconColor,
         isRunning: true,
         instanceId: webContentsId,
       });
@@ -112,6 +114,7 @@ export class IntentResolver {
         title: def.title,
         description: def.description,
         icon: def.icon,
+        iconColor: def.iconColor,
         isRunning: false,
       });
     }

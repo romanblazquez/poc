@@ -28,6 +28,7 @@ const BLANK_APP: AppEntry = {
   title: '',
   description: '',
   icon: '',
+  iconColor: '',
   category: '',
   url: '',
   devPort: 0,
@@ -93,7 +94,8 @@ function AppForm({
           <label className="text-[10px] font-black uppercase tracking-[0.07em] text-muted-foreground">Icon</label>
           <IconPicker
             value={draft.icon ?? ''}
-            onChange={(val) => set('icon', val)}
+            color={draft.iconColor ?? ''}
+            onChange={(val, col) => setDraft((prev) => ({ ...prev, icon: val, iconColor: col }))}
             fallback={draft.title.slice(0, 1) || '?'}
           />
         </div>
@@ -283,7 +285,7 @@ function AppRow({ app, onEdit, onDelete }: { app: AppEntry; onEdit: () => void; 
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-lg"
           style={{ background: `${color}18`, borderColor: `${color}40`, color }}
         >
-          <AppIcon icon={app.icon} fallback={app.title.slice(0, 1)} size={22} />
+          <AppIcon icon={app.icon} iconColor={app.iconColor} fallback={app.title.slice(0, 1)} size={22} />
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex items-center gap-2">

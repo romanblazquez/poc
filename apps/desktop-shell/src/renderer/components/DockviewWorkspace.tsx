@@ -66,6 +66,7 @@ interface AppPanelParams {
   channelId: string | null;
   theme: ThemeMode;
   icon?: string | null;
+  iconColor?: string | null;
 }
 
 // ─── Webview pool context ─────────────────────────────────────────────────────
@@ -91,6 +92,7 @@ function AppTabComponent({ api, params }: IDockviewPanelHeaderProps<AppPanelPara
   const channel = useContext(CurrentChannelContext);
   const color = channel?.displayMetadata.color;
   const icon = params?.icon;
+  const iconColor = params?.iconColor;
   // Only render AppIcon for structured formats; emoji is already in the title string via panelTitle().
   const showIconComponent = !!icon && (icon.startsWith('lucide:') || icon.startsWith('data:'));
   const rawTitle = api.title ?? '';
@@ -104,7 +106,7 @@ function AppTabComponent({ api, params }: IDockviewPanelHeaderProps<AppPanelPara
     >
       {showIconComponent && (
         <span className="flex shrink-0 items-center" style={{ lineHeight: 1 }}>
-          <AppIcon icon={icon} size={13} />
+          <AppIcon icon={icon} iconColor={iconColor} size={13} />
         </span>
       )}
       <span className="min-w-0 flex-1 truncate text-[12px]">{titleText}</span>
@@ -227,6 +229,7 @@ function populatePanels(
       channelId,
       theme,
       icon: panelApps[0].icon,
+      iconColor: panelApps[0].iconColor,
     },
   });
 
@@ -242,6 +245,7 @@ function populatePanels(
         channelId,
         theme,
         icon: panelApps[1].icon,
+        iconColor: panelApps[1].iconColor,
       },
       position: { referencePanel: panelApps[0].appId, direction: 'right' },
     });
@@ -259,6 +263,7 @@ function populatePanels(
         channelId,
         theme,
         icon: panelApps[2].icon,
+        iconColor: panelApps[2].iconColor,
       },
       position: { referencePanel: panelApps[1]?.appId ?? panelApps[0].appId, direction: 'below' },
     });
@@ -277,6 +282,7 @@ function populatePanels(
         channelId,
         theme,
         icon: app.icon,
+        iconColor: app.iconColor,
       },
     });
   }
@@ -533,7 +539,7 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
       if (!app) continue;
       const p = panel as { api?: { setTitle?: (t: string) => void; updateParameters?: (p: Partial<AppPanelParams>) => void } };
       p.api?.setTitle?.(panelTitle(app));
-      p.api?.updateParameters?.({ icon: app.icon });
+      p.api?.updateParameters?.({ icon: app.icon, iconColor: app.iconColor });
     }
   }, [apps]);
 
@@ -668,6 +674,7 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
         channelId,
         theme,
         icon: app.icon,
+        iconColor: app.iconColor,
       },
     });
 

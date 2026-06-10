@@ -18,6 +18,7 @@ interface Candidate {
   title?: string;
   description?: string;
   icon?: string;
+  iconColor?: string;
   isRunning: boolean;
   instanceId?: number;
 }
@@ -170,7 +171,7 @@ export function IntentResolverDialog({ apps }: IntentResolverDialogProps): JSX.E
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-xl"
                   style={{ background: `${categoryColor}20`, borderColor: `${categoryColor}50`, color: categoryColor }}
                 >
-                  <AppIcon icon={candidate.icon} fallback={(candidate.title ?? candidate.appId).slice(0, 1)} size={22} />
+                  <AppIcon icon={candidate.icon} iconColor={candidate.iconColor} fallback={(candidate.title ?? candidate.appId).slice(0, 1)} size={22} />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="truncate text-sm font-black text-foreground">

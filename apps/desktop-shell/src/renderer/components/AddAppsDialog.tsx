@@ -205,7 +205,7 @@ function MegaMenuAppCard({
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-xl"
           style={{ background: `${categoryColor}20`, borderColor: `${categoryColor}55` }}
         >
-          <AppIcon icon={app.icon} fallback={app.title.slice(0, 1)} size={22} />
+          <AppIcon icon={app.icon} iconColor={app.iconColor} fallback={app.title.slice(0, 1)} size={22} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[12px] font-black text-foreground">{app.title}</div>

@@ -41,19 +41,20 @@ export const LUCIDE_ICONS: Record<string, LucideIcon> = {
 
 interface AppIconProps {
   icon?: string | null;
+  iconColor?: string | null;
   fallback?: string;
   size?: number;
   className?: string;
 }
 
-export function AppIcon({ icon, fallback = '?', size = 20, className }: AppIconProps) {
+export function AppIcon({ icon, iconColor, fallback = '?', size = 20, className }: AppIconProps) {
   if (!icon) {
-    return <span className={className} style={{ fontSize: size * 0.75, lineHeight: 1 }}>{fallback}</span>;
+    return <span className={className} style={{ fontSize: size * 0.75, lineHeight: 1, color: iconColor ?? undefined }}>{fallback}</span>;
   }
   if (icon.startsWith('lucide:')) {
     const name = icon.slice(7);
     const Icon = LUCIDE_ICONS[name];
-    if (Icon) return <Icon size={size} className={className} />;
+    if (Icon) return <Icon size={size} className={className} color={iconColor ?? undefined} />;
     return <span className={className} style={{ fontSize: size * 0.75, lineHeight: 1 }}>{fallback}</span>;
   }
   if (icon.startsWith('data:image/')) {
@@ -63,10 +64,10 @@ export function AppIcon({ icon, fallback = '?', size = 20, className }: AppIconP
         width={size}
         height={size}
         className={className}
-        style={{ objectFit: 'cover', borderRadius: 4, display: 'block' }}
+        style={{ objectFit: 'cover', borderRadius: 4, display: 'block', background: iconColor ?? undefined }}
         alt=""
       />
     );
   }
-  return <span className={className} style={{ fontSize: size * 0.75, lineHeight: 1 }}>{icon}</span>;
+  return <span className={className} style={{ fontSize: size * 0.75, lineHeight: 1, color: iconColor ?? undefined }}>{icon}</span>;
 }

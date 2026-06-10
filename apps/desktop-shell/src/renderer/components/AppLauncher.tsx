@@ -382,7 +382,7 @@ function AppCard({
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-2xl"
             style={{ background: `${categoryColor}20`, borderColor: `${categoryColor}55`, color: categoryColor }}
           >
-            <AppIcon icon={app.icon} fallback={app.title.slice(0, 1)} size={24} />
+            <AppIcon icon={app.icon} iconColor={app.iconColor} fallback={app.title.slice(0, 1)} size={24} />
           </div>
           <div className="flex min-w-0 flex-col gap-0.5">
             <div className="truncate text-sm font-black text-foreground">{app.title}</div>

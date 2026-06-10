@@ -76,6 +76,7 @@ export interface AppEntry {
   title: string;
   description?: string;
   icon?: string;
+  iconColor?: string;
   category?: string;
   url: string;
   devPort: number;

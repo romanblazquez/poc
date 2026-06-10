@@ -94,6 +94,8 @@ export interface AppDefinition {
   listensForContexts?: string[];
   /** Emoji or short icon code for the launcher */
   icon?: string;
+  /** CSS color applied to the icon (tints Lucide SVGs, background for images) */
+  iconColor?: string;
   /** Category for launcher grouping */
   category?: string;
   /** FDC3 capability declarations (broadcasts, listensTo, raisesIntents, handlesIntents) */

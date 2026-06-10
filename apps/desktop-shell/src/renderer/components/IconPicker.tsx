@@ -15,7 +15,7 @@ const OUTPUT_SIZE = 96; // px — stored at 96×96 retina-friendly
 
 // ─── Lucide Library Tab ───────────────────────────────────────────────────────
 
-function LibraryTab({ onSelect }: { onSelect: (val: string) => void }) {
+function LibraryTab({ onSelect, color }: { onSelect: (val: string) => void; color: string }) {
   const [query, setQuery] = useState('');
   const filtered = query.trim()
     ? ICON_NAMES.filter((n) => n.toLowerCase().includes(query.trim().toLowerCase()))
@@ -44,7 +44,7 @@ function LibraryTab({ onSelect }: { onSelect: (val: string) => void }) {
             onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--shell-accent)'; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'transparent'; }}
           >
-            <AppIcon icon={`lucide:${name}`} size={20} />
+            <AppIcon icon={`lucide:${name}`} iconColor={color || undefined} size={20} />
             <span style={{ fontSize: 9, color: 'var(--shell-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
               {name}
             </span>
@@ -300,20 +300,95 @@ function UploadTab({ onSelect }: { onSelect: (val: string) => void }) {
   );
 }
 
+// ─── Color picker strip ───────────────────────────────────────────────────────
+
+const COLOR_PRESETS = [
+  '#ffffff', '#94a3b8', '#64748b',
+  '#ef4444', '#f97316', '#eab308',
+  '#22c55e', '#14b8a6', '#3b82f6',
+  '#8b5cf6', '#ec4899', '#f43f5e',
+];
+
+interface ColorStripProps {
+  color: string;
+  onChange: (c: string) => void;
+}
+
+function ColorStrip({ color, onChange }: ColorStripProps) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', borderTop: '1px solid var(--shell-border)', flexShrink: 0 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--shell-muted)', textTransform: 'uppercase', marginRight: 4 }}>Color</span>
+      {COLOR_PRESETS.map((c) => (
+        <button
+          key={c}
+          onClick={() => onChange(c)}
+          title={c}
+          style={{
+            width: 18, height: 18, borderRadius: '50%', background: c, border: 'none', cursor: 'pointer', flexShrink: 0,
+            outline: color === c ? `2px solid var(--shell-accent)` : '2px solid transparent',
+            outlineOffset: 1,
+          }}
+        />
+      ))}
+      {/* Native color picker for full spectrum */}
+      <label title="Custom color" style={{ position: 'relative', width: 18, height: 18, flexShrink: 0, cursor: 'pointer' }}>
+        <div style={{
+          width: 18, height: 18, borderRadius: '50%', border: '2px dashed var(--shell-border)',
+          background: COLOR_PRESETS.includes(color) ? 'transparent' : color,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 10, color: 'var(--shell-muted)',
+        }}>
+          {COLOR_PRESETS.includes(color) ? '+' : ''}
+        </div>
+        <input
+          type="color"
+          value={color || '#3b82f6'}
+          onChange={(e) => onChange(e.target.value)}
+          style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
+        />
+      </label>
+      {color && (
+        <button
+          onClick={() => onChange('')}
+          title="Remove color"
+          style={{ fontSize: 10, color: 'var(--shell-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px' }}
+        >
+          ✕
+        </button>
+      )}
+      {/* Live preview */}
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 10, color: 'var(--shell-muted)' }}>Preview</span>
+        <div style={{
+          width: 28, height: 28, borderRadius: 6, border: '1px solid var(--shell-border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--shell-panel-2)',
+        }}>
+          <span style={{ fontSize: 14, color: color || 'inherit' }}>✦</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Picker Component ────────────────────────────────────────────────────
 
 interface IconPickerProps {
   value?: string | null;
-  onChange: (val: string) => void;
+  color?: string | null;
+  onChange: (val: string, color: string) => void;
   fallback?: string;
 }
 
-export function IconPicker({ value, onChange, fallback = '?' }: IconPickerProps) {
+export function IconPicker({ value, color, onChange, fallback = '?' }: IconPickerProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'library' | 'upload'>('library');
+  const [pendingColor, setPendingColor] = useState(color ?? '');
+
+  // Sync pendingColor when modal opens
+  const openModal = () => { setPendingColor(color ?? ''); setOpen(true); };
 
   const select = (val: string) => {
-    onChange(val);
+    onChange(val, pendingColor);
     setOpen(false);
   };
 
@@ -321,7 +396,7 @@ export function IconPicker({ value, onChange, fallback = '?' }: IconPickerProps)
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       {/* Preview button */}
       <button
-        onClick={() => setOpen(true)}
+        onClick={openModal}
         title="Change icon"
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -329,17 +404,17 @@ export function IconPicker({ value, onChange, fallback = '?' }: IconPickerProps)
           background: 'var(--shell-panel-2)', cursor: 'pointer',
         }}
       >
-        <AppIcon icon={value} fallback={fallback} size={20} />
+        <AppIcon icon={value} iconColor={color} fallback={fallback} size={20} />
       </button>
       <button
-        onClick={() => setOpen(true)}
+        onClick={openModal}
         style={{ fontSize: 11, color: 'var(--shell-accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700 }}
       >
         Change icon
       </button>
       {value && (
         <button
-          onClick={() => onChange('')}
+          onClick={() => onChange('', '')}
           title="Remove icon"
           style={{ fontSize: 11, color: 'var(--shell-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
         >
@@ -359,16 +434,15 @@ export function IconPicker({ value, onChange, fallback = '?' }: IconPickerProps)
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              width: 620, maxWidth: '95vw', height: 520, maxHeight: '90vh',
+              width: 620, maxWidth: '95vw', height: 560, maxHeight: '90vh',
               background: 'var(--shell-panel)', border: '1px solid var(--shell-border)',
               borderRadius: 12, boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
               display: 'flex', flexDirection: 'column', overflow: 'hidden',
             }}
           >
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--shell-border)', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--shell-border)', gap: 8, flexShrink: 0 }}>
               <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--shell-text)', flex: 1 }}>Pick Icon</span>
-              {/* Tabs */}
               {(['library', 'upload'] as const).map((t) => (
                 <button
                   key={t}
@@ -388,12 +462,15 @@ export function IconPicker({ value, onChange, fallback = '?' }: IconPickerProps)
             </div>
 
             {/* Body */}
-            <div style={{ flex: 1, minHeight: 0, padding: 14 }}>
+            <div style={{ flex: 1, minHeight: 0, padding: 14, overflow: 'hidden' }}>
               {tab === 'library'
-                ? <LibraryTab onSelect={select} />
+                ? <LibraryTab onSelect={select} color={pendingColor} />
                 : <UploadTab onSelect={select} />
               }
             </div>
+
+            {/* Color strip — always visible */}
+            <ColorStrip color={pendingColor} onChange={setPendingColor} />
           </div>
         </div>
       )}
