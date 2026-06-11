@@ -212,6 +212,9 @@ export class WindowManager {
       height: 1040,
       minWidth: 1100,
       minHeight: 700,
+      ...(payload.targetX !== undefined && payload.targetY !== undefined
+        ? { x: payload.targetX, y: payload.targetY }
+        : {}),
       ...customTitleBarOptions('#090916'),
       autoHideMenuBar: true,
       webPreferences: {
@@ -228,15 +231,19 @@ export class WindowManager {
     });
 
     win.loadURL(appendQuery(getShellUrl(), `detachedWorkspaceId=${encodeURIComponent(payload.id)}`)).catch(console.error);
-    win.once('ready-to-show', () => {
-      if (payload.targetX !== undefined && payload.targetY !== undefined) {
-        win.setPosition(payload.targetX, payload.targetY);
-      }
+
+    const showWin = () => {
+      if (win.isDestroyed() || win.isVisible()) return;
       win.show();
-      // On Windows, show() alone may not bring the window to the foreground
-      // if Windows' focus-stealing prevention is active.
-      if (process.platform === 'win32') win.focus();
-    });
+      win.focus();
+    };
+    win.once('ready-to-show', showWin);
+    // ready-to-show can silently not fire on Windows — use did-finish-load and a
+    // timeout as belt-and-suspenders fallbacks so the window always becomes visible.
+    win.webContents.once('did-finish-load', showWin);
+    const fallback = setTimeout(showWin, 3000);
+    win.once('show', () => clearTimeout(fallback));
+
     this.register(win, `workspace:${payload.id}`);
     win.on('closed', () => this.returnDetachedWorkspace(payload.id));
     return win;
@@ -309,7 +316,15 @@ export class WindowManager {
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
     win.loadURL(resolveAppUrl(def)).catch(console.error);
-    win.once('ready-to-show', () => win.show());
+
+    const showAppWin = () => {
+      if (win.isDestroyed() || win.isVisible()) return;
+      win.show();
+    };
+    win.once('ready-to-show', showAppWin);
+    win.webContents.once('did-finish-load', showAppWin);
+    const fallback = setTimeout(showAppWin, 3000);
+    win.once('show', () => clearTimeout(fallback));
 
     this.register(win, appId);
     return win;
