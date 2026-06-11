@@ -27,6 +27,7 @@ import { ShellAssetsLoader } from './shell-assets-loader.js';
 import { ManagerService } from './manager-service.js';
 import { BridgeService } from './bridge-service.js';
 import { EnvironmentStore } from './environment-store.js';
+import { loadBootstrapConfig } from './bridge-settings.js';
 import { RbacStore } from './rbac-store.js';
 import { ChannelManager } from '@fdc3-poc/channel-engine';
 import { IntentRegistry } from '@fdc3-poc/intent-engine';
@@ -88,13 +89,18 @@ async function bootstrap(): Promise<void> {
     }
     return { version: '1.0', applications: appDefs };
   })();
+  // Load IT bootstrap config once — shared by both stores so the file is read once.
+  const bootstrap = loadBootstrapConfig(configRoot);
+
   const managerService = new ManagerService(initialDirectoryFile, 'local');
-  const bridgeService = new BridgeService();
-  const environmentStore = new EnvironmentStore();
+  const bridgeService = new BridgeService(configRoot, bootstrap);
+  const environmentStore = new EnvironmentStore(configRoot, bootstrap);
   const rbacStore = new RbacStore();
 
-  // Apply the active env's persisted app directory (overrides bundled config).
-  const envApps = environmentStore.loadActiveAppDirectory();
+  // Apply the active env's app directory using priority chain:
+  //   user-saved → IT-managed (config/) → bundled default.
+  const activeEnvId = environmentStore.getActiveId();
+  const envApps = activeEnvId ? environmentStore.loadAppDirectoryForId(activeEnvId) : environmentStore.loadActiveAppDirectory();
   if (envApps && envApps.length > 0) {
     appDefs.splice(0, appDefs.length, ...envApps);
   }

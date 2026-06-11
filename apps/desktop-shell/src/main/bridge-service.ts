@@ -1,5 +1,5 @@
 import net from 'net';
-import type { BridgeCandidate, BridgeProfile, BridgeSettings, BridgeStatus } from '@fdc3-poc/fdc3-core';
+import type { BridgeCandidate, BridgeProfile, BridgeSettings, BridgeStatus, FDC3BootstrapConfig } from '@fdc3-poc/fdc3-core';
 import { BridgeSettingsStore, WELL_KNOWN_BRIDGE_PORTS } from './bridge-settings.js';
 
 type BridgeStatusListener = (status: BridgeStatus) => void;
@@ -9,14 +9,19 @@ const MAX_RANGE_SIZE = 32;
 const POLL_INTERVAL_MS = 15_000;
 
 export class BridgeService {
-  private readonly store = new BridgeSettingsStore();
+  private readonly store: BridgeSettingsStore;
   private readonly listeners = new Set<BridgeStatusListener>();
-  private status: BridgeStatus = this.makeStatus('disabled', {
-    lastCheckedAt: null,
-    notes: this.defaultNotes(),
-  });
+  private status: BridgeStatus;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private scanning = false;
+
+  constructor(configRoot: string, bootstrap?: FDC3BootstrapConfig) {
+    this.store = new BridgeSettingsStore(configRoot, bootstrap);
+    this.status = this.makeStatus('disabled', {
+      lastCheckedAt: null,
+      notes: this.defaultNotes(),
+    });
+  }
 
   init(): void {
     if (this.store.get().enabled) {

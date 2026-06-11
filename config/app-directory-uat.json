@@ -1,0 +1,694 @@
+[
+  {
+    "appId": "customer-search",
+    "title": "Customer Search",
+    "description": "Search and browse customers by name, ID, or segment.",
+    "url": "https://uat-apps.firm.internal/customer-search",
+    "devPort": 4001,
+    "icon": "🔍",
+    "category": "CRM",
+    "initialLayout": {
+      "x": 50,
+      "y": 80,
+      "width": 480,
+      "height": 560
+    },
+    "listensForContexts": [
+      "fdc3.contact"
+    ],
+    "capabilities": {
+      "broadcasts": [
+        "fdc3.contact"
+      ],
+      "listensTo": [],
+      "raisesIntents": [
+        "ViewContact",
+        "ViewPortfolio"
+      ],
+      "handlesIntents": []
+    }
+  },
+  {
+    "appId": "customer-profile",
+    "title": "Customer Profile",
+    "description": "Full customer profile including KYC, accounts, and recent activity.",
+    "url": "https://uat-apps.firm.internal/customer-profile",
+    "devPort": 4002,
+    "icon": "👤",
+    "category": "CRM",
+    "initialLayout": {
+      "x": 560,
+      "y": 80,
+      "width": 560,
+      "height": 560
+    },
+    "listensForContexts": [
+      "fdc3.contact"
+    ],
+    "intents": [
+      {
+        "intent": "ViewContact",
+        "contextTypes": [
+          "fdc3.contact"
+        ],
+        "appId": "customer-profile",
+        "displayName": "View Customer Profile"
+      }
+    ],
+    "capabilities": {
+      "broadcasts": [],
+      "listensTo": [
+        "fdc3.contact",
+        "com.demo.theme"
+      ],
+      "raisesIntents": [
+        "StartPayment",
+        "ViewPortfolio"
+      ],
+      "handlesIntents": [
+        "ViewContact"
+      ]
+    }
+  },
+  {
+    "appId": "portfolio-view",
+    "title": "Portfolio View",
+    "description": "Live re-marked portfolio positions, P&L, exposure, and discovered instrument actions.",
+    "url": "https://uat-apps.firm.internal/portfolio-view",
+    "devPort": 4003,
+    "icon": "📊",
+    "category": "Investments",
+    "initialLayout": {
+      "x": 1150,
+      "y": 80,
+      "width": 560,
+      "height": 560
+    },
+    "listensForContexts": [
+      "fdc3.contact",
+      "fdc3.portfolio"
+    ],
+    "intents": [
+      {
+        "intent": "ViewPortfolio",
+        "contextTypes": [
+          "fdc3.contact"
+        ],
+        "appId": "portfolio-view",
+        "displayName": "View Portfolio"
+      }
+    ],
+    "capabilities": {
+      "broadcasts": [
+        "fdc3.instrument",
+        "fdc3.portfolio"
+      ],
+      "listensTo": [
+        "fdc3.contact",
+        "fdc3.portfolio",
+        "com.demo.theme"
+      ],
+      "raisesIntents": [
+        "ViewChart",
+        "CreateOrder",
+        "ViewNews",
+        "ViewInstrument",
+        "Allocate"
+      ],
+      "handlesIntents": [
+        "ViewPortfolio"
+      ]
+    }
+  },
+  {
+    "appId": "market-watch",
+    "title": "Market Watch",
+    "description": "Live instrument prices with bid/ask, sparklines, flashing cells, and discovered instrument actions.",
+    "url": "https://uat-apps.firm.internal/market-watch",
+    "devPort": 4004,
+    "icon": "📈",
+    "category": "Markets",
+    "initialLayout": {
+      "x": 50,
+      "y": 680,
+      "width": 700,
+      "height": 460
+    },
+    "listensForContexts": [
+      "fdc3.instrument"
+    ],
+    "intents": [
+      {
+        "intent": "ViewInstrument",
+        "contextTypes": [
+          "fdc3.instrument"
+        ],
+        "appId": "market-watch",
+        "displayName": "View in Market Watch"
+      }
+    ],
+    "capabilities": {
+      "broadcasts": [
+        "fdc3.instrument"
+      ],
+      "listensTo": [
+        "fdc3.instrument",
+        "com.demo.theme"
+      ],
+      "raisesIntents": [
+        "ViewChart",
+        "CreateOrder",
+        "ViewNews",
+        "ViewOrders"
+      ],
+      "handlesIntents": [
+        "ViewInstrument"
+      ]
+    }
+  },
+  {
+    "appId": "payment-action",
+    "title": "Payment Action",
+    "description": "Initiate and authorise customer payment instructions.",
+    "url": "https://uat-apps.firm.internal/payment-action",
+    "devPort": 4005,
+    "icon": "💳",
+    "category": "Payments",
+    "initialLayout": {
+      "x": 780,
+      "y": 680,
+      "width": 500,
+      "height": 460
+    },
+    "listensForContexts": [],
+    "intents": [
+      {
+        "intent": "StartPayment",
+        "contextTypes": [
+          "com.demo.paymentRequest"
+        ],
+        "appId": "payment-action",
+        "displayName": "Start Payment"
+      }
+    ],
+    "capabilities": {
+      "broadcasts": [],
+      "listensTo": [
+        "com.demo.theme"
+      ],
+      "raisesIntents": [],
+      "handlesIntents": [
+        "StartPayment"
+      ]
+    }
+  },
+  {
+    "appId": "order-ticket",
+    "title": "Order Ticket",
+    "description": "Equity order ticket — buy/sell, qty, limit/market, TIF, venue. Streams fills via PrivateChannel.",
+    "url": "https://uat-apps.firm.internal/order-ticket",
+    "devPort": 4006,
+    "icon": "🧾",
+    "category": "Trading",
+    "initialLayout": {
+      "x": 200,
+      "y": 80,
+      "width": 520,
+      "height": 720
+    },
+    "listensForContexts": [
+      "fdc3.instrument",
+      "com.demo.theme"
+    ],
+    "intents": [
+      {
+        "intent": "CreateOrder",
+        "contextTypes": [
+          "fdc3.instrument"
+        ],
+        "appId": "order-ticket",
+        "displayName": "Trade Instrument"
+      },
+      {
+        "intent": "StartOrder",
+        "contextTypes": [
+          "fdc3.instrument"
+        ],
+        "appId": "order-ticket",
+        "displayName": "Open Order Ticket"
+      }
+    ],
+    "capabilities": {
+      "broadcasts": [
+        "com.demo.traderOrder",
+        "com.demo.orderStatus"
+      ],
+      "listensTo": [
+        "fdc3.instrument",
+        "com.demo.theme"
+      ],
+      "raisesIntents": [],
+      "handlesIntents": [
+        "CreateOrder",
+        "StartOrder"
+      ]
+    }
+  },
+  {
+    "appId": "order-blotter",
+    "title": "Order Blotter",
+    "description": "AG Grid blotter that listens for trader orders and fills, with cancel and view actions.",
+    "url": "https://uat-apps.firm.internal/order-blotter",
+    "devPort": 4007,
+    "icon": "🗒",
+    "category": "Trading",
+    "initialLayout": {
+      "x": 740,
+      "y": 80,
+      "width": 1100,
+      "height": 540
+    },
+    "listensForContexts": [
+      "com.demo.traderOrder",
+      "com.demo.orderStatus",
+      "fdc3.instrument",
+      "com.demo.theme"
+    ],
+    "intents": [
+      {
+        "intent": "ViewOrders",
+        "contextTypes": [
+          "fdc3.instrument"
+        ],
+        "appId": "order-blotter",
+        "displayName": "View Orders for Instrument"
+      }
+    ],
+    "capabilities": {
+      "broadcasts": [
+        "fdc3.instrument"
+      ],
+      "listensTo": [
+        "com.demo.traderOrder",
+        "com.demo.orderStatus",
+        "fdc3.instrument",
+        "com.demo.theme"
+      ],
+      "raisesIntents": [
+        "CancelOrder",
+        "ModifyOrder"
+      ],
+      "handlesIntents": [
+        "ViewOrders"
+      ]
+    }
+  },
+  {
+    "appId": "chart",
+    "title": "Chart",
+    "description": "Live SVG price chart that listens to fdc3.instrument and handles ViewChart. Trade-this raises CreateOrder.",
+    "url": "https://uat-apps.firm.internal/chart",
+    "devPort": 4008,
+    "icon": "📉",
+    "category": "Markets",
+    "initialLayout": {
+      "x": 200,
+      "y": 80,
+      "width": 900,
+      "height": 560
+    },
+    "listensForContexts": [
+      "fdc3.instrument",
+      "com.demo.orderStatus",
+      "com.demo.theme"
+    ],
+    "intents": [
+      {
+        "intent": "ViewChart",
+        "contextTypes": [
+          "fdc3.instrument"
+        ],
+        "appId": "chart",
+        "displayName": "View Chart"
+      }
+    ],
+    "capabilities": {
+      "broadcasts": [],
+      "listensTo": [
+        "fdc3.instrument",
+        "com.demo.orderStatus",
+        "com.demo.theme"
+      ],
+      "raisesIntents": [
+        "CreateOrder"
+      ],
+      "handlesIntents": [
+        "ViewChart"
+      ]
+    }
+  },
+  {
+    "appId": "news",
+    "title": "News",
+    "description": "Instrument-driven news feed. Per-headline actions are discovered live via findIntentsByContext.",
+    "url": "https://uat-apps.firm.internal/news",
+    "devPort": 4009,
+    "icon": "📰",
+    "category": "Markets",
+    "initialLayout": {
+      "x": 1140,
+      "y": 80,
+      "width": 560,
+      "height": 700
+    },
+    "listensForContexts": [
+      "fdc3.instrument",
+      "com.demo.theme"
+    ],
+    "intents": [
+      {
+        "intent": "ViewNews",
+        "contextTypes": [
+          "fdc3.instrument"
+        ],
+        "appId": "news",
+        "displayName": "View Related News"
+      }
+    ],
+    "capabilities": {
+      "broadcasts": [
+        "fdc3.instrument"
+      ],
+      "listensTo": [
+        "fdc3.instrument",
+        "com.demo.theme"
+      ],
+      "raisesIntents": [
+        "ViewChart",
+        "CreateOrder",
+        "ViewPortfolio",
+        "ViewInstrument"
+      ],
+      "handlesIntents": [
+        "ViewNews"
+      ]
+    }
+  },
+  {
+    "appId": "rfq-quote",
+    "title": "RFQ Quote",
+    "description": "Request quotes from N venues over a PrivateChannel. Accept routes a TraderOrder to the blotter.",
+    "url": "https://uat-apps.firm.internal/rfq-quote",
+    "devPort": 4010,
+    "icon": "💱",
+    "category": "Trading",
+    "initialLayout": {
+      "x": 200,
+      "y": 80,
+      "width": 700,
+      "height": 720
+    },
+    "listensForContexts": [
+      "fdc3.instrument",
+      "com.demo.theme"
+    ],
+    "capabilities": {
+      "broadcasts": [
+        "com.demo.traderOrder"
+      ],
+      "listensTo": [
+        "fdc3.instrument",
+        "com.demo.theme"
+      ],
+      "raisesIntents": [],
+      "handlesIntents": []
+    }
+  },
+  {
+    "appId": "cloud-trader",
+    "title": "Cloud Trader",
+    "description": "Proof-of-life Angular app built on @fdc3-poc/interop-angular. Same source runs inside the shell, in an FDC3 web host, or as a plain browser tab via BroadcastChannel fallback.",
+    "url": "https://uat-apps.firm.internal/cloud-trader",
+    "devPort": 4016,
+    "icon": "☁️",
+    "category": "Trading",
+    "initialLayout": {
+      "x": 200,
+      "y": 80,
+      "width": 980,
+      "height": 720
+    },
+    "listensForContexts": [
+      "fdc3.instrument",
+      "com.demo.traderOrder",
+      "com.demo.theme"
+    ],
+    "capabilities": {
+      "autoWire": false,
+      "broadcasts": [
+        "fdc3.instrument",
+        "com.demo.traderOrder"
+      ],
+      "listensTo": [
+        "fdc3.instrument",
+        "com.demo.traderOrder",
+        "com.demo.theme"
+      ],
+      "raisesIntents": [
+        "CreateOrder",
+        "ViewChart",
+        "ViewNews",
+        "ViewPortfolio"
+      ],
+      "handlesIntents": []
+    }
+  },
+  {
+    "appId": "funds-allocations",
+    "title": "Funds Allocations",
+    "description": "AG Grid allocation monitor for fund weights, drift, risk, and manager ownership.",
+    "url": "https://uat-apps.firm.internal/funds-allocations",
+    "devPort": 4011,
+    "icon": "▦",
+    "category": "Funds",
+    "initialLayout": {
+      "x": 930,
+      "y": 80,
+      "width": 780,
+      "height": 620
+    },
+    "listensForContexts": [
+      "com.demo.theme"
+    ],
+    "intents": [
+      {
+        "intent": "ViewFund",
+        "contextTypes": [
+          "com.demo.fund"
+        ],
+        "appId": "funds-allocations",
+        "displayName": "View Fund Allocations"
+      }
+    ],
+    "capabilities": {
+      "broadcasts": [
+        "com.demo.fund"
+      ],
+      "listensTo": [
+        "com.demo.order",
+        "com.demo.fund",
+        "com.demo.theme"
+      ],
+      "raisesIntents": [
+        "ViewFund"
+      ],
+      "handlesIntents": [
+        "ViewFund"
+      ]
+    }
+  },
+  {
+    "appId": "incoming-orders",
+    "title": "Incoming Orders",
+    "description": "AG Grid blotter for incoming fund orders, filtered by selected fund context.",
+    "url": "https://uat-apps.firm.internal/incoming-orders",
+    "devPort": 4012,
+    "icon": "≡",
+    "category": "Funds",
+    "initialLayout": {
+      "x": 50,
+      "y": 80,
+      "width": 850,
+      "height": 420
+    },
+    "listensForContexts": [
+      "com.demo.fund",
+      "com.demo.theme"
+    ],
+    "capabilities": {
+      "broadcasts": [
+        "com.demo.order",
+        "com.demo.fund"
+      ],
+      "listensTo": [
+        "com.demo.fund",
+        "com.demo.theme"
+      ],
+      "raisesIntents": [
+        "ViewOrder"
+      ],
+      "handlesIntents": []
+    }
+  },
+  {
+    "appId": "audit-log",
+    "title": "Audit",
+    "description": "AG Grid audit trail that listens to fund and order context.",
+    "url": "https://uat-apps.firm.internal/audit-log",
+    "devPort": 4013,
+    "icon": "!",
+    "category": "Funds",
+    "initialLayout": {
+      "x": 50,
+      "y": 530,
+      "width": 850,
+      "height": 420
+    },
+    "listensForContexts": [
+      "com.demo.fund",
+      "com.demo.order",
+      "com.demo.theme"
+    ],
+    "capabilities": {
+      "broadcasts": [],
+      "listensTo": [
+        "com.demo.order",
+        "com.demo.fund",
+        "com.demo.theme"
+      ],
+      "raisesIntents": [],
+      "handlesIntents": [
+        "OpenAudit",
+        "ViewFund"
+      ]
+    }
+  },
+  {
+    "appId": "theme-toggle",
+    "title": "Theme Toggle",
+    "description": "Broadcasts workspace theme context so participating apps switch light or dark mode together.",
+    "url": "https://uat-apps.firm.internal/theme-toggle",
+    "devPort": 4014,
+    "icon": "◐",
+    "category": "Workspace",
+    "initialLayout": {
+      "x": 930,
+      "y": 730,
+      "width": 360,
+      "height": 220
+    },
+    "listensForContexts": [
+      "com.demo.theme"
+    ],
+    "capabilities": {
+      "broadcasts": [
+        "com.demo.theme"
+      ],
+      "listensTo": [
+        "com.demo.theme"
+      ],
+      "raisesIntents": [
+        "ApplyTheme"
+      ],
+      "handlesIntents": [
+        "ApplyTheme"
+      ]
+    }
+  },
+  {
+    "appId": "fdc3-conformance",
+    "title": "FDC3 Conformance Console",
+    "description": "Vanilla web app (no shell dependencies) that discovers the agent via getAgent() and live-tests the standard FDC3 2.0 surface — proves any third-party FDC3 app interoperates here.",
+    "url": "https://uat-apps.firm.internal/fdc3-conformance",
+    "devPort": 4015,
+    "icon": "✓",
+    "category": "Diagnostics",
+    "initialLayout": {
+      "x": 240,
+      "y": 120,
+      "width": 920,
+      "height": 680
+    },
+    "listensForContexts": [
+      "fdc3.instrument",
+      "fdc3.contact"
+    ],
+    "capabilities": {
+      "broadcasts": [
+        "fdc3.instrument",
+        "fdc3.contact"
+      ],
+      "listensTo": [
+        "fdc3.instrument",
+        "fdc3.contact"
+      ],
+      "raisesIntents": [
+        "ViewInstrument"
+      ],
+      "handlesIntents": []
+    }
+  },
+  {
+    "appId": "external-app",
+    "title": "External FDC3 App (slot)",
+    "description": "Drop-in slot for testing ANY external FDC3 app. Swap the url for the app you want to evaluate; if it speaks FDC3 it interoperates with the fleet with no code changes. Default points at the FINOS FDC3 Workbench — a real third-party FDC3 app you can broadcast to / receive from.",
+    "url": "https://fdc3.finos.org/toolbox/fdc3-workbench/",
+    "devPort": 0,
+    "icon": "🌐",
+    "category": "External",
+    "initialLayout": {
+      "x": 220,
+      "y": 140,
+      "width": 1180,
+      "height": 820
+    },
+    "listensForContexts": [
+      "fdc3.instrument",
+      "fdc3.contact"
+    ],
+    "capabilities": {
+      "broadcasts": [
+        "fdc3.instrument",
+        "fdc3.contact"
+      ],
+      "listensTo": [
+        "fdc3.instrument",
+        "fdc3.contact"
+      ],
+      "raisesIntents": [],
+      "handlesIntents": []
+    }
+  },
+  {
+    "appId": "cloud-sample",
+    "title": "Cloud App",
+    "description": "Sample cloud-hosted app loaded directly from a remote URL — demonstrates embedding external web content.",
+    "url": "https://example.com",
+    "devPort": 0,
+    "icon": "☁",
+    "category": "Cloud",
+    "initialLayout": {
+      "x": 200,
+      "y": 200,
+      "width": 1100,
+      "height": 760
+    },
+    "listensForContexts": [],
+    "capabilities": {
+      "broadcasts": [],
+      "listensTo": [],
+      "raisesIntents": [],
+      "handlesIntents": []
+    }
+  }
+]

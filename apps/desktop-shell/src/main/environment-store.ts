@@ -2,13 +2,13 @@ import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import type { AppDefinition, EnvironmentProfile, EnvironmentSettings } from '@fdc3-poc/fdc3-core';
+import type { AppDefinition, EnvironmentProfile, EnvironmentSettings, FDC3BootstrapConfig } from '@fdc3-poc/fdc3-core';
 
 const SETTINGS_FILE = 'environments.json';
 const APP_DIR_PREFIX = 'app-directory-';
 
-const DEFAULT_PROFILES: EnvironmentProfile[] = [
-  { id: 'dev',  name: 'Development', color: '#4CAF50', description: 'Local development environment' },
+const HARDCODED_DEFAULT_PROFILES: EnvironmentProfile[] = [
+  { id: 'dev',  name: 'Development', color: '#4CAF50', description: 'Local development — apps on localhost' },
   { id: 'uat',  name: 'UAT',         color: '#FF9800', description: 'User acceptance testing' },
   { id: 'prod', name: 'Production',  color: '#F44336', description: 'Live production environment' },
 ];
@@ -16,9 +16,13 @@ const DEFAULT_PROFILES: EnvironmentProfile[] = [
 export class EnvironmentStore {
   private readonly settingsPath = path.join(app.getPath('userData'), SETTINGS_FILE);
   private readonly userDataDir = app.getPath('userData');
+  private readonly configRoot: string;
+  private readonly bootstrap: FDC3BootstrapConfig;
   private settings: EnvironmentSettings;
 
-  constructor() {
+  constructor(configRoot: string, bootstrap: FDC3BootstrapConfig) {
+    this.configRoot = configRoot;
+    this.bootstrap = bootstrap;
     this.settings = this.read();
   }
 
@@ -98,16 +102,28 @@ export class EnvironmentStore {
     return this.loadAppDirectoryForId(activeId);
   }
 
-  /** Load for a specific env id — used on activate to hot-swap directory. */
+  /**
+   * Load app directory for a specific env using the priority chain:
+   *   1. userData/app-directory-<id>.json  — user-saved edits
+   *   2. config/app-directory-<id>.json    — IT-managed per-env baseline
+   *   3. null                              — caller falls back to bundled default
+   */
   loadAppDirectoryForId(id: string): AppDefinition[] | null {
-    const filePath = this.appDirPath(id);
-    if (!fs.existsSync(filePath)) return null;
-    try {
-      const raw = fs.readFileSync(filePath, 'utf-8');
-      const parsed = JSON.parse(raw) as AppDefinition[];
-      if (Array.isArray(parsed)) return parsed;
-    } catch (err) {
-      console.warn(`[env-store] failed to load app directory for env ${id}: ${(err as Error).message}`);
+    const candidates = [
+      this.appDirPath(id),
+      path.join(this.configRoot, `${APP_DIR_PREFIX}${id}.json`),
+    ];
+    for (const filePath of candidates) {
+      if (!fs.existsSync(filePath)) continue;
+      try {
+        const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as AppDefinition[];
+        if (Array.isArray(parsed)) {
+          console.log(`[env-store] app directory for "${id}" loaded from ${filePath}`);
+          return parsed;
+        }
+      } catch (err) {
+        console.warn(`[env-store] failed to load ${filePath}: ${(err as Error).message}`);
+      }
     }
     return null;
   }
@@ -116,20 +132,35 @@ export class EnvironmentStore {
     return path.join(this.userDataDir, `${APP_DIR_PREFIX}${id}.json`);
   }
 
+  private defaultProfiles(): EnvironmentProfile[] {
+    const bp = this.bootstrap.environments?.profiles;
+    if (Array.isArray(bp) && bp.length > 0) {
+      return bp.map((p) => ({
+        id: p.id,
+        name: p.name,
+        color: p.color,
+        description: p.description,
+      }));
+    }
+    return HARDCODED_DEFAULT_PROFILES;
+  }
+
   private read(): EnvironmentSettings {
+    const defaults = this.defaultProfiles();
+    const bootstrapDefault = this.bootstrap.environments?.default ?? null;
     try {
       if (!fs.existsSync(this.settingsPath)) {
-        return { activeId: null, profiles: DEFAULT_PROFILES };
+        return { activeId: bootstrapDefault, profiles: defaults };
       }
       const parsed = JSON.parse(fs.readFileSync(this.settingsPath, 'utf-8')) as Partial<EnvironmentSettings>;
       const profiles = Array.isArray(parsed.profiles) && parsed.profiles.length > 0
         ? parsed.profiles
-        : DEFAULT_PROFILES;
-      const activeId = typeof parsed.activeId === 'string' ? parsed.activeId : null;
+        : defaults;
+      const activeId = typeof parsed.activeId === 'string' ? parsed.activeId : bootstrapDefault;
       return { activeId, profiles };
     } catch (err) {
       console.warn(`[env-store] failed to read settings: ${(err as Error).message}`);
-      return { activeId: null, profiles: DEFAULT_PROFILES };
+      return { activeId: bootstrapDefault, profiles: defaults };
     }
   }
 

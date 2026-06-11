@@ -47,3 +47,4 @@ export interface BridgeStatus {
   lastError: string | null;
   notes: string[];
 }
+

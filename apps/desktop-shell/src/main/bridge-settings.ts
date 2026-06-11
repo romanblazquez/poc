@@ -2,9 +2,10 @@ import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import type { BridgeProfile, BridgeSettings } from '@fdc3-poc/fdc3-core';
+import type { FDC3BootstrapConfig, BridgeProfile, BridgeSettings } from '@fdc3-poc/fdc3-core';
 
 const SETTINGS_FILE = 'bridge-settings.json';
+export const BOOTSTRAP_FILE = 'fdc3-config.json';
 
 // Well-known FDC3 Desktop Agent Bridge ports: FINOS default, io.Connect/Glue42, generic fallback.
 export const WELL_KNOWN_BRIDGE_PORTS = [4475, 9090, 8080] as const;
@@ -18,11 +19,39 @@ export const DEFAULT_BRIDGE_SETTINGS: BridgeSettings = {
   endpointUrl: '',
 };
 
+export function loadBootstrapConfig(configRoot: string): FDC3BootstrapConfig {
+  const filePath = path.join(configRoot, BOOTSTRAP_FILE);
+  try {
+    if (!fs.existsSync(filePath)) return {};
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as FDC3BootstrapConfig;
+    console.log(`[bootstrap] IT config loaded from ${filePath}`);
+    return parsed;
+  } catch (error) {
+    console.warn(`[bootstrap] could not read config: ${(error as Error).message}`);
+    return {};
+  }
+}
+
+function bridgeDefaults(bootstrap: FDC3BootstrapConfig): BridgeSettings {
+  const b = bootstrap.bridge ?? {};
+  const port = typeof b.port === 'number' && b.port > 0 && b.port <= 65535 ? b.port : DEFAULT_BRIDGE_SETTINGS.portStart;
+  const host = typeof b.host === 'string' && b.host.trim() ? b.host.trim() : DEFAULT_BRIDGE_SETTINGS.host;
+  return {
+    ...DEFAULT_BRIDGE_SETTINGS,
+    host,
+    portStart: port,
+    portEnd: port,
+    enabled: typeof b.enabled === 'boolean' ? b.enabled : DEFAULT_BRIDGE_SETTINGS.enabled,
+  };
+}
+
 export class BridgeSettingsStore {
   private readonly filePath = path.join(app.getPath('userData'), SETTINGS_FILE);
   private settings: BridgeSettings = { ...DEFAULT_BRIDGE_SETTINGS };
+  private readonly bootstrap: FDC3BootstrapConfig;
 
-  constructor() {
+  constructor(configRoot: string, bootstrap?: FDC3BootstrapConfig) {
+    this.bootstrap = bootstrap ?? loadBootstrapConfig(configRoot);
     this.settings = this.read();
   }
 
@@ -89,18 +118,29 @@ export class BridgeSettingsStore {
   }
 
   private read(): BridgeSettings {
+    const defaults = bridgeDefaults(this.bootstrap);
     try {
-      if (!fs.existsSync(this.filePath)) return { ...DEFAULT_BRIDGE_SETTINGS, profiles: [], activeProfileId: null };
+      if (!fs.existsSync(this.filePath)) {
+        // First run: seed profiles from bootstrap if provided
+        const profiles = this.seedBootstrapProfiles();
+        return { ...defaults, profiles, activeProfileId: null };
+      }
       const parsed = JSON.parse(fs.readFileSync(this.filePath, 'utf-8')) as Partial<BridgeSettings>;
-      const normalized = normalizeSettings({ ...DEFAULT_BRIDGE_SETTINGS, ...parsed });
-      // Restore optional fields that normalizeSettings strips (it only returns the 6 core fields).
+      // Bootstrap fills gaps in saved settings (e.g. IT changes host between deployments)
+      const normalized = normalizeSettings({ ...defaults, ...parsed });
       const profiles = Array.isArray(parsed.profiles) ? parsed.profiles : [];
       const activeProfileId = typeof parsed.activeProfileId === 'string' ? parsed.activeProfileId : null;
       return { ...normalized, profiles, activeProfileId };
     } catch (error) {
       console.warn(`[bridge-settings] failed to read settings: ${(error as Error).message}`);
-      return { ...DEFAULT_BRIDGE_SETTINGS, profiles: [], activeProfileId: null };
+      return { ...defaults, profiles: [], activeProfileId: null };
     }
+  }
+
+  private seedBootstrapProfiles(): BridgeProfile[] {
+    const profiles = this.bootstrap.bridge?.profiles;
+    if (!Array.isArray(profiles) || profiles.length === 0) return [];
+    return profiles.map((p) => ({ id: randomUUID(), ...p }));
   }
 
   private write(settings: BridgeSettings): void {

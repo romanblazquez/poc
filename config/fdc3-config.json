@@ -1,0 +1,40 @@
+{
+  "_comment": "IT-managed bootstrap config. Deploy via SCCM/Intune/GPO alongside the installer. User settings always take precedence — this file seeds defaults for new installs. Per-env app directories: config/app-directory-<envId>.json",
+  "environments": {
+    "default": "dev",
+    "profiles": [
+      {
+        "id": "dev",
+        "name": "Development",
+        "color": "#4CAF50",
+        "description": "Local development — apps on localhost"
+      },
+      {
+        "id": "uat",
+        "name": "UAT",
+        "color": "#FF9800",
+        "description": "User acceptance testing — cloud-hosted apps"
+      },
+      {
+        "id": "prod",
+        "name": "Production",
+        "color": "#F44336",
+        "description": "Live production — cloud-hosted apps"
+      }
+    ]
+  },
+  "bridge": {
+    "host": "127.0.0.1",
+    "port": 4475,
+    "enabled": false,
+    "profiles": [
+      {
+        "name": "Local Dev",
+        "host": "127.0.0.1",
+        "portStart": 4475,
+        "portEnd": 4475,
+        "endpointUrl": ""
+      }
+    ]
+  }
+}
