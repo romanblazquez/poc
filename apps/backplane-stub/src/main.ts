@@ -36,10 +36,11 @@ function resolvePort(): { port: number; source: string } {
   const args = process.argv.slice(2);
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg.startsWith('--port=')) {
+    const argLower = arg.toLowerCase();
+    if (argLower.startsWith('--port=')) {
       return { port: parsePort(arg.slice('--port='.length), '--port flag'), source: '--port flag' };
     }
-    if (arg === '--port' && i + 1 < args.length) {
+    if (argLower === '--port' && i + 1 < args.length) {
       return { port: parsePort(args[i + 1], '--port flag'), source: '--port flag' };
     }
   }
@@ -266,7 +267,12 @@ httpServer.on('error', (err: NodeJS.ErrnoException) => {
   process.exit(1);
 });
 
+let shuttingDown = false;
 process.on('SIGINT', () => {
-  console.log('\n\n  Shutting down backplane-stub…');
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log('\n\n  Shutting down backplane-stub…\n');
+  for (const ws of wss.clients) ws.terminate();
   wss.close(() => httpServer.close(() => process.exit(0)));
+  setTimeout(() => process.exit(0), 1500);
 });

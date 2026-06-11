@@ -118,12 +118,12 @@ function latencyVariant(ms: number): 'success' | 'warning' | 'destructive' {
 
 function stateLabel(state: BridgeStatusState): string {
   switch (state) {
-    case 'disabled':   return 'Disabled';
-    case 'scanning':   return 'Scanning';
-    case 'available':  return 'Connected';
-    case 'unavailable': return 'Unavailable';
-    case 'error':      return 'Error';
-    default:           return state;
+    case 'disabled':    return 'Disabled';
+    case 'scanning':    return 'Scanning';
+    case 'available':   return 'Detected';
+    case 'unavailable': return 'Not found';
+    case 'error':       return 'Error';
+    default:            return state;
   }
 }
 
@@ -328,8 +328,8 @@ function MonitorSection({ current, isScanning, busy, onScan }: MonitorSectionPro
         <div className="flex shrink-0 items-center gap-3 rounded-lg border border-[color:color-mix(in_srgb,var(--shell-positive)_35%,transparent)] bg-[color:color-mix(in_srgb,var(--shell-positive)_6%,transparent)] px-3 py-2">
           <CheckCircle2 className="size-4 shrink-0 text-[color:var(--shell-positive)]" />
           <div className="min-w-0 flex-1 text-[11px] text-muted-foreground">
-            Connected · <code className="font-bold text-foreground">{selected.endpointUrl}</code>
-            <span className="ml-2 text-muted-foreground/60">— Bridge readiness reported via <code>fdc3.getInfo()</code></span>
+            TCP endpoint detected · <code className="font-bold text-foreground">{selected.endpointUrl}</code>
+            <span className="ml-2 text-muted-foreground/60">— port is open, WebSocket not verified. Start <code>nx serve backplane-stub</code> to enable full bridging.</span>
           </div>
           <Badge variant="success" className="shrink-0">{candidates.length} candidate{candidates.length === 1 ? '' : 's'}</Badge>
         </div>
@@ -337,7 +337,7 @@ function MonitorSection({ current, isScanning, busy, onScan }: MonitorSectionPro
         <div className="flex shrink-0 items-center gap-3 rounded-lg border border-[color:color-mix(in_srgb,var(--shell-negative)_35%,transparent)] bg-[color:color-mix(in_srgb,var(--shell-negative)_6%,transparent)] px-3 py-2">
           <TriangleAlert className="size-4 shrink-0 text-[color:var(--shell-negative)]" />
           <div className="min-w-0 flex-1 text-[11px] text-muted-foreground">
-            {lastError ?? (state === 'unavailable' ? 'No FINOS Backplane found — start a local instance or check Configuration.' : 'Connection error — verify host and port range in Configuration.')}
+            {lastError ?? (state === 'unavailable' ? 'No Backplane endpoint found — run nx serve backplane-stub or check Configuration.' : 'Scan error — verify host and port range in Configuration.')}
           </div>
           <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onScan} className="shrink-0">Retry</Button>
         </div>
@@ -666,14 +666,13 @@ function ProfilesSection({
                                 size="sm"
                                 variant="ghost"
                                 className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                                disabled={profiles.length <= 1}
                                 onClick={() => onDelete(profile.id)}
                               >
                                 <Trash2 className="size-3.5" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                              {profiles.length <= 1 ? 'Cannot delete the only profile' : 'Delete profile'}
+                              Delete profile
                             </TooltipContent>
                           </Tooltip>
                         </div>
@@ -1079,8 +1078,8 @@ export function Bridge(): JSX.Element {
           title="Desktop Agent Bridge"
           description={
             <>
-              Detects and connects to a <strong>FINOS Backplane</strong> service — a local WebSocket hub that lets
-              multiple FDC3-enabled applications share context and intents across different desktop agents on the same machine or network.
+              Scans for a <strong>FINOS Backplane</strong> service via TCP probe. A detected port means the address is reachable —
+              a running <code className="text-[10px]">nx serve backplane-stub</code> (or real Backplane) is required for actual WebSocket bridging.
             </>
           }
           meta={<StatusBadge label={stateLabel(current.state)} tone={stateTone(current.state)} />}
