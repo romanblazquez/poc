@@ -8,9 +8,16 @@
  * to detect candidates — any process listening on the target port is enough.
  * This stub also handles the WebSocket upgrade so you can interact with it.
  *
+ * Port precedence (highest → lowest):
+ *   1. --port=<n>  command-line argument
+ *   2. PORT        environment variable
+ *   3. 4475        built-in default (FINOS well-known bridge port)
+ *
  * Usage:
- *   PORT=4475 nx serve backplane-stub
- *   PORT=9090 nx serve backplane-stub   ← second well-known port
+ *   nx serve backplane-stub                   # → 4475 (default)
+ *   PORT=9090 nx serve backplane-stub         # → 9090
+ *   nx serve backplane-stub -- --port=4477    # → 4477
+ *   npx tsx src/main.ts --port=4477           # → 4477 (direct)
  *
  * FINOS DAB (Desktop Agent Bridge) message types simulated:
  *   WCP1Hello      → server responds with WCP2LoadURL (noop URL since we're a stub)
@@ -21,7 +28,37 @@
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 
-const PORT = Number(process.env['PORT'] ?? 4475);
+const DEFAULT_PORT = 4475;
+
+// ── Port resolution (argv > env > default) ─────────────────────────────────
+
+function resolvePort(): { port: number; source: string } {
+  const args = process.argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith('--port=')) {
+      return { port: parsePort(arg.slice('--port='.length), '--port flag'), source: '--port flag' };
+    }
+    if (arg === '--port' && i + 1 < args.length) {
+      return { port: parsePort(args[i + 1], '--port flag'), source: '--port flag' };
+    }
+  }
+  if (process.env['PORT']) {
+    return { port: parsePort(process.env['PORT'], 'PORT env var'), source: 'PORT env var' };
+  }
+  return { port: DEFAULT_PORT, source: 'default' };
+}
+
+function parsePort(raw: string, source: string): number {
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > 65535) {
+    console.error(`\n  ✗ Invalid port "${raw}" (from ${source}). Must be an integer between 1 and 65535.\n`);
+    process.exit(1);
+  }
+  return n;
+}
+
+const { port: PORT, source: PORT_SOURCE } = resolvePort();
 const HOST = process.env['HOST'] ?? '127.0.0.1';
 
 // ── FINOS DAB message shapes (minimal subset) ──────────────────────────────
@@ -205,12 +242,14 @@ wss.on('connection', (ws, req) => {
 // ── Startup ────────────────────────────────────────────────────────────────
 
 httpServer.listen(PORT, HOST, () => {
+  const portLabel = `${PORT}  (${PORT_SOURCE})`;
   console.log('');
   console.log('  ╔═══════════════════════════════════════════════════╗');
   console.log('  ║         FINOS Backplane Stub  v' + STUB_VERSION.padEnd(20) + '║');
   console.log('  ╠═══════════════════════════════════════════════════╣');
-  console.log(`  ║  WebSocket  ws://${HOST}:${PORT}`.padEnd(53) + '║');
-  console.log(`  ║  HTTP info  http://${HOST}:${PORT}`.padEnd(53) + '║');
+  console.log(`  ║  Port         ${portLabel}`.padEnd(53) + '║');
+  console.log(`  ║  WebSocket    ws://${HOST}:${PORT}`.padEnd(53) + '║');
+  console.log(`  ║  HTTP info    http://${HOST}:${PORT}`.padEnd(53) + '║');
   console.log('  ╠═══════════════════════════════════════════════════╣');
   console.log('  ║  Bridge scanner: enable Auto-Discovery in shell   ║');
   console.log('  ║  and click Scan — this stub will be detected.     ║');
@@ -220,7 +259,7 @@ httpServer.listen(PORT, HOST, () => {
 
 httpServer.on('error', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
-    console.error(`\n  ✗ Port ${PORT} is already in use. Try: PORT=9090 nx serve backplane-stub\n`);
+    console.error(`\n  ✗ Port ${PORT} is already in use.\n  Try: PORT=9090 nx serve backplane-stub\n  Or:  nx serve backplane-stub -- --port=9090\n`);
   } else {
     console.error(`\n  ✗ Server error: ${err.message}\n`);
   }

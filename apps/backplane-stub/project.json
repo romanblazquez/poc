@@ -8,18 +8,8 @@
     "serve": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "npx tsx apps/backplane-stub/src/main.ts",
+        "command": "npx tsx apps/backplane-stub/src/main.ts {args}",
         "cwd": "{workspaceRoot}"
-      }
-    },
-    "serve:port": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "npx tsx apps/backplane-stub/src/main.ts",
-        "cwd": "{workspaceRoot}",
-        "env": {
-          "PORT": "4475"
-        }
       }
     },
     "lint": {
