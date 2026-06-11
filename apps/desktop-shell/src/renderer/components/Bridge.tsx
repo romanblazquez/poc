@@ -13,7 +13,7 @@ import { cn } from '../lib/utils.js';
 
 type BridgeProvider = 'finos-backplane';
 type BridgeStatusState = 'disabled' | 'scanning' | 'available' | 'unavailable' | 'error';
-type BridgeSection = 'monitor' | 'configuration' | 'profiles';
+type BridgeSection = 'configuration' | 'profiles';
 
 interface BridgeProfile {
   id: string;
@@ -84,10 +84,9 @@ const EMPTY_PROFILE_FORM: Omit<BridgeProfile, 'id'> = {
   endpointUrl: '',
 };
 
-const NAV: { id: BridgeSection; label: string; description: string }[] = [
-  { id: 'monitor',       label: 'Monitor',       description: 'Live connection status and detected services' },
-  { id: 'configuration', label: 'Configuration', description: 'Discovery host, ports, and scan settings' },
-  { id: 'profiles',      label: 'Profiles',      description: 'Saved bridge environments and quick-switch' },
+const NAV: { id: BridgeSection; label: string }[] = [
+  { id: 'configuration', label: 'Configuration' },
+  { id: 'profiles',      label: 'Profiles' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -276,100 +275,88 @@ function MonitorSection({ current, isScanning, busy, onScan }: MonitorSectionPro
   const { selected, candidates, lastCheckedAt, lastError } = current;
 
   return (
-    <div className="grid gap-4">
-
-      {/* ── Connection status card ──────────────────────────────────────── */}
-      <Card>
-        <CardHeader className="flex-row items-center justify-between gap-3 border-b py-3">
-          <div>
-            <CardTitle className="text-sm">Connection Status</CardTitle>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Live readiness of the FINOS Backplane service</p>
-          </div>
-          <div className="flex items-center gap-2">
+    <>
+      {/* ── Metric strip (always visible) ─────────────────────────────── */}
+      <div className="grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-4">
+        {/* Status chip */}
+        <div className={cn(
+          'flex min-w-0 flex-col gap-1 rounded-lg border p-3',
+          state === 'available' ? 'border-[color:color-mix(in_srgb,var(--shell-positive)_35%,transparent)] bg-[color:color-mix(in_srgb,var(--shell-positive)_6%,transparent)]' : 'bg-[color:rgba(255,255,255,0.025)]',
+        )}>
+          <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">
+            Status
             {isScanning && <ScanningPulse />}
-            <Badge
-              variant={state === 'available' ? 'success' : state === 'scanning' ? 'default' : state === 'error' ? 'destructive' : state === 'unavailable' ? 'warning' : 'secondary'}
-            >
-              {stateLabel(state)}
-            </Badge>
           </div>
-        </CardHeader>
-        <CardContent className="pt-4">
-          {/* Main status banner */}
-          {state === 'available' && selected ? (
-            <div className="flex items-start gap-3 rounded-lg border border-[color:color-mix(in_srgb,var(--shell-positive)_40%,transparent)] bg-[color:color-mix(in_srgb,var(--shell-positive)_7%,transparent)] p-3">
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[color:var(--shell-positive)]" />
-              <div className="min-w-0 flex-1">
-                <div className="text-[10px] font-black uppercase tracking-wide text-[color:var(--shell-positive)]">Connected to FINOS Backplane</div>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <code className="text-sm font-bold text-foreground">{selected.endpointUrl}</code>
-                  <Badge variant="success">{selected.latencyMs} ms</Badge>
-                </div>
-                <div className="mt-1 text-[11px] text-muted-foreground">
-                  The shell can report bridge readiness to FDC3 apps via <code className="font-mono">fdc3.getInfo()</code>.
-                </div>
-              </div>
-            </div>
-          ) : state === 'scanning' || isScanning ? (
-            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3">
-              <Radio className="size-4 shrink-0 animate-pulse text-primary" />
-              <div>
-                <div className="text-xs font-bold text-foreground">Scanning for Backplane service…</div>
-                <div className="text-[11px] text-muted-foreground">Probing the configured host and port range</div>
-              </div>
-            </div>
-          ) : state === 'unavailable' || state === 'error' ? (
-            <div className="flex items-start gap-3 rounded-lg border border-[color:color-mix(in_srgb,var(--shell-negative)_40%,transparent)] bg-[color:color-mix(in_srgb,var(--shell-negative)_7%,transparent)] p-3">
-              <TriangleAlert className="mt-0.5 size-4 shrink-0 text-[color:var(--shell-negative)]" />
-              <div className="flex-1">
-                <div className="text-[10px] font-black uppercase tracking-wide text-[color:var(--shell-negative)]">
-                  {state === 'error' ? 'Connection error' : 'No service detected'}
-                </div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground">
-                  {state === 'error'
-                    ? 'Check your configuration and ensure the Backplane service is reachable.'
-                    : 'No FINOS Backplane was found in the scanned range. Start a Backplane instance or adjust the port range in Configuration.'}
-                </div>
-                {lastError && <div className="mt-1 font-mono text-[11px] text-[color:var(--shell-negative)]">{lastError}</div>}
-              </div>
-              <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onScan} className="shrink-0">
-                Retry
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3">
-              <Link2 className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <div className="text-xs font-bold text-muted-foreground">Discovery is disabled</div>
-                <div className="text-[11px] text-muted-foreground">Go to Configuration, enable auto-discovery, and scan to connect.</div>
-              </div>
-            </div>
-          )}
-
-          {/* Metrics row */}
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <div className="rounded-lg border bg-[color:rgba(255,255,255,0.025)] p-3">
-              <div className="text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">Last scan</div>
-              <div className="mt-1 text-sm font-black text-foreground">{formatTime(lastCheckedAt)}</div>
-            </div>
-            <div className="rounded-lg border bg-[color:rgba(255,255,255,0.025)] p-3">
-              <div className="text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">Candidates</div>
-              <div className="mt-1 text-sm font-black text-foreground">{candidates.length > 0 ? candidates.length : '—'}</div>
-            </div>
-            <div className="rounded-lg border bg-[color:rgba(255,255,255,0.025)] p-3">
-              <div className="text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">Provider</div>
-              <div className="mt-1 truncate text-sm font-black text-foreground">FINOS Backplane</div>
-            </div>
+          <div className={cn(
+            'text-sm font-black',
+            state === 'available' ? 'text-[color:var(--shell-positive)]' : state === 'error' || state === 'unavailable' ? 'text-[color:var(--shell-negative)]' : 'text-foreground',
+          )}>
+            {stateLabel(state)}
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* ── Detected endpoints ──────────────────────────────────────────── */}
-      <Card>
-        <CardHeader className="flex-row items-center gap-3 border-b py-3">
+        {/* Connected endpoint */}
+        <div className="flex min-w-0 flex-col gap-1 rounded-lg border bg-[color:rgba(255,255,255,0.025)] p-3">
+          <div className="text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">Endpoint</div>
+          <div className="truncate text-sm font-black text-foreground">
+            {selected?.endpointUrl ?? '—'}
+          </div>
+        </div>
+
+        {/* Latency */}
+        <div className="flex min-w-0 flex-col gap-1 rounded-lg border bg-[color:rgba(255,255,255,0.025)] p-3">
+          <div className="text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">Latency</div>
+          <div className={cn(
+            'text-sm font-black',
+            selected ? (selected.latencyMs < 20 ? 'text-[color:var(--shell-positive)]' : selected.latencyMs < 100 ? 'text-amber-400' : 'text-[color:var(--shell-negative)]') : 'text-foreground',
+          )}>
+            {selected ? `${selected.latencyMs} ms` : '—'}
+          </div>
+        </div>
+
+        {/* Last scan */}
+        <div className="flex min-w-0 flex-col gap-1 rounded-lg border bg-[color:rgba(255,255,255,0.025)] p-3">
+          <div className="text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">Last scan</div>
+          <div className="truncate text-sm font-black text-foreground">{formatTime(lastCheckedAt)}</div>
+        </div>
+      </div>
+
+      {/* ── Connection detail / error banner ──────────────────────────── */}
+      {(state === 'available' && selected) ? (
+        <div className="flex shrink-0 items-center gap-3 rounded-lg border border-[color:color-mix(in_srgb,var(--shell-positive)_35%,transparent)] bg-[color:color-mix(in_srgb,var(--shell-positive)_6%,transparent)] px-3 py-2">
+          <CheckCircle2 className="size-4 shrink-0 text-[color:var(--shell-positive)]" />
+          <div className="min-w-0 flex-1 text-[11px] text-muted-foreground">
+            Connected · <code className="font-bold text-foreground">{selected.endpointUrl}</code>
+            <span className="ml-2 text-muted-foreground/60">— Bridge readiness reported via <code>fdc3.getInfo()</code></span>
+          </div>
+          <Badge variant="success" className="shrink-0">{candidates.length} candidate{candidates.length === 1 ? '' : 's'}</Badge>
+        </div>
+      ) : (state === 'error' || state === 'unavailable') ? (
+        <div className="flex shrink-0 items-center gap-3 rounded-lg border border-[color:color-mix(in_srgb,var(--shell-negative)_35%,transparent)] bg-[color:color-mix(in_srgb,var(--shell-negative)_6%,transparent)] px-3 py-2">
+          <TriangleAlert className="size-4 shrink-0 text-[color:var(--shell-negative)]" />
+          <div className="min-w-0 flex-1 text-[11px] text-muted-foreground">
+            {lastError ?? (state === 'unavailable' ? 'No FINOS Backplane found — start a local instance or check Configuration.' : 'Connection error — verify host and port range in Configuration.')}
+          </div>
+          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onScan} className="shrink-0">Retry</Button>
+        </div>
+      ) : state === 'scanning' || isScanning ? (
+        <div className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2">
+          <Radio className="size-3.5 shrink-0 animate-pulse text-primary" />
+          <span className="text-[11px] text-muted-foreground">Probing configured host and port range…</span>
+        </div>
+      ) : (
+        <div className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2">
+          <Link2 className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="text-[11px] text-muted-foreground">Discovery disabled — enable auto-discovery in <strong className="text-foreground">Configuration</strong> and scan to connect.</span>
+        </div>
+      )}
+
+      {/* ── Detected endpoints table ───────────────────────────────────── */}
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <CardHeader className="shrink-0 flex-row items-center gap-3 border-b py-3">
           <div className="flex items-center gap-1.5">
             <CardTitle className="text-sm">Detected Endpoints</CardTitle>
-            <InfoTip tip="All Backplane service endpoints found during the last scan. The selected endpoint is the one this shell is actively using. Latency is the round-trip probe time." />
+            <InfoTip tip="All Backplane endpoints found during the last scan. The selected endpoint is the one this shell is actively using. Latency is the round-trip probe time." />
           </div>
           <div className="ml-auto flex items-center gap-2">
             <span className="text-[11px] text-muted-foreground">{candidates.length} found</span>
@@ -378,13 +365,13 @@ function MonitorSection({ current, isScanning, busy, onScan }: MonitorSectionPro
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="scrollbar-thin min-h-0 flex-1 overflow-auto p-0">
           {candidates.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-6 py-8 text-center">
               <p className="text-xs text-muted-foreground">
-                {current.state === 'disabled'
+                {state === 'disabled'
                   ? 'Enable auto-discovery in Configuration and scan to find local Backplane services.'
-                  : 'No Backplane endpoints were found in the last scan. Make sure a FINOS Backplane instance is running on the configured host and port.'}
+                  : 'No endpoints found in the last scan. Ensure a FINOS Backplane instance is running on the configured host and port.'}
               </p>
             </div>
           ) : (
@@ -421,7 +408,7 @@ function MonitorSection({ current, isScanning, busy, onScan }: MonitorSectionPro
           )}
         </CardContent>
       </Card>
-    </div>
+    </>
   );
 }
 
@@ -721,7 +708,7 @@ function ProfilesSection({
 
 export function Bridge(): JSX.Element {
   const api = getBridgeApi();
-  const [section, setSection] = useState<BridgeSection>('monitor');
+  const [section, setSection] = useState<BridgeSection>('configuration');
   const [status, setStatus] = useState<BridgeStatus | null>(null);
   const [form, setForm] = useState<BridgeSettings>(DEFAULT_SETTINGS);
   const [busy, setBusy] = useState(false);
@@ -870,12 +857,22 @@ export function Bridge(): JSX.Element {
           }
         />
 
+        {/* ── Monitor strip (always visible at top) ──────────────────────── */}
+        <div className="flex shrink-0 flex-col gap-2">
+          <MonitorSection
+            current={current}
+            isScanning={isScanning}
+            busy={busy}
+            onScan={scan}
+          />
+        </div>
+
+        {/* ── Sidebar + section content below ────────────────────────────── */}
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          {/* ── Left sidebar nav ─────────────────────────────────────────── */}
+          {/* Left sidebar */}
           <nav className="flex w-44 shrink-0 flex-col gap-0.5 overflow-y-auto border-r bg-card p-1.5">
             <div className="px-2 pb-1 pt-2">
-              <div className="text-xs font-black text-foreground">Bridge</div>
-              <div className="text-[10px] text-muted-foreground">FINOS Backplane</div>
+              <div className="text-xs font-black text-foreground">Settings</div>
             </div>
             {NAV.map(({ id, label }) => (
               <Button
@@ -887,16 +884,6 @@ export function Bridge(): JSX.Element {
                 className={cn('w-full justify-start gap-2', section !== id && 'text-muted-foreground')}
               >
                 <span className="flex-1 text-left">{label}</span>
-                {id === 'monitor' && current.state !== 'disabled' && (
-                  <span className={cn(
-                    'size-1.5 shrink-0 rounded-full',
-                    current.state === 'available'
-                      ? (section === id ? 'bg-white/70' : 'bg-[color:var(--shell-positive)]')
-                      : current.state === 'error' || current.state === 'unavailable'
-                        ? (section === id ? 'bg-white/70' : 'bg-[color:var(--shell-negative)]')
-                        : (section === id ? 'bg-white/70' : 'bg-primary'),
-                  )} />
-                )}
                 {id === 'configuration' && dirty && (
                   <span className={cn('size-1.5 shrink-0 rounded-full', section === id ? 'bg-white/70' : 'bg-amber-400')} />
                 )}
@@ -909,16 +896,8 @@ export function Bridge(): JSX.Element {
             ))}
           </nav>
 
-          {/* ── Main content ──────────────────────────────────────────────── */}
+          {/* Section content */}
           <div className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4">
-            {section === 'monitor' && (
-              <MonitorSection
-                current={current}
-                isScanning={isScanning}
-                busy={busy}
-                onScan={scan}
-              />
-            )}
             {section === 'configuration' && (
               <ConfigSection
                 form={form}
