@@ -6,7 +6,8 @@ import { DashboardHeader, DashboardPage, StatusBadge } from './ui/dashboard.js';
 import { Input } from './ui/input.js';
 import { Switch } from './ui/switch.js';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip.js';
-import { AlertCircle, ArrowRight, BookOpen, CheckCircle2, Code2, Info, Link2, Pencil, Radio, TriangleAlert, Trash2, Zap } from 'lucide-react';
+import { AlertCircle, BookOpen, CheckCircle2, Code2, Info, Link2, Pencil, Radio, TriangleAlert, Trash2, Zap } from 'lucide-react';
+import { MermaidDiagram } from './ui/mermaid.js';
 import { cn } from '../lib/utils.js';
 
 // ─── Local types ───────────────────────────────────────────────────────────────
@@ -734,32 +735,6 @@ function GuideStep({ n, title, children }: { n: number; title: string; children:
   );
 }
 
-function ArchNode({
-  label,
-  sublabel,
-  tone = 'default',
-}: {
-  label: string;
-  sublabel?: string;
-  tone?: 'default' | 'accent' | 'bridge';
-}): JSX.Element {
-  return (
-    <div className={cn(
-      'flex min-w-0 flex-col items-center gap-1 rounded-lg border px-3 py-2 text-center',
-      tone === 'accent' && 'border-[color:var(--shell-accent-border)] bg-[color:var(--shell-accent-soft)]',
-      tone === 'bridge' && 'border-[color:color-mix(in_srgb,var(--shell-positive)_40%,transparent)] bg-[color:color-mix(in_srgb,var(--shell-positive)_8%,transparent)]',
-      tone === 'default' && 'border-border bg-muted/30',
-    )}>
-      <span className={cn(
-        'text-[11px] font-black',
-        tone === 'accent' && 'text-[color:var(--shell-accent-text)]',
-        tone === 'bridge' && 'text-[color:var(--shell-positive)]',
-        tone === 'default' && 'text-foreground',
-      )}>{label}</span>
-      {sublabel && <span className="text-[10px] text-muted-foreground">{sublabel}</span>}
-    </div>
-  );
-}
 
 function GuideSection(): JSX.Element {
   return (
@@ -785,36 +760,24 @@ function GuideSection(): JSX.Element {
             The bridge acts as a <strong className="text-foreground">neutral hub</strong> that routes FDC3 messages between them.
           </p>
 
-          {/* Architecture diagram */}
-          <div className="mt-4 rounded-lg border border-border bg-muted/10 p-4">
-            <div className="mb-3 text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">Topology</div>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <div className="flex flex-col gap-2">
-                <ArchNode label="Bloomberg Terminal" sublabel="FDC3 Desktop Agent" />
-                <ArchNode label="Mobile App" sublabel="FDC3 Desktop Agent" />
-                <ArchNode label="Your Shell" sublabel="FDC3 Desktop Agent" tone="accent" />
-              </div>
-              <div className="flex flex-col items-center gap-1 px-2">
-                <ArrowRight className="size-4 text-muted-foreground/50" />
-                <ArrowRight className="size-4 text-muted-foreground/50" />
-                <ArrowRight className="size-4 text-muted-foreground/50" />
-              </div>
-              <ArchNode label="FINOS Backplane" sublabel="Desktop Agent Bridge" tone="bridge" />
-              <div className="flex flex-col items-center gap-1 px-2">
-                <ArrowRight className="size-4 rotate-180 text-muted-foreground/50" />
-                <ArrowRight className="size-4 rotate-180 text-muted-foreground/50" />
-                <ArrowRight className="size-4 rotate-180 text-muted-foreground/50" />
-              </div>
-              <div className="flex flex-col gap-2">
-                <ArchNode label="fdc3.broadcast()" sublabel="context flows" />
-                <ArchNode label="fdc3.raiseIntent()" sublabel="intents route" />
-                <ArchNode label="fdc3.getInfo()" sublabel="bridge reported" />
-              </div>
-            </div>
-            <p className="mt-3 text-center text-[10px] text-muted-foreground">
-              Every Desktop Agent connects to the bridge. FDC3 messages are routed across all of them transparently.
-            </p>
-          </div>
+          <MermaidDiagram
+            className="mt-4"
+            caption="Topology"
+            definition={`
+flowchart LR
+    BBG["Bloomberg Terminal\\nFDC3 Desktop Agent"]
+    MOB["Mobile App\\nFDC3 Desktop Agent"]
+    SHL["Your Shell\\nFDC3 Desktop Agent"]
+    BRP(["FINOS Backplane\\nBridge Hub"])
+
+    BBG -->|WebSocket| BRP
+    MOB -->|WebSocket| BRP
+    SHL -->|WebSocket| BRP
+    BRP -->|broadcast| BBG
+    BRP -->|broadcast| MOB
+    BRP -->|broadcast| SHL
+            `.trim()}
+          />
         </CardContent>
       </Card>
 
@@ -873,35 +836,25 @@ function GuideSection(): JSX.Element {
             no user action required, no custom API calls between the two apps.
           </p>
 
-          {/* Message flow */}
-          <div className="mt-4 overflow-x-auto rounded-lg border border-border bg-muted/10 p-4">
-            <div className="mb-2 text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">Message flow</div>
-            <div className="flex min-w-max items-center gap-2 text-[11px]">
-              <div className="rounded border border-border bg-muted/30 px-2.5 py-1.5 font-bold text-foreground">Bloomberg Terminal</div>
-              <div className="flex flex-col items-center gap-0.5">
-                <ArrowRight className="size-3.5 text-muted-foreground/50" />
-                <span className="text-[10px] text-muted-foreground">fdc3.broadcast()</span>
-              </div>
-              <div className="rounded border border-border bg-muted/30 px-2.5 py-1.5 font-bold text-foreground">Bloomberg DA</div>
-              <div className="flex flex-col items-center gap-0.5">
-                <ArrowRight className="size-3.5 text-muted-foreground/50" />
-                <span className="text-[10px] text-muted-foreground">WebSocket</span>
-              </div>
-              <div className="rounded border border-[color:color-mix(in_srgb,var(--shell-positive)_40%,transparent)] bg-[color:color-mix(in_srgb,var(--shell-positive)_8%,transparent)] px-2.5 py-1.5 font-bold text-[color:var(--shell-positive)]">
-                FINOS Backplane
-              </div>
-              <div className="flex flex-col items-center gap-0.5">
-                <ArrowRight className="size-3.5 text-muted-foreground/50" />
-                <span className="text-[10px] text-muted-foreground">WebSocket</span>
-              </div>
-              <div className="rounded border border-[color:var(--shell-accent-border)] bg-[color:var(--shell-accent-soft)] px-2.5 py-1.5 font-bold text-[color:var(--shell-accent-text)]">Your Shell</div>
-              <div className="flex flex-col items-center gap-0.5">
-                <ArrowRight className="size-3.5 text-muted-foreground/50" />
-                <span className="text-[10px] text-muted-foreground">route</span>
-              </div>
-              <div className="rounded border border-border bg-muted/30 px-2.5 py-1.5 font-bold text-foreground">Mobile App</div>
-            </div>
-          </div>
+          <MermaidDiagram
+            className="mt-4"
+            caption="Message flow"
+            definition={`
+sequenceDiagram
+    participant BT as Bloomberg Terminal
+    participant BD as Bloomberg DA
+    participant BP as FINOS Backplane
+    participant YS as Your Shell
+    participant MA as Mobile App
+
+    BT->>BD: fdc3.broadcast(fdc3.instrument)
+    BD->>BP: BroadcastRequest (WebSocket)
+    BP->>YS: BroadcastRequest (WebSocket)
+    BP->>MA: BroadcastRequest (WebSocket)
+    MA-->>MA: addContextListener fires
+    YS-->>YS: addContextListener fires
+            `.trim()}
+          />
 
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
             <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
