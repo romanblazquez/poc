@@ -4,9 +4,8 @@ import {
   BarChart3,
   Workflow,
   Radio,
-  CloudDownload,
+  AppWindow,
   Network,
-  BookOpen,
   Globe,
   Grid3x3,
   ShieldCheck,
@@ -22,9 +21,8 @@ type WorkspaceMode =
   | 'interop-flow'
   | 'control-tower'
   | 'inspector'
-  | 'manager'
+  | 'apps'
   | 'bridge'
-  | 'app-directory'
   | 'environment'
   | 'rbac';
 
@@ -44,14 +42,13 @@ const MODE_ITEM_DEFS: Array<{
   { mode: 'workspace',     label: 'Workspace',     icon: LayoutDashboard, shortcutKey: '1' },
   { mode: 'dashboard',     label: 'WS Dashboard',  icon: BarChart3 },
   { mode: 'interop-flow',  label: 'Flow Designer',  icon: Workflow,        shortcutKey: '2' },
-  { mode: 'control-tower', label: 'Control Tower', icon: Radio,           shortcutKey: '3' },
-  { mode: 'inspector',     label: 'Inspector',      icon: ScanLine,        shortcutKey: '6' },
-  { mode: 'manager',       label: 'Manager',        icon: CloudDownload,   shortcutKey: '4' },
-  { mode: 'bridge',        label: 'Bridge',         icon: Network,         shortcutKey: '5' },
-  { mode: 'app-directory', label: 'App Directory',  icon: BookOpen },
-  { mode: 'environment',   label: 'Environments',   icon: Globe },
-  { mode: 'launcher',      label: 'App Launcher',   icon: Grid3x3,         shortcutKey: '0' },
-  { mode: 'rbac',          label: 'RBAC',           icon: ShieldCheck },
+  { mode: 'control-tower', label: 'Control Tower',  icon: Radio,           shortcutKey: '3' },
+  { mode: 'inspector',     label: 'Inspector',       icon: ScanLine,        shortcutKey: '6' },
+  { mode: 'apps',          label: 'Apps',            icon: AppWindow,       shortcutKey: '4' },
+  { mode: 'bridge',        label: 'Bridge',          icon: Network,         shortcutKey: '5' },
+  { mode: 'environment',   label: 'Environments',    icon: Globe },
+  { mode: 'launcher',      label: 'App Launcher',    icon: Grid3x3,         shortcutKey: '0' },
+  { mode: 'rbac',          label: 'RBAC',            icon: ShieldCheck },
 ];
 
 export function ShellSidebar({ activeMode, onModeChange, expanded }: ShellSidebarProps) {

@@ -7,11 +7,10 @@ import { TopBar } from './components/TopBar.js';
 import { NotificationsCenter } from './components/NotificationsCenter.js';
 import { HotkeyHelp } from './components/HotkeyHelp.js';
 import { IntentResolverDialog } from './components/IntentResolverDialog.js';
-import { AppDirectoryEditor } from './components/AppDirectoryEditor.js';
+import { AppCatalog } from './components/AppCatalog.js';
 import { DockviewWorkspace } from './components/DockviewWorkspace.js';
 import type { DetachedWorkspacePayload, DisplayInfo, DockviewWorkspaceHandle } from './components/DockviewWorkspace.js';
 import { ControlTower } from './components/ControlTower.js';
-import { Manager } from './components/Manager.js';
 import { Bridge } from './components/Bridge.js';
 import { Environments } from './components/Environments.js';
 import { Badge } from './components/ui/badge.js';
@@ -87,7 +86,7 @@ export interface AppEntry {
 
 type ThemeMode = ThemeName;
 type SidebarPosition = 'left' | 'right' | 'bottom';
-export type WorkspaceMode = 'launcher' | 'workspace' | 'dashboard' | 'interop-flow' | 'control-tower' | 'inspector' | 'manager' | 'bridge' | 'app-directory' | 'environment' | 'rbac';
+export type WorkspaceMode = 'launcher' | 'workspace' | 'dashboard' | 'interop-flow' | 'control-tower' | 'inspector' | 'apps' | 'bridge' | 'environment' | 'rbac';
 
 export interface WorkspaceState {
   channelId: string | null;
@@ -474,7 +473,7 @@ export function App() {
         '1': 'workspace',
         '2': 'interop-flow',
         '3': 'control-tower',
-        '4': 'manager',
+        '4': 'apps',
         '5': 'bridge',
         '6': 'inspector',
         '0': 'launcher',
@@ -1028,12 +1027,10 @@ export function App() {
               />
             ) : activeMode === 'inspector' ? (
               <ContextInspector />
-            ) : activeMode === 'manager' ? (
-              <Manager apps={apps} />
+            ) : activeMode === 'apps' ? (
+              <AppCatalog apps={apps} onAppsChanged={setApps} />
             ) : activeMode === 'bridge' ? (
               <Bridge />
-            ) : activeMode === 'app-directory' ? (
-              <AppDirectoryEditor apps={apps} onAppsChanged={setApps} />
             ) : activeMode === 'environment' ? (
               <Environments />
             ) : activeMode === 'rbac' ? (
