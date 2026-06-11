@@ -47,7 +47,7 @@ const MODE_ITEM_DEFS: Array<{
   { mode: 'apps',          label: 'Apps',            icon: AppWindow,       shortcutKey: '4' },
   { mode: 'bridge',        label: 'Bridge',          icon: Network,         shortcutKey: '5' },
   { mode: 'environment',   label: 'Environments',    icon: Globe },
-  { mode: 'launcher',      label: 'App Launcher',    icon: Grid3x3,         shortcutKey: '0' },
+  { mode: 'launcher',      label: 'Launch',           icon: Grid3x3,         shortcutKey: '0' },
   { mode: 'rbac',          label: 'RBAC',            icon: ShieldCheck },
 ];
 
