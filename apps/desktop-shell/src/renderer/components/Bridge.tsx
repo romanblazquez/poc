@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js';
@@ -6,14 +6,14 @@ import { DashboardHeader, DashboardPage, StatusBadge } from './ui/dashboard.js';
 import { Input } from './ui/input.js';
 import { Switch } from './ui/switch.js';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip.js';
-import { CheckCircle2, Info, Link2, Pencil, Radio, TriangleAlert, Trash2, Zap } from 'lucide-react';
+import { AlertCircle, ArrowRight, BookOpen, CheckCircle2, Code2, Info, Link2, Pencil, Radio, TriangleAlert, Trash2, Zap } from 'lucide-react';
 import { cn } from '../lib/utils.js';
 
 // ─── Local types ───────────────────────────────────────────────────────────────
 
 type BridgeProvider = 'finos-backplane';
 type BridgeStatusState = 'disabled' | 'scanning' | 'available' | 'unavailable' | 'error';
-type BridgeSection = 'configuration' | 'profiles';
+type BridgeSection = 'configuration' | 'profiles' | 'guide';
 
 interface BridgeProfile {
   id: string;
@@ -87,6 +87,7 @@ const EMPTY_PROFILE_FORM: Omit<BridgeProfile, 'id'> = {
 const NAV: { id: BridgeSection; label: string }[] = [
   { id: 'configuration', label: 'Configuration' },
   { id: 'profiles',      label: 'Profiles' },
+  { id: 'guide',         label: 'How it works' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -704,6 +705,279 @@ function ProfilesSection({
   );
 }
 
+// ─── Section: Guide ───────────────────────────────────────────────────────────
+
+function GuidePill({ label }: { label: string }): JSX.Element {
+  return (
+    <span className="inline-flex items-center rounded-md border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-bold text-foreground">
+      {label}
+    </span>
+  );
+}
+
+function GuideStep({ n, title, children }: { n: number; title: string; children: React.ReactNode }): JSX.Element {
+  return (
+    <div className="flex gap-3">
+      <div className="flex size-6 shrink-0 items-center justify-center rounded-full border border-border bg-muted/40 text-[11px] font-black text-muted-foreground">
+        {n}
+      </div>
+      <div className="min-w-0 flex-1 pb-4">
+        <div className="text-xs font-black text-foreground">{title}</div>
+        <div className="mt-1 text-[11px] leading-5 text-muted-foreground">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function ArchNode({
+  label,
+  sublabel,
+  tone = 'default',
+}: {
+  label: string;
+  sublabel?: string;
+  tone?: 'default' | 'accent' | 'bridge';
+}): JSX.Element {
+  return (
+    <div className={cn(
+      'flex min-w-0 flex-col items-center gap-1 rounded-lg border px-3 py-2 text-center',
+      tone === 'accent' && 'border-[color:var(--shell-accent-border)] bg-[color:var(--shell-accent-soft)]',
+      tone === 'bridge' && 'border-[color:color-mix(in_srgb,var(--shell-positive)_40%,transparent)] bg-[color:color-mix(in_srgb,var(--shell-positive)_8%,transparent)]',
+      tone === 'default' && 'border-border bg-muted/30',
+    )}>
+      <span className={cn(
+        'text-[11px] font-black',
+        tone === 'accent' && 'text-[color:var(--shell-accent-text)]',
+        tone === 'bridge' && 'text-[color:var(--shell-positive)]',
+        tone === 'default' && 'text-foreground',
+      )}>{label}</span>
+      {sublabel && <span className="text-[10px] text-muted-foreground">{sublabel}</span>}
+    </div>
+  );
+}
+
+function GuideSection(): JSX.Element {
+  return (
+    <div className="grid gap-4">
+
+      {/* ── What is the Bridge ───────────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="border-b py-3">
+          <div className="flex items-center gap-2">
+            <BookOpen className="size-4 shrink-0 text-muted-foreground" />
+            <CardTitle className="text-sm">What is the Desktop Agent Bridge?</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            The <strong className="text-foreground">FINOS Desktop Agent Bridge (DAB)</strong> is an open standard for connecting
+            multiple independent FDC3-enabled applications running on the same machine or across a local network —
+            even when they are built by different vendors using different technologies.
+          </p>
+          <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+            Without a bridge, each Desktop Agent is an island: your shell knows about its own apps, Bloomberg knows about its own,
+            and they cannot share context or raise intents with each other.
+            The bridge acts as a <strong className="text-foreground">neutral hub</strong> that routes FDC3 messages between them.
+          </p>
+
+          {/* Architecture diagram */}
+          <div className="mt-4 rounded-lg border border-border bg-muted/10 p-4">
+            <div className="mb-3 text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">Topology</div>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <div className="flex flex-col gap-2">
+                <ArchNode label="Bloomberg Terminal" sublabel="FDC3 Desktop Agent" />
+                <ArchNode label="Mobile App" sublabel="FDC3 Desktop Agent" />
+                <ArchNode label="Your Shell" sublabel="FDC3 Desktop Agent" tone="accent" />
+              </div>
+              <div className="flex flex-col items-center gap-1 px-2">
+                <ArrowRight className="size-4 text-muted-foreground/50" />
+                <ArrowRight className="size-4 text-muted-foreground/50" />
+                <ArrowRight className="size-4 text-muted-foreground/50" />
+              </div>
+              <ArchNode label="FINOS Backplane" sublabel="Desktop Agent Bridge" tone="bridge" />
+              <div className="flex flex-col items-center gap-1 px-2">
+                <ArrowRight className="size-4 rotate-180 text-muted-foreground/50" />
+                <ArrowRight className="size-4 rotate-180 text-muted-foreground/50" />
+                <ArrowRight className="size-4 rotate-180 text-muted-foreground/50" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <ArchNode label="fdc3.broadcast()" sublabel="context flows" />
+                <ArchNode label="fdc3.raiseIntent()" sublabel="intents route" />
+                <ArchNode label="fdc3.getInfo()" sublabel="bridge reported" />
+              </div>
+            </div>
+            <p className="mt-3 text-center text-[10px] text-muted-foreground">
+              Every Desktop Agent connects to the bridge. FDC3 messages are routed across all of them transparently.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Who is it for ───────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="border-b py-3">
+          <CardTitle className="text-sm">Who is this for?</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[
+              {
+                role: 'Desktop integration developers',
+                detail: 'Building workflows that span a Bloomberg Terminal, a trading system, an order ticket, and a risk dashboard — all from different vendors.',
+              },
+              {
+                role: 'Platform / DX teams',
+                detail: 'Adopting FDC3 across the firm and needing apps from multiple providers to interoperate without custom point-to-point integrations.',
+              },
+              {
+                role: 'Vendor SDK developers',
+                detail: 'Adding DAB client support to an existing application so it can participate in a shared FDC3 desktop environment.',
+              },
+              {
+                role: 'QA / conformance testers',
+                detail: 'Verifying that context broadcast and intent routing work correctly when multiple Desktop Agents are bridged together.',
+              },
+            ].map(({ role, detail }) => (
+              <div key={role} className="flex gap-2 rounded-lg border border-border bg-muted/20 p-3">
+                <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-[color:var(--shell-positive)]" />
+                <div>
+                  <div className="text-[11px] font-black text-foreground">{role}</div>
+                  <div className="mt-0.5 text-[11px] leading-4 text-muted-foreground">{detail}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Bloomberg + Mobile example ───────────────────────────────────── */}
+      <Card>
+        <CardHeader className="border-b py-3">
+          <CardTitle className="text-sm">Example: Bloomberg Terminal + Mobile App</CardTitle>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            A real-world interop scenario — two completely different providers, one shared context.
+          </p>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            A trader clicks a security in <strong className="text-foreground">Bloomberg Terminal</strong>.
+            Bloomberg broadcasts an <GuidePill label="fdc3.instrument" /> context with ticker <GuidePill label="AAPL:US" />.
+            That message travels through the FINOS Backplane to <strong className="text-foreground">your shell</strong>,
+            which forwards it to the mobile app's Desktop Agent.
+            The <strong className="text-foreground">mobile app</strong> receives the instrument and loads a real-time chart —
+            no user action required, no custom API calls between the two apps.
+          </p>
+
+          {/* Message flow */}
+          <div className="mt-4 overflow-x-auto rounded-lg border border-border bg-muted/10 p-4">
+            <div className="mb-2 text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">Message flow</div>
+            <div className="flex min-w-max items-center gap-2 text-[11px]">
+              <div className="rounded border border-border bg-muted/30 px-2.5 py-1.5 font-bold text-foreground">Bloomberg Terminal</div>
+              <div className="flex flex-col items-center gap-0.5">
+                <ArrowRight className="size-3.5 text-muted-foreground/50" />
+                <span className="text-[10px] text-muted-foreground">fdc3.broadcast()</span>
+              </div>
+              <div className="rounded border border-border bg-muted/30 px-2.5 py-1.5 font-bold text-foreground">Bloomberg DA</div>
+              <div className="flex flex-col items-center gap-0.5">
+                <ArrowRight className="size-3.5 text-muted-foreground/50" />
+                <span className="text-[10px] text-muted-foreground">WebSocket</span>
+              </div>
+              <div className="rounded border border-[color:color-mix(in_srgb,var(--shell-positive)_40%,transparent)] bg-[color:color-mix(in_srgb,var(--shell-positive)_8%,transparent)] px-2.5 py-1.5 font-bold text-[color:var(--shell-positive)]">
+                FINOS Backplane
+              </div>
+              <div className="flex flex-col items-center gap-0.5">
+                <ArrowRight className="size-3.5 text-muted-foreground/50" />
+                <span className="text-[10px] text-muted-foreground">WebSocket</span>
+              </div>
+              <div className="rounded border border-[color:var(--shell-accent-border)] bg-[color:var(--shell-accent-soft)] px-2.5 py-1.5 font-bold text-[color:var(--shell-accent-text)]">Your Shell</div>
+              <div className="flex flex-col items-center gap-0.5">
+                <ArrowRight className="size-3.5 text-muted-foreground/50" />
+                <span className="text-[10px] text-muted-foreground">route</span>
+              </div>
+              <div className="rounded border border-border bg-muted/30 px-2.5 py-1.5 font-bold text-foreground">Mobile App</div>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+            <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
+            <p className="text-[11px] leading-5 text-muted-foreground">
+              <strong className="text-foreground">This is not plug-and-play.</strong>{' '}
+              Bloomberg, the mobile app, and any other participant must each implement the DAB client protocol.
+              The bridge is the transport layer — it routes messages, it does not translate or adapt them.
+              Each Desktop Agent developer is responsible for connecting to the bridge and conforming to the FDC3 message contracts.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── What you need to build ───────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="border-b py-3">
+          <div className="flex items-center gap-2">
+            <Code2 className="size-4 shrink-0 text-muted-foreground" />
+            <CardTitle className="text-sm">What you need to develop</CardTitle>
+          </div>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Each party in the interop scenario has development responsibilities.
+          </p>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* For each participant */}
+            <div>
+              <div className="mb-3 text-[11px] font-black uppercase tracking-[0.05em] text-muted-foreground">Each Desktop Agent (Bloomberg, mobile, your shell)</div>
+              <div className="space-y-0.5">
+                <GuideStep n={1} title="Implement the DAB WebSocket client">
+                  Open a WebSocket connection to the FINOS Backplane on startup. Send <GuidePill label="WCP1Hello" /> with your FDC3 version and app identity. Handle <GuidePill label="WCP2LoadURL" /> and subsequent handshake messages.
+                </GuideStep>
+                <GuideStep n={2} title="Forward broadcasts through the bridge">
+                  When your app calls <GuidePill label="fdc3.broadcast()" />, your DA must relay the context message to the bridge in the DAB wire format, not just to local listeners.
+                </GuideStep>
+                <GuideStep n={3} title="Receive and deliver remote contexts">
+                  When the bridge delivers a context from a remote DA, route it to the correct local channel so your apps receive it as a native <GuidePill label="addContextListener" /> event.
+                </GuideStep>
+                <GuideStep n={4} title="Bridge intent resolution">
+                  When <GuidePill label="fdc3.raiseIntent()" /> finds no local resolver, query the bridge for remote resolvers. Handle the response and open the remote app if needed.
+                </GuideStep>
+              </div>
+            </div>
+
+            {/* Infrastructure */}
+            <div>
+              <div className="mb-3 text-[11px] font-black uppercase tracking-[0.05em] text-muted-foreground">Infrastructure &amp; shared contracts</div>
+              <div className="space-y-0.5">
+                <GuideStep n={5} title="Run a FINOS Backplane instance">
+                  Deploy the FINOS Backplane process on a machine accessible to all participants. For local development, <GuidePill label="nx serve backplane-stub" /> simulates it on <GuidePill label="ws://127.0.0.1:4475" />.
+                </GuideStep>
+                <GuideStep n={6} title="Agree on context types and channels">
+                  All apps must use the same FDC3 context types (<GuidePill label="fdc3.instrument" />, <GuidePill label="fdc3.contact" />, etc.) and channel names. Custom types need a shared schema.
+                </GuideStep>
+                <GuideStep n={7} title="App identity &amp; permissions">
+                  Each Desktop Agent registers its apps with the bridge. The bridge uses <GuidePill label="WCP5ValidateAppIdentity" /> to verify participants. You control which apps can communicate with which.
+                </GuideStep>
+                <GuideStep n={8} title="Test with the conformance suite">
+                  Run the <GuidePill label="fdc3-conformance" /> test app in this shell to verify your bridge integration against the official FINOS test vectors before connecting real apps.
+                </GuideStep>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-2 flex items-start gap-2 rounded-lg border border-border bg-muted/20 p-3">
+            <Info className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+            <p className="text-[11px] leading-5 text-muted-foreground">
+              The <strong className="text-foreground">FINOS Desktop Agent Bridge spec (DAB)</strong> is currently experimental (marked{' '}
+              <GuidePill label="@experimental" /> in FDC3 2.1). This shell reports <GuidePill label="DesktopAgentBridging: false" /> in{' '}
+              <GuidePill label="fdc3.getInfo()" /> until a standards-safe DAB implementation is added. The bridge scanner on this page
+              tracks readiness — use it to verify the Backplane is reachable before committing to the full integration work.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function Bridge(): JSX.Element {
@@ -892,6 +1166,9 @@ export function Bridge(): JSX.Element {
                     {profiles.length}
                   </span>
                 )}
+                {id === 'guide' && (
+                  <BookOpen className={cn('size-3 shrink-0', section === id ? 'opacity-70' : 'text-muted-foreground')} />
+                )}
               </Button>
             ))}
           </nav>
@@ -923,6 +1200,7 @@ export function Bridge(): JSX.Element {
                 saving={profileSaving}
               />
             )}
+            {section === 'guide' && <GuideSection />}
           </div>
         </div>
       </DashboardPage>
