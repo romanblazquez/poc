@@ -58,6 +58,7 @@ interface ManagerStatus {
     refreshIntervalMs: number;
     currentRole: string;
     telemetryEndpoint: string;
+    autoApply: boolean;
   };
   identity: {
     user: string;
@@ -154,6 +155,7 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
   const [draftInterval, setDraftInterval] = useState(0);
   const [draftRole, setDraftRole] = useState('default');
   const [draftTelemetry, setDraftTelemetry] = useState('');
+  const [draftAutoApply, setDraftAutoApply] = useState(false);
 
   // Initial fetch + live push subscription.
   useEffect(() => {
@@ -178,6 +180,7 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
     setDraftInterval(status.settings.refreshIntervalMs);
     setDraftRole(status.settings.currentRole);
     setDraftTelemetry(status.settings.telemetryEndpoint);
+    setDraftAutoApply(status.settings.autoApply ?? false);
   }, [status]);
 
   const settingsDirty = useMemo(() => {
@@ -186,9 +189,10 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
       draftUrl !== status.settings.directoryUrl ||
       draftInterval !== status.settings.refreshIntervalMs ||
       draftRole !== status.settings.currentRole ||
-      draftTelemetry !== status.settings.telemetryEndpoint
+      draftTelemetry !== status.settings.telemetryEndpoint ||
+      draftAutoApply !== (status.settings.autoApply ?? false)
     );
-  }, [draftUrl, draftInterval, draftRole, draftTelemetry, status]);
+  }, [draftUrl, draftInterval, draftRole, draftTelemetry, draftAutoApply, status]);
 
   const handleCheck = useCallback(async () => {
     if (!api) return;
@@ -234,6 +238,7 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
       refreshIntervalMs: Number(draftInterval) || 0,
       currentRole: draftRole,
       telemetryEndpoint: draftTelemetry.trim(),
+      autoApply: draftAutoApply,
     });
     setBusy(null);
     setActionMessage(
@@ -477,6 +482,39 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
                   onChange={(e) => setDraftTelemetry(e.target.value)}
                 />
               </Field>
+
+              <div className="flex flex-col gap-2 md:col-span-2">
+                <div className="text-[10px] font-black uppercase tracking-[0.07em] text-muted-foreground">Auto-apply updates</div>
+                <label className="flex cursor-pointer items-center gap-3">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={draftAutoApply}
+                    onClick={() => setDraftAutoApply((v) => !v)}
+                    className={cn(
+                      'relative h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none',
+                      draftAutoApply ? 'bg-primary' : 'bg-muted',
+                    )}
+                  >
+                    <span className={cn(
+                      'pointer-events-none block h-4 w-4 rounded-full bg-white shadow-md transition-transform',
+                      draftAutoApply ? 'translate-x-4' : 'translate-x-0',
+                    )} />
+                  </button>
+                  <span className="text-sm font-semibold text-foreground">
+                    {draftAutoApply ? 'On — updates applied automatically after each fetch' : 'Off — admin must review and apply updates manually'}
+                  </span>
+                </label>
+                {draftAutoApply && (
+                  <p className="text-[11px] font-bold text-amber-500">
+                    Warning: enabling auto-apply bypasses the diff review step. Only enable in environments where IT controls the directory URL and traders should always receive the latest catalogue without intervention.
+                  </p>
+                )}
+                <div className="text-[10px] font-bold text-muted-foreground">
+                  When off, a successful fetch that finds a diff surfaces an "Update available" banner — ops clicks Apply to push it to all users.
+                </div>
+              </div>
+
               <div className="flex justify-end gap-2 md:col-span-2">
                 <Button
                   onClick={() => {
@@ -485,6 +523,7 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
                     setDraftInterval(status.settings.refreshIntervalMs);
                     setDraftRole(status.settings.currentRole);
                     setDraftTelemetry(status.settings.telemetryEndpoint);
+                    setDraftAutoApply(status.settings.autoApply ?? false);
                   }}
                   disabled={!settingsDirty || busy === 'save'}
                   type="button"

@@ -445,6 +445,7 @@ export class IpcRouter {
     this.handleManagerApplyUpdate();
     this.handleManagerDismissUpdate();
     this.handleManagerUpdateSettings();
+    this.wireManagerAutoApply();
     this.handleNotificationsRaise();
     this.handleNotificationsList();
     this.handleNotificationsMarkRead();
@@ -621,6 +622,19 @@ export class IpcRouter {
     ipcMain.handle(IpcEvents.MANAGER_UPDATE_SETTINGS, (_event, patch: Partial<ManagerSettings>) => {
       if (!this.managerService) return null;
       return this.managerService.updateSettings(patch ?? {});
+    });
+  }
+
+  private wireManagerAutoApply(): void {
+    if (!this.managerService) return;
+    this.managerService.onAutoApply((apps) => {
+      this.replaceRuntimeAppDirectory(apps);
+      this.emitPlatformLog({
+        level: 'info',
+        category: 'config.manager',
+        message: `Directory auto-applied: ${apps.length} apps`,
+        data: { appCount: apps.length },
+      });
     });
   }
 
@@ -1748,6 +1762,23 @@ export class IpcRouter {
         message: `Environment activated: ${profile.name}`,
         data: { from: prevId, to: id, appCount: envApps?.length ?? 0, fetchedFromUrl },
       });
+
+      // Seed Manager directoryUrl from env profile if not already configured.
+      if (this.managerService && profile.appDirectoryUrl) {
+        const currentUrl = this.managerService.getSettings().directoryUrl;
+        if (!currentUrl) {
+          this.managerService.updateSettings({ directoryUrl: profile.appDirectoryUrl });
+          console.log(`[manager] seeded directoryUrl from env "${profile.name}": ${profile.appDirectoryUrl}`);
+        }
+      }
+
+      // Trigger a silent background check on env switch — no auto-apply unless the toggle is on.
+      if (this.managerService && this.managerService.getSettings().directoryUrl) {
+        void this.managerService.checkForUpdates().catch((e: unknown) => {
+          console.warn('[manager] background check on env activation failed', e);
+        });
+      }
+
       return { profile, appCount: envApps?.length ?? null, fetchedFromUrl };
     });
   }

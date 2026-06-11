@@ -41,6 +41,12 @@ export interface ManagerSettings {
    * Display-only for now (the full pillar will plumb the actual POST).
    */
   telemetryEndpoint: string;
+  /**
+   * When true, a successful fetch that produces a non-empty diff is immediately
+   * applied without waiting for an admin to click "Apply update".
+   * Requires ops sign-off before enabling in production environments.
+   */
+  autoApply: boolean;
 }
 
 /**

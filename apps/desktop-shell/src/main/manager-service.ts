@@ -25,6 +25,7 @@ import type { RemoteFetchResult } from './remote-directory.js';
  * polling.
  */
 export type ManagerStatusListener = (status: ManagerStatus) => void;
+export type ManagerAutoApplyListener = (apps: AppDefinition[]) => void;
 
 interface AvailableUpdate {
   file: AppDirectoryFile;
@@ -54,6 +55,7 @@ export class ManagerService {
   private available: AvailableUpdate | null = null;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
   private readonly listeners = new Set<ManagerStatusListener>();
+  private readonly autoApplyListeners = new Set<ManagerAutoApplyListener>();
   private readonly identity = {
     user: this.safeUserName(),
     host: os.hostname(),
@@ -93,6 +95,12 @@ export class ManagerService {
   subscribe(listener: ManagerStatusListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  /** Subscribe to auto-apply events (fires when autoApply=true and a diff is applied). */
+  onAutoApply(listener: ManagerAutoApplyListener): () => void {
+    this.autoApplyListeners.add(listener);
+    return () => this.autoApplyListeners.delete(listener);
   }
 
   /** Build the full snapshot the renderer + IPC expects. */
@@ -158,6 +166,7 @@ export class ManagerService {
       (result.file.directoryVersion ?? null) === (this.appliedFile.directoryVersion ?? null);
     if (same) {
       this.available = null;
+      this.emit();
     } else {
       this.available = {
         file: result.file,
@@ -168,8 +177,17 @@ export class ManagerService {
         appCount: result.file.applications.length,
         diff,
       };
+      if (this.settingsStore.get().autoApply) {
+        const applyResult = this.applyAvailable();
+        if (applyResult.applied) {
+          for (const l of this.autoApplyListeners) {
+            try { l(this.appliedFile.applications); } catch { /* ignore */ }
+          }
+        }
+      } else {
+        this.emit();
+      }
     }
-    this.emit();
     return result;
   }
 

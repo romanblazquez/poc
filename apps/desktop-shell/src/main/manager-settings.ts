@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS: ManagerSettings = {
   refreshIntervalMs: 0,
   currentRole: 'default',
   telemetryEndpoint: '',
+  autoApply: false,
 };
 
 /**
