@@ -2,6 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { Button } from './ui/button.js';
 import { Input } from './ui/input.js';
 import { AlertTriangle, CheckCircle2, Globe, Layers, Lock, Server, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
+import { JsonSampleButton } from './JsonSampleButton.js';
+import { SAMPLES } from '../samples.js';
 
 interface EnvironmentProfile {
   id: string;
@@ -184,6 +186,7 @@ export function SetupWizard({ env, onComplete, onSkip }: SetupWizardProps): Reac
                     placeholder="https://apps.firm.internal/app-directory.json"
                     className="h-9 font-mono text-xs"
                   />
+                  <JsonSampleButton {...SAMPLES.appDirectory} />
                   <Button
                     type="button"
                     size="sm"

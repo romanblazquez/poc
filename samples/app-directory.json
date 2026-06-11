@@ -1,0 +1,56 @@
+[
+  {
+    "appId": "order-blotter",
+    "title": "Order Blotter",
+    "description": "Real-time view of all open and filled orders for the current session.",
+    "url": "https://apps.firm.internal/order-blotter",
+    "devPort": 4010,
+    "icon": "📋",
+    "category": "Trading",
+    "listensForContexts": ["fdc3.instrument", "fdc3.order"],
+    "intents": [
+      {
+        "intent": "ViewOrders",
+        "contextTypes": ["fdc3.instrument"],
+        "appId": "order-blotter",
+        "displayName": "View Orders"
+      }
+    ],
+    "capabilities": {
+      "broadcasts": ["fdc3.order"],
+      "listensTo": ["fdc3.instrument"],
+      "raisesIntents": [],
+      "handlesIntents": ["ViewOrders"]
+    }
+  },
+  {
+    "appId": "market-watch",
+    "title": "Market Watch",
+    "description": "Live price feed with configurable watchlist and alerts.",
+    "url": "https://apps.firm.internal/market-watch",
+    "devPort": 4011,
+    "icon": "📈",
+    "category": "Markets",
+    "listensForContexts": [],
+    "intents": [
+      {
+        "intent": "ViewInstrument",
+        "contextTypes": ["fdc3.instrument"],
+        "appId": "market-watch",
+        "displayName": "View in Market Watch"
+      },
+      {
+        "intent": "ViewChart",
+        "contextTypes": ["fdc3.instrument"],
+        "appId": "market-watch",
+        "displayName": "View Chart"
+      }
+    ],
+    "capabilities": {
+      "broadcasts": ["fdc3.instrument"],
+      "listensTo": [],
+      "raisesIntents": ["ViewOrders"],
+      "handlesIntents": ["ViewInstrument", "ViewChart"]
+    }
+  }
+]

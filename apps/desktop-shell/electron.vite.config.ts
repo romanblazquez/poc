@@ -55,6 +55,7 @@ export default defineConfig({
         ...libAliases,
         '@fdc3-poc/shared-ui': resolve(libsRoot, 'shared-ui/src/index.ts'),
         '@': resolve(__dirname, 'src/renderer'),
+        '@samples': resolve(root, 'samples'),
       },
     },
     server: {

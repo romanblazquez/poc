@@ -2,6 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "baseUrl": ".",
+    "resolveJsonModule": true,
     "paths": {
       "@fdc3-poc/fdc3-core": ["../../libs/fdc3-core/src/index.ts"],
       "@fdc3-poc/app-registry": ["../../libs/app-registry/src/index.ts"],
@@ -11,9 +12,10 @@
       "@fdc3-poc/interop-electron-adapter": ["../../libs/interop-electron-adapter/src/index.ts"],
       "@fdc3-poc/shared-domain": ["../../libs/shared-domain/src/index.ts"],
       "@fdc3-poc/shared-ui": ["../../libs/shared-ui/src/index.ts"],
-      "@/*": ["src/renderer/*"]
+      "@/*": ["src/renderer/*"],
+      "@samples/*": ["../../samples/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "electron.vite.config.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "electron.vite.config.ts", "../../samples/**/*.json"],
   "exclude": ["node_modules", "out"]
 }

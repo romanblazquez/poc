@@ -7,6 +7,8 @@ import { Button } from './ui/button.js';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js';
 import { Input } from './ui/input.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select.js';
+import { JsonSampleButton } from './JsonSampleButton.js';
+import { SAMPLES } from '../samples.js';
 
 /**
  * Manager Console — the io.Manager-class central distribution + admin layer.
@@ -429,12 +431,15 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
             </CardHeader>
             <CardContent className="grid gap-4 pt-4 md:grid-cols-2">
               <Field label="Directory URL" description="HTTPS endpoint returning a JSON app-directory file. Leave empty to use the local bundle.">
-                <Input
-                  type="text"
-                  placeholder="https://directory.example.com/app-directory.json"
-                  value={draftUrl}
-                  onChange={(e) => setDraftUrl(e.target.value)}
-                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    placeholder="https://directory.example.com/app-directory.json"
+                    value={draftUrl}
+                    onChange={(e) => setDraftUrl(e.target.value)}
+                  />
+                  <JsonSampleButton {...SAMPLES.appDirectory} />
+                </div>
               </Field>
 
               <Field label="Refresh interval" description="How often to poll the remote. 'Off' = manual only.">

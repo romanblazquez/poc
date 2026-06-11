@@ -8,6 +8,8 @@ import { cn } from '../lib/utils.js';
 import { IconPicker } from './IconPicker.js';
 import { AppIcon } from './AppIcon.js';
 import { CloudDownload, X } from 'lucide-react';
+import { JsonSampleButton } from './JsonSampleButton.js';
+import { SAMPLES } from '../samples.js';
 
 interface AppDirectoryEditorProps {
   apps: AppEntry[];
@@ -487,6 +489,7 @@ export function AppDirectoryEditor({ apps, onAppsChanged }: AppDirectoryEditorPr
           placeholder="https://appd.firm.com/v2/apps  or  file.json"
           className="h-7 flex-1 font-mono text-xs"
         />
+        <JsonSampleButton {...SAMPLES.appDirectory} />
         <Button
           type="button"
           size="sm"

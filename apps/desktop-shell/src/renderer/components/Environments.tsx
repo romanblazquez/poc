@@ -6,6 +6,8 @@ import { Input } from './ui/input.js';
 import { Pencil, Trash2, CheckCircle2, RefreshCw, Lock, AlertTriangle, Settings2 } from 'lucide-react';
 import { SetupWizard } from './SetupWizard.js';
 import { EnvSwitchConfirm } from './EnvSwitchConfirm.js';
+import { JsonSampleButton } from './JsonSampleButton.js';
+import { SAMPLES } from '../samples.js';
 
 interface EnvironmentProfile {
   id: string;
@@ -172,7 +174,10 @@ export function Environments() {
       </div>
       <div>
         <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--shell-muted)', display: 'block', marginBottom: 4 }}>APP DIRECTORY URL <span style={{ color: 'var(--shell-subtle)', fontWeight: 400 }}>(optional — leave blank to use local saved copy)</span></label>
-        <Input value={form.appDirectoryUrl} onChange={(e) => setForm((f) => ({ ...f, appDirectoryUrl: e.target.value }))} placeholder="https://uat.firm.com/app-directory.json" className="h-8 text-sm" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Input value={form.appDirectoryUrl} onChange={(e) => setForm((f) => ({ ...f, appDirectoryUrl: e.target.value }))} placeholder="https://uat.firm.com/app-directory.json" className="h-8 text-sm" />
+          <JsonSampleButton {...SAMPLES.appDirectory} />
+        </div>
         {(() => {
           const sec = urlSecurity(form.appDirectoryUrl ?? '');
           if (sec === 'insecure') return (
