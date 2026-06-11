@@ -1011,8 +1011,12 @@ export function Bridge(): JSX.Element {
   }, [api, dirty, save]);
 
   const handleToggleEnabled = useCallback((enabled: boolean) => {
+    if (!api) return;
     setForm((f) => ({ ...f, enabled }));
-    if (enabled && api) setTimeout(() => void scan(), 50);
+    void api.updateSettings({ enabled }).then((next) => {
+      if (next) { setStatus(next); setForm(next.settings); }
+      if (enabled) void scan();
+    });
   }, [api, scan]);
 
   const handleAddProfile = useCallback(async (data: Omit<BridgeProfile, 'id'>) => {
