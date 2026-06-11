@@ -48,6 +48,7 @@ interface DockviewWorkspaceProps {
   onSave?: () => void;
   saveStatus?: string;
   lastSavedAt?: number | null;
+  onSaveAsLayout?: (name: string, description: string) => void;
 }
 
 export interface DetachedWorkspacePayload {
@@ -329,6 +330,7 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
   onSave,
   saveStatus = '',
   lastSavedAt,
+  onSaveAsLayout,
 }, ref) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const dockApiRef = useRef<DockviewApi | null>(null);
@@ -837,8 +839,8 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
             </Button>
           )}
           <div className="flex-1" />
-          {onSave && (
-            <WorkspaceToolbar onSave={onSave} saveStatus={saveStatus} lastSavedAt={lastSavedAt} />
+          {(onSave || onSaveAsLayout) && (
+            <WorkspaceToolbar onSave={onSave} saveStatus={saveStatus} lastSavedAt={lastSavedAt} onSaveAsLayout={onSaveAsLayout} />
           )}
           <Button
             onClick={reloadAll}

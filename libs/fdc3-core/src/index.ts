@@ -13,6 +13,7 @@ export * from './types/bridge.js';
 export * from './types/bootstrap.js';
 export * from './types/environment.js';
 export * from './types/rbac.js';
+export * from './types/layout.js';
 
 // Contracts
 export * from './contracts/interop-adapter.js';

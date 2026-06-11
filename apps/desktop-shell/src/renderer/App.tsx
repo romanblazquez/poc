@@ -18,7 +18,7 @@ import { Button } from './components/ui/button.js';
 import { Card, CardContent } from './components/ui/card.js';
 import { Input } from './components/ui/input.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select.js';
-import { Palette, RefreshCcw } from 'lucide-react';
+import { LayoutTemplate, Palette, RefreshCcw, X } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './components/ui/dropdown-menu.js';
 import { cn, modShortcut } from './lib/utils.js';
 import { InteropCopilot } from './copilot/InteropCopilot.js';
@@ -29,9 +29,16 @@ import { WorkspaceDashboard } from './components/WorkspaceDashboard.js';
 import { RbacPanel } from './components/RbacPanel.js';
 import { AddAppsDialog } from './components/AddAppsDialog.js';
 import { ShellMenu } from './components/ShellMenu.js';
-import type { Fdc3Context, UserChannel } from '@fdc3-poc/fdc3-core';
+import type { Fdc3Context, LayoutDefinition, UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { FlowPolicy, ThemeName } from '@fdc3-poc/fdc3-core';
+
+interface ShellChromeLayouts {
+  list(): Promise<LayoutDefinition[]>;
+  save(data: { name: string; description?: string; panelIds: string[]; dockviewLayout: unknown | null }): Promise<LayoutDefinition | null>;
+  update(id: string, patch: { name?: string; description?: string }): Promise<LayoutDefinition | null>;
+  delete(id: string): Promise<boolean>;
+}
 
 // window.fdc3 is injected by the preload script
 declare global {
@@ -86,7 +93,7 @@ export interface AppEntry {
 
 type ThemeMode = ThemeName;
 type SidebarPosition = 'left' | 'right' | 'bottom';
-export type WorkspaceMode = 'launcher' | 'workspace' | 'dashboard' | 'interop-flow' | 'control-tower' | 'inspector' | 'apps' | 'bridge' | 'environment' | 'rbac';
+export type WorkspaceMode = 'launcher' | 'workspace' | 'dashboard' | 'layout-editor' | 'interop-flow' | 'control-tower' | 'inspector' | 'apps' | 'bridge' | 'environment' | 'rbac';
 
 export interface WorkspaceState {
   channelId: string | null;
@@ -306,6 +313,12 @@ export function App() {
     readSidebarPosition('fdc3.shell.notifications-panel.position'));
   const [hotkeysOpen, setHotkeysOpen] = useState(false);
   const [addAppsOpen, setAddAppsOpen] = useState(false);
+  const [layouts, setLayouts] = useState<LayoutDefinition[]>([]);
+  // Layout editor — ephemeral dockview instance for creating layouts from scratch
+  const [layoutEditorPanelIds, setLayoutEditorPanelIds] = useState<string[]>([]);
+  const [layoutEditorDockviewLayout, setLayoutEditorDockviewLayout] = useState<unknown | null>(null);
+  const [layoutEditorResetKey, setLayoutEditorResetKey] = useState<number>(0);
+  const layoutEditorRef = useRef<DockviewWorkspaceHandle>(null);
   // Stable ref for current workspace state — read by the env-changed event handler to avoid stale closures
   const workspaceSnapshotRef = useRef<{ tabs: WorkspaceTab[]; states: Record<string, WorkspaceState>; activeId: string } | null>(null);
   const dockviewRef = useRef<DockviewWorkspaceHandle>(null);
@@ -415,6 +428,12 @@ export function App() {
     void api.getManifest()
       .then((manifest) => setShellManifest(manifest))
       .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    const chrome = (window as unknown as { shellChrome?: { layouts?: ShellChromeLayouts } }).shellChrome;
+    if (!chrome?.layouts) return;
+    void chrome.layouts.list().then(setLayouts).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -652,6 +671,63 @@ export function App() {
     setActiveMode('workspace');
     setOpenPanelIds(panelIds);
   }, [activeWorkspaceState.channelId, activeWorkspaceState.theme, workspaceTabs.length]);
+
+  const handleSaveAsLayout = useCallback(async (name: string, description: string, panelIds: string[], dockviewLayout: unknown | null) => {
+    const chrome = (window as unknown as { shellChrome?: { layouts?: ShellChromeLayouts } }).shellChrome;
+    if (!chrome?.layouts) return;
+    const saved = await chrome.layouts.save({ name, description: description || undefined, panelIds, dockviewLayout }).catch(() => null);
+    if (saved) setLayouts((prev) => [...prev, saved]);
+  }, []);
+
+  const handleSaveCurrentAsLayout = useCallback(async (name: string, description: string) => {
+    const snap = workspaceSnapshotRef.current;
+    if (!snap) return;
+    const activeTab = snap.tabs.find((t) => t.id === snap.activeId) ?? snap.tabs[0];
+    if (!activeTab) return;
+    const dockviewLayout = snap.states[activeTab.id]?.layout ?? null;
+    await handleSaveAsLayout(name, description, activeTab.panelIds, dockviewLayout);
+  }, [handleSaveAsLayout]);
+
+  const handleEnterLayoutEditor = useCallback(() => {
+    setLayoutEditorPanelIds([]);
+    setLayoutEditorDockviewLayout(null);
+    setLayoutEditorResetKey(Date.now());
+    setActiveMode('layout-editor');
+  }, []);
+
+  const handleSaveFromLayoutEditor = useCallback(async (name: string, description: string) => {
+    await handleSaveAsLayout(name, description, layoutEditorPanelIds, layoutEditorDockviewLayout);
+    setActiveMode('dashboard');
+    setLayoutEditorPanelIds([]);
+    setLayoutEditorDockviewLayout(null);
+  }, [handleSaveAsLayout, layoutEditorDockviewLayout, layoutEditorPanelIds]);
+
+  const handleCancelLayoutEditor = useCallback(() => {
+    setActiveMode('dashboard');
+    setLayoutEditorPanelIds([]);
+    setLayoutEditorDockviewLayout(null);
+  }, []);
+
+  const handleNewFromLayout = useCallback((layout: LayoutDefinition) => {
+    const nextId = `workspace-${Date.now().toString(36)}`;
+    const panelIds = [...layout.panelIds];
+    setWorkspaceTabs((prev) => ([...prev, { id: nextId, name: layout.name, panelIds }]));
+    setWorkspaceStates((prev) => ({
+      ...prev,
+      [nextId]: { channelId: null, theme: activeWorkspaceState.theme, layout: layout.dockviewLayout },
+    }));
+    setActiveWorkspaceId(nextId);
+    setActiveMode('workspace');
+    setOpenPanelIds(panelIds);
+    setWorkspaceResetKeys((prev) => ({ ...prev, [nextId]: Date.now().toString() }));
+  }, [activeWorkspaceState.theme]);
+
+const handleDeleteLayout = useCallback(async (id: string) => {
+    const chrome = (window as unknown as { shellChrome?: { layouts?: ShellChromeLayouts } }).shellChrome;
+    if (!chrome?.layouts) return;
+    const ok = await chrome.layouts.delete(id).catch(() => false);
+    if (ok) setLayouts((prev) => prev.filter((l) => l.id !== id));
+  }, []);
 
   const handleComposeWorkspace = useCallback(async (template: SmartWorkspaceTemplate) => {
     const existing = workspaceTabs.find((tab) => tab.id === template.id);
@@ -986,6 +1062,7 @@ export function App() {
                           onSave={handleSave}
                           saveStatus={saveStatus}
                           lastSavedAt={lastSavedAt}
+                          onSaveAsLayout={(name, desc) => void handleSaveCurrentAsLayout(name, desc)}
                         />
                       </div>
                     );
@@ -1009,7 +1086,45 @@ export function App() {
                 onDuplicate={handleDuplicateWorkspace}
                 onDelete={handleCloseWorkspace}
                 onAdd={handleAddWorkspace}
+                onFromScratch={handleEnterLayoutEditor}
+                layouts={layouts}
+                onSaveAsLayout={(name, desc, panelIds, layout) => void handleSaveAsLayout(name, desc, panelIds, layout)}
+                onNewFromLayout={handleNewFromLayout}
+                onDeleteLayout={(id) => void handleDeleteLayout(id)}
               />
+            ) : activeMode === 'layout-editor' ? (
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card">
+                <div className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-xs">
+                  <LayoutTemplate className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="font-bold text-muted-foreground uppercase tracking-wide">Layout Editor</span>
+                  <span className="flex-1 text-muted-foreground">Add apps and arrange panels, then save as a layout.</span>
+                  <button
+                    type="button"
+                    onClick={handleCancelLayoutEditor}
+                    className="text-muted-foreground hover:text-foreground"
+                    title="Cancel — discard this layout"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+                {preloadPath && (
+                  <DockviewWorkspace
+                    ref={layoutEditorRef}
+                    resetKey={layoutEditorResetKey}
+                    apps={apps}
+                    currentChannel={null}
+                    channelId={null}
+                    preloadPath={preloadPath}
+                    initialPanelIds={[]}
+                    initialLayout={null}
+                    onLayoutChange={setLayoutEditorDockviewLayout}
+                    onOpenPanelsChange={setLayoutEditorPanelIds}
+                    onAddApp={() => setAddAppsOpen(true)}
+                    theme={theme}
+                    onSaveAsLayout={(name, desc) => void handleSaveFromLayoutEditor(name, desc)}
+                  />
+                )}
+              </div>
             ) : activeMode === 'interop-flow' ? (
               <InteropFlowDesigner
                 apps={activeWorkspaceApps}
@@ -1088,13 +1203,22 @@ export function App() {
         open={addAppsOpen}
         onClose={() => setAddAppsOpen(false)}
         apps={apps}
-        currentWorkspaceAppIds={activeWorkspaceTab.panelIds}
+        currentWorkspaceAppIds={activeMode === 'layout-editor' ? layoutEditorPanelIds : activeWorkspaceTab.panelIds}
         onAddToWorkspace={(appId) => {
           const app = apps.find((a) => a.appId === appId);
-          if (app) dockviewRef.current?.addApp(app);
+          if (!app) return;
+          if (activeMode === 'layout-editor') {
+            layoutEditorRef.current?.addApp(app);
+          } else {
+            dockviewRef.current?.addApp(app);
+          }
         }}
         onRemoveFromWorkspace={(appId) => {
-          dockviewRef.current?.removeApp(appId);
+          if (activeMode === 'layout-editor') {
+            layoutEditorRef.current?.removeApp(appId);
+          } else {
+            dockviewRef.current?.removeApp(appId);
+          }
         }}
       />
     </div>

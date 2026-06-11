@@ -93,6 +93,10 @@ export const IpcEvents = {
   ENV_DELETE: 'env:delete',
   ENV_ACTIVATE: 'env:activate',
   ENV_GET_ACTIVE: 'env:getActive',
+  LAYOUT_LIST: 'layout:list',
+  LAYOUT_SAVE: 'layout:save',
+  LAYOUT_UPDATE: 'layout:update',
+  LAYOUT_DELETE: 'layout:delete',
 
   // ─── Main → Renderer (webContents.send) ──────────────────────────────────
   INTENT_RESOLVER_REQUEST: 'fdc3:intentResolverRequest',

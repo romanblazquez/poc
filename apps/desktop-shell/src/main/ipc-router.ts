@@ -25,6 +25,7 @@ import type { WorkspaceManager } from './workspace-manager.js';
 import type { ThemeManager } from './theme-manager.js';
 import type { AppDefinition } from '@fdc3-poc/fdc3-core';
 import { ShellAssetsLoader } from './shell-assets-loader.js';
+import type { LayoutsStore } from './layouts-store.js';
 
 // ─── FDC3 AppD v2 response mapper ─────────────────────────────────────────────
 
@@ -130,6 +131,7 @@ export class IpcRouter {
     private readonly bridgeService?: BridgeService,
     private readonly environmentStore?: EnvironmentStore,
     private readonly rbacStore?: RbacStore,
+    private readonly layoutsStore?: LayoutsStore,
   ) {
     this.intentResolver = new IntentResolver();
     this.appRegistry = new AppRegistry(appDirectory);
@@ -473,6 +475,10 @@ export class IpcRouter {
     this.handleEnvDelete();
     this.handleEnvActivate();
     this.handleEnvGetActive();
+    this.handleLayoutList();
+    this.handleLayoutSave();
+    this.handleLayoutUpdate();
+    this.handleLayoutDelete();
   }
 
   // ─── FINOS bridge readiness (non-experimental Backplane discovery) ───────
@@ -1780,6 +1786,37 @@ export class IpcRouter {
       }
 
       return { profile, appCount: envApps?.length ?? null, fetchedFromUrl };
+    });
+  }
+
+  private handleLayoutList(): void {
+    ipcMain.handle(IpcEvents.LAYOUT_LIST, () => this.layoutsStore?.list() ?? []);
+  }
+
+  private handleLayoutSave(): void {
+    ipcMain.handle(IpcEvents.LAYOUT_SAVE, (_event, data: { name: string; description?: string; panelIds: string[]; dockviewLayout: unknown | null }) => {
+      if (!this.layoutsStore) return null;
+      const layout = this.layoutsStore.save(data);
+      this.emitPlatformLog({ level: 'info', category: 'config.layout', message: `Layout saved: ${layout.name}`, data: { id: layout.id } });
+      return layout;
+    });
+  }
+
+  private handleLayoutUpdate(): void {
+    ipcMain.handle(IpcEvents.LAYOUT_UPDATE, (_event, { id, patch }: { id: string; patch: { name?: string; description?: string } }) => {
+      if (!this.layoutsStore) return null;
+      const layout = this.layoutsStore.update(id, patch ?? {});
+      if (layout) this.emitPlatformLog({ level: 'info', category: 'config.layout', message: `Layout updated: ${layout.name}`, data: { id, patch } });
+      return layout;
+    });
+  }
+
+  private handleLayoutDelete(): void {
+    ipcMain.handle(IpcEvents.LAYOUT_DELETE, (_event, id: string) => {
+      if (!this.layoutsStore) return false;
+      const ok = this.layoutsStore.delete(id);
+      if (ok) this.emitPlatformLog({ level: 'warning', category: 'config.layout', message: `Layout deleted`, data: { id } });
+      return ok;
     });
   }
 

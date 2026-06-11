@@ -706,6 +706,20 @@ contextBridge.exposeInMainWorld('shellChrome', {
       return ipcRenderer.invoke(IpcEvents.ENV_ACTIVATE, id) as Promise<{ profile: import('@fdc3-poc/fdc3-core').EnvironmentProfile; appCount: number | null } | null>;
     },
   },
+  layouts: {
+    list(): Promise<import('@fdc3-poc/fdc3-core').LayoutDefinition[]> {
+      return ipcRenderer.invoke(IpcEvents.LAYOUT_LIST) as Promise<import('@fdc3-poc/fdc3-core').LayoutDefinition[]>;
+    },
+    save(data: { name: string; description?: string; panelIds: string[]; dockviewLayout: unknown | null }): Promise<import('@fdc3-poc/fdc3-core').LayoutDefinition | null> {
+      return ipcRenderer.invoke(IpcEvents.LAYOUT_SAVE, data) as Promise<import('@fdc3-poc/fdc3-core').LayoutDefinition | null>;
+    },
+    update(id: string, patch: { name?: string; description?: string }): Promise<import('@fdc3-poc/fdc3-core').LayoutDefinition | null> {
+      return ipcRenderer.invoke(IpcEvents.LAYOUT_UPDATE, { id, patch }) as Promise<import('@fdc3-poc/fdc3-core').LayoutDefinition | null>;
+    },
+    delete(id: string): Promise<boolean> {
+      return ipcRenderer.invoke(IpcEvents.LAYOUT_DELETE, id) as Promise<boolean>;
+    },
+  },
 });
 
 // ─── window.fdc3 surface ──────────────────────────────────────────────────

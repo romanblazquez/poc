@@ -29,6 +29,7 @@ import { BridgeService } from './bridge-service.js';
 import { EnvironmentStore } from './environment-store.js';
 import { loadBootstrapConfig } from './bridge-settings.js';
 import { RbacStore } from './rbac-store.js';
+import { LayoutsStore } from './layouts-store.js';
 import { ChannelManager } from '@fdc3-poc/channel-engine';
 import { IntentRegistry } from '@fdc3-poc/intent-engine';
 import type { AppDirectoryFile } from '@fdc3-poc/app-registry';
@@ -96,6 +97,7 @@ async function bootstrap(): Promise<void> {
   const bridgeService = new BridgeService(configRoot, bootstrap);
   const environmentStore = new EnvironmentStore(configRoot, bootstrap);
   const rbacStore = new RbacStore();
+  const layoutsStore = new LayoutsStore(configRoot);
 
   // Apply the active env's app directory using priority chain:
   //   user-saved → IT-managed (config/) → bundled default.
@@ -139,6 +141,7 @@ async function bootstrap(): Promise<void> {
     bridgeService,
     environmentStore,
     rbacStore,
+    layoutsStore,
   );
   ipcRouter.register();
 

@@ -18,6 +18,7 @@ type WorkspaceMode =
   | 'launcher'
   | 'workspace'
   | 'dashboard'
+  | 'layout-editor'
   | 'interop-flow'
   | 'control-tower'
   | 'inspector'

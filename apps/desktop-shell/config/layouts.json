@@ -1,0 +1,20 @@
+{
+  "layouts": [
+    {
+      "id": "trading-flow",
+      "name": "Trading Flow",
+      "description": "Incoming orders, funds allocation, and audit trail side-by-side.",
+      "panelIds": ["incoming-orders", "funds-allocations", "audit-log"],
+      "dockviewLayout": null,
+      "isDefault": true
+    },
+    {
+      "id": "market-view",
+      "name": "Market View",
+      "description": "Market watch, customer profile, and portfolio overview.",
+      "panelIds": ["market-watch", "customer-profile", "portfolio-view"],
+      "dockviewLayout": null,
+      "isDefault": true
+    }
+  ]
+}
