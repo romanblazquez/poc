@@ -354,17 +354,22 @@ function MonitorSection({ current, isScanning, busy, onScan }: MonitorSectionPro
 
       {/* ── Detected endpoints table ───────────────────────────────────── */}
       <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <CardHeader className="shrink-0 flex-row items-center gap-3 border-b py-3">
-          <div className="flex items-center gap-1.5">
-            <CardTitle className="text-sm">Detected Endpoints</CardTitle>
-            <InfoTip tip="All Backplane endpoints found during the last scan. The selected endpoint is the one this shell is actively using. Latency is the round-trip probe time." />
+        <CardHeader className="shrink-0 border-b py-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <CardTitle className="text-sm">Detected Endpoints</CardTitle>
+              <InfoTip tip="Live TCP scan results — services actually running on the network right now. Independent of saved profiles. Scan again to refresh." />
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-[11px] text-muted-foreground">{candidates.length} found</span>
+              <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onScan}>
+                {isScanning ? 'Scanning…' : 'Scan Now'}
+              </Button>
+            </div>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground">{candidates.length} found</span>
-            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onScan}>
-              {isScanning ? 'Scanning…' : 'Scan Now'}
-            </Button>
-          </div>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Services found by the last TCP scan — not your saved profiles. Scan again to refresh after stopping a service.
+          </p>
         </CardHeader>
         <CardContent className="scrollbar-thin min-h-0 flex-1 overflow-auto p-0">
           {candidates.length === 0 ? (
