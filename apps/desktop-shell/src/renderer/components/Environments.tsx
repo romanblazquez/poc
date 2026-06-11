@@ -3,7 +3,8 @@ import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js';
 import { Input } from './ui/input.js';
-import { Pencil, Trash2, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Pencil, Trash2, CheckCircle2, RefreshCw, Lock, AlertTriangle, Settings2 } from 'lucide-react';
+import { SetupWizard } from './SetupWizard.js';
 
 interface EnvironmentProfile {
   id: string;
@@ -35,6 +36,12 @@ const EMPTY_FORM: Omit<EnvironmentProfile, 'id'> = {
 
 const COLOR_PRESETS = ['#4CAF50', '#FF9800', '#F44336', '#2196F3', '#9C27B0', '#00BCD4'];
 
+function urlSecurity(url: string): 'secure' | 'insecure' | 'local' | 'empty' {
+  if (!url?.trim()) return 'empty';
+  if (url.includes('localhost') || url.includes('127.0.0.1')) return 'local';
+  return url.trim().startsWith('https://') ? 'secure' : 'insecure';
+}
+
 export function Environments() {
   const [profiles, setProfiles] = useState<EnvironmentProfile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -44,6 +51,7 @@ export function Environments() {
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState<Omit<EnvironmentProfile, 'id'>>(EMPTY_FORM);
   const [toast, setToast] = useState<string | null>(null);
+  const [wizardEnv, setWizardEnv] = useState<EnvironmentProfile | null>(null);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -63,14 +71,15 @@ export function Environments() {
 
   useEffect(() => { void reload(); }, [reload]);
 
-  const activate = useCallback(async (id: string) => {
+  const doActivate = useCallback(async (id: string) => {
     setActivating(id);
     try {
       const result = await envApi().activate(id);
       if (result) {
         setActiveId(result.profile.id);
+        const extra = (result as { fetchedFromUrl?: boolean }).fetchedFromUrl ? ' (fetched from URL)' : '';
         const msg = result.appCount != null
-          ? `Switched to ${result.profile.name} — ${result.appCount} apps loaded`
+          ? `Switched to ${result.profile.name} — ${result.appCount} apps loaded${extra}`
           : `Switched to ${result.profile.name} (using current app directory)`;
         showToast(msg);
       }
@@ -78,6 +87,15 @@ export function Environments() {
       setActivating(null);
     }
   }, []);
+
+  const activate = useCallback(async (profile: EnvironmentProfile) => {
+    const isDevLike = profile.id === 'dev' || urlSecurity(profile.appDirectoryUrl ?? '') === 'local';
+    if (!isDevLike && !profile.appDirectoryUrl?.trim()) {
+      setWizardEnv(profile);
+      return;
+    }
+    await doActivate(profile.id);
+  }, [doActivate]);
 
   const handleAdd = useCallback(async () => {
     if (!form.name.trim()) return;
@@ -144,9 +162,23 @@ export function Environments() {
       <div>
         <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--shell-muted)', display: 'block', marginBottom: 4 }}>APP DIRECTORY URL <span style={{ color: 'var(--shell-subtle)', fontWeight: 400 }}>(optional — leave blank to use local saved copy)</span></label>
         <Input value={form.appDirectoryUrl} onChange={(e) => setForm((f) => ({ ...f, appDirectoryUrl: e.target.value }))} placeholder="https://uat.firm.com/app-directory.json" className="h-8 text-sm" />
+        {(() => {
+          const sec = urlSecurity(form.appDirectoryUrl ?? '');
+          if (sec === 'insecure') return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: 11, color: 'var(--shell-negative, #f74f4f)', fontWeight: 600 }}>
+              <AlertTriangle size={12} /> HTTP is not allowed for cloud environments — use https://
+            </div>
+          );
+          if (sec === 'secure') return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: 11, color: 'var(--shell-positive, #40e880)', fontWeight: 600 }}>
+              <Lock size={12} /> Secure HTTPS URL
+            </div>
+          );
+          return null;
+        })()}
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
-        <Button size="sm" onClick={editingId ? commitEdit : handleAdd} disabled={!form.name.trim()}>
+        <Button size="sm" onClick={editingId ? commitEdit : handleAdd} disabled={!form.name.trim() || urlSecurity(form.appDirectoryUrl ?? '') === 'insecure'}>
           {editingId ? 'Save' : 'Add Environment'}
         </Button>
         <Button size="sm" variant="outline" onClick={() => { setShowAdd(false); setEditingId(null); setForm(EMPTY_FORM); }}>Cancel</Button>
@@ -156,6 +188,22 @@ export function Environments() {
 
   return (
     <div style={{ padding: '24px 28px', maxWidth: 760, position: 'relative' }}>
+      {/* Wizard overlay */}
+      {wizardEnv && (
+        <SetupWizard
+          env={wizardEnv}
+          onComplete={async (_updates) => {
+            setWizardEnv(null);
+            await doActivate(wizardEnv.id);
+            await reload();
+          }}
+          onSkip={async () => {
+            setWizardEnv(null);
+            await doActivate(wizardEnv.id);
+          }}
+        />
+      )}
+
       {/* Toast */}
       {toast && (
         <div style={{
@@ -210,18 +258,28 @@ export function Environments() {
                         {isActive && <Badge variant="default" className="text-[10px] px-1.5 py-0">Active</Badge>}
                       </div>
                       {p.description && <div style={{ fontSize: 11, color: 'var(--shell-muted)', marginTop: 1 }}>{p.description}</div>}
-                      {p.appDirectoryUrl && <div style={{ fontSize: 10, color: 'var(--shell-subtle)', fontFamily: 'monospace', marginTop: 2 }}>{p.appDirectoryUrl}</div>}
+                      {p.appDirectoryUrl && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--shell-subtle)', fontFamily: 'monospace', marginTop: 2 }}>
+                          {urlSecurity(p.appDirectoryUrl) === 'secure'   && <Lock size={9} style={{ color: 'var(--shell-positive)' }} />}
+                          {urlSecurity(p.appDirectoryUrl) === 'insecure' && <AlertTriangle size={9} style={{ color: 'var(--shell-negative)' }} />}
+                          {p.appDirectoryUrl}
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                       {!isActive && (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => void activate(p.id)}
+                          onClick={() => void activate(p)}
                           disabled={activating === p.id}
                           className="h-7 text-xs"
                         >
-                          {activating === p.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <><CheckCircle2 className="h-3 w-3 mr-1" />Switch</>}
+                          {activating === p.id
+                            ? <RefreshCw className="h-3 w-3 animate-spin" />
+                            : !p.appDirectoryUrl && p.id !== 'dev'
+                              ? <><Settings2 className="h-3 w-3 mr-1" />Setup</>
+                              : <><CheckCircle2 className="h-3 w-3 mr-1" />Switch</>}
                         </Button>
                       )}
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEdit(p)}>

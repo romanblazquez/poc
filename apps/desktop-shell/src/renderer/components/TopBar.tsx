@@ -22,6 +22,7 @@ export interface TopBarProps {
   subtitle?: string;
   mark?: React.ReactNode;
   leftActions?: React.ReactNode;
+  center?: React.ReactNode;
   actions?: React.ReactNode;
   sidebarOpen?: boolean;
   onSidebarToggle?: () => void;
@@ -51,7 +52,7 @@ function useWindowFullscreen(): boolean {
   return fullscreen;
 }
 
-export function TopBar({ title, subtitle, mark, leftActions, actions, sidebarOpen, onSidebarToggle }: TopBarProps): React.JSX.Element | null {
+export function TopBar({ title, subtitle, mark, leftActions, center, actions, sidebarOpen, onSidebarToggle }: TopBarProps): React.JSX.Element | null {
   const fullscreen = useWindowFullscreen();
   const isMac = useMemo(() => {
     if (typeof navigator === 'undefined') return false;
@@ -72,7 +73,7 @@ export function TopBar({ title, subtitle, mark, leftActions, actions, sidebarOpe
 
   return (
     <div
-      className="flex shrink-0 select-none items-center justify-between border-b bg-card"
+      className="relative flex shrink-0 select-none items-center justify-between border-b bg-card"
       style={{
         ...dragStyle,
         height: barHeight,
@@ -80,6 +81,14 @@ export function TopBar({ title, subtitle, mark, leftActions, actions, sidebarOpe
         paddingRight: isMac ? 14 : WIN_CONTROLS_WIDTH,
       }}
     >
+      {center && (
+        <div
+          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+          style={noDragStyle}
+        >
+          <div className="pointer-events-auto" style={noDragStyle}>{center}</div>
+        </div>
+      )}
       <div className="flex min-w-0 items-center gap-2.5">
         {onSidebarToggle && (
           <button

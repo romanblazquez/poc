@@ -301,6 +301,7 @@ export function App() {
   const [addAppsOpen, setAddAppsOpen] = useState(false);
   const dockviewRef = useRef<DockviewWorkspaceHandle>(null);
   const [shellManifest, setShellManifest] = useState<ShellManifestView | null>(null);
+  const [activeEnv, setActiveEnv] = useState<{ id: string; name: string; color?: string } | null>(null);
   // Stable ref so handlers that must stay stable can still read the current active workspace.
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   activeWorkspaceIdRef.current = activeWorkspaceId;
@@ -404,6 +405,18 @@ export function App() {
     void api.getManifest()
       .then((manifest) => setShellManifest(manifest))
       .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    const chrome = (window as unknown as { shellChrome?: { environment?: {
+      list(): Promise<Array<{ id: string; name: string; color?: string }>>;
+      getActiveId(): Promise<string | null>;
+    } } }).shellChrome;
+    if (!chrome?.environment) return;
+    void Promise.all([chrome.environment.list(), chrome.environment.getActiveId()]).then(([list, activeId]) => {
+      const found = activeId ? list.find((e) => e.id === activeId) ?? null : null;
+      setActiveEnv(found);
+    });
   }, []);
 
   useEffect(() => {
@@ -778,6 +791,12 @@ export function App() {
         subtitle={shellManifest?.subtitle ?? 'TRADER WORKSTATION'}
         sidebarOpen={sidebarExpanded}
         onSidebarToggle={() => setSidebarExpanded((v) => !v)}
+        center={activeEnv ? (
+          <div className="flex items-center gap-1.5 rounded-full border bg-card/80 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-muted-foreground backdrop-blur-sm">
+            <div className="size-2 rounded-full" style={{ background: activeEnv.color ?? '#888' }} />
+            {activeEnv.name.toUpperCase()}
+          </div>
+        ) : undefined}
         actions={
           <>
             <Button

@@ -1661,14 +1661,39 @@ export class IpcRouter {
   }
 
   private handleEnvActivate(): void {
-    ipcMain.handle(IpcEvents.ENV_ACTIVATE, (_event, id: string) => {
+    ipcMain.handle(IpcEvents.ENV_ACTIVATE, async (_event, id: string) => {
       if (!this.environmentStore) return null;
       const profile = this.environmentStore.activate(id);
       if (!profile) return null;
-      // Hot-swap the runtime app directory with the env's persisted copy (if any).
-      const envApps = this.environmentStore.loadAppDirectoryForId(id);
+
+      // Priority: user-saved / IT-managed local file first.
+      let envApps = this.environmentStore.loadAppDirectoryForId(id);
+      let fetchedFromUrl = false;
+
+      // If no local directory and env has a cloud URL, auto-fetch it.
+      if (!envApps && profile.appDirectoryUrl) {
+        const url = profile.appDirectoryUrl.trim();
+        if (url) {
+          try {
+            const res = await net.fetch(url);
+            if (res.ok) {
+              const json = await res.json() as unknown;
+              const fetched = mapAppDResponseToDefinitions(json);
+              if (fetched.length > 0) {
+                this.environmentStore.saveAppDirectory(fetched);
+                envApps = fetched;
+                fetchedFromUrl = true;
+                console.log(`[env] fetched ${fetched.length} apps from ${url}`);
+              }
+            }
+          } catch (e) {
+            console.warn(`[env] failed to fetch app directory from ${url}: ${(e as Error).message}`);
+          }
+        }
+      }
+
       if (envApps) this.replaceRuntimeAppDirectory(envApps);
-      return { profile, appCount: envApps?.length ?? null };
+      return { profile, appCount: envApps?.length ?? null, fetchedFromUrl };
     });
   }
 
