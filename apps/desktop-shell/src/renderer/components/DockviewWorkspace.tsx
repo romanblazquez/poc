@@ -5,7 +5,7 @@ import type { AppEntry } from '../App.js';
 import type { UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { ThemeName } from '@fdc3-poc/fdc3-core';
-import { LayoutGrid, Plus } from 'lucide-react';
+import { LayoutGrid, Plus, RefreshCcw } from 'lucide-react';
 import { Button } from './ui/button.js';
 import { AppIcon } from './AppIcon.js';
 import { WorkspaceToolbar } from './WorkspaceToolbar.js';
@@ -305,6 +305,7 @@ function populatePanels(
 export interface DockviewWorkspaceHandle {
   addApp: (app: AppEntry) => void;
   removeApp: (appId: string) => void;
+  reloadAll: () => void;
 }
 
 export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWorkspaceProps>(function DockviewWorkspace({
@@ -760,7 +761,13 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
     if (panel) api.removePanel(panel);
   }, []);
 
-  useImperativeHandle(ref, () => ({ addApp: addPanel, removeApp: removePanel }), [addPanel, removePanel]);
+  const reloadAll = useCallback(() => {
+    for (const wv of webviewPoolRef.current.values()) {
+      wv.reload();
+    }
+  }, []);
+
+  useImperativeHandle(ref, () => ({ addApp: addPanel, removeApp: removePanel, reloadAll }), [addPanel, removePanel, reloadAll]);
 
   const detachToDisplay = useCallback(async (display?: DisplayInfo) => {
     if (!onDetachWorkspace) return;
@@ -833,6 +840,16 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
           {onSave && (
             <WorkspaceToolbar onSave={onSave} saveStatus={saveStatus} lastSavedAt={lastSavedAt} />
           )}
+          <Button
+            onClick={reloadAll}
+            variant="outline"
+            size="sm"
+            title="Reload all apps in this workspace"
+            className="gap-1.5"
+          >
+            <RefreshCcw className="size-3.5" />
+            Reload
+          </Button>
           <span className="text-[11px] font-extrabold text-muted-foreground">
             {workspaceName ?? 'Workspace'}
           </span>

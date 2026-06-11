@@ -19,7 +19,7 @@ import { Button } from './components/ui/button.js';
 import { Card, CardContent } from './components/ui/card.js';
 import { Input } from './components/ui/input.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select.js';
-import { Palette } from 'lucide-react';
+import { Palette, RefreshCcw } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './components/ui/dropdown-menu.js';
 import { cn } from './lib/utils.js';
 import { InteropCopilot } from './copilot/InteropCopilot.js';
@@ -1062,6 +1062,7 @@ function DetachedWorkspaceShell({
   const [currentChannel, setCurrentChannel] = useState<UserChannel | null>(null);
   const [editLayout, setEditLayout] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
+  const wsRef = useRef<DockviewWorkspaceHandle | null>(null);
 
   useEffect(() => {
     if (!window.fdc3) return;
@@ -1183,6 +1184,16 @@ function DetachedWorkspaceShell({
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              onClick={() => wsRef.current?.reloadAll()}
+              variant="outline"
+              size="sm"
+              title="Reload all apps in this workspace"
+              className="gap-1.5"
+            >
+              <RefreshCcw className="size-3.5" />
+              Reload
+            </Button>
             <ZoomControl />
             <WorkspaceToolbar onSave={handleDetachedSave} saveStatus={saveStatus} />
           </>
@@ -1194,6 +1205,7 @@ function DetachedWorkspaceShell({
         </div>
       ) : (
         <DockviewWorkspace
+          ref={wsRef}
           apps={apps}
           currentChannel={currentChannel}
           channelId={payload.channelId}
