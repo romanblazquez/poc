@@ -90,7 +90,6 @@ async function bootstrap(): Promise<void> {
   })();
   const managerService = new ManagerService(initialDirectoryFile, 'local');
   const bridgeService = new BridgeService();
-  bridgeService.init();
   const environmentStore = new EnvironmentStore();
   const rbacStore = new RbacStore();
 
@@ -143,9 +142,9 @@ async function bootstrap(): Promise<void> {
   if (managerService.getSettings().directoryUrl) {
     void managerService.checkForUpdates();
   }
-  if (bridgeService.getSettings().enabled) {
-    void bridgeService.scan();
-  }
+  // init() after IpcRouter so the bridge→renderer subscription exists before
+  // the first scan fires and emits BRIDGE_STATUS_CHANGED.
+  bridgeService.init();
 
   // Clean up engine state when a window closes
   app.on('web-contents-created', (_, wc) => {
