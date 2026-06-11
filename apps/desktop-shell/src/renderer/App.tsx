@@ -21,7 +21,7 @@ import { Input } from './components/ui/input.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select.js';
 import { Palette, RefreshCcw } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './components/ui/dropdown-menu.js';
-import { cn } from './lib/utils.js';
+import { cn, modShortcut } from './lib/utils.js';
 import { InteropCopilot } from './copilot/InteropCopilot.js';
 import { InteropFlowDesigner } from './interop-flow/components/InteropFlowDesigner.js';
 import { ShellSidebar } from './components/ShellSidebar.js';
@@ -837,12 +837,12 @@ export function App() {
           <>
             <Button
               onClick={() => setCopilotOpen(true)}
-              title="Ask the Desktop (⌘K) — natural-language FDC3 orchestration"
+              title={`Ask the Desktop (${modShortcut('K')}) — natural-language FDC3 orchestration`}
               size="sm"
               type="button"
             >
               ✦ Ask
-              <span className="text-[10px] font-semibold opacity-60">⌘K</span>
+              <span className="text-[10px] font-semibold opacity-60">{modShortcut('K')}</span>
             </Button>
             <ChannelBar
               currentChannel={currentChannel}

@@ -12,7 +12,7 @@ import {
   ShieldCheck,
   ScanLine,
 } from 'lucide-react';
-import { cn } from '../lib/utils.js';
+import { cn, modShortcut } from '../lib/utils.js';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js';
 
 type WorkspaceMode =
@@ -35,26 +35,31 @@ interface ShellSidebarProps {
   onToggleExpanded: () => void;
 }
 
-const MODE_ITEMS: Array<{
+const MODE_ITEM_DEFS: Array<{
   mode: WorkspaceMode;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  shortcut?: string;
+  shortcutKey?: string;
 }> = [
-  { mode: 'workspace',     label: 'Workspace',     icon: LayoutDashboard, shortcut: '⌘1' },
+  { mode: 'workspace',     label: 'Workspace',     icon: LayoutDashboard, shortcutKey: '1' },
   { mode: 'dashboard',     label: 'WS Dashboard',  icon: BarChart3 },
-  { mode: 'interop-flow',  label: 'Flow Designer',  icon: Workflow,        shortcut: '⌘2' },
-  { mode: 'control-tower', label: 'Control Tower', icon: Radio,           shortcut: '⌘3' },
-  { mode: 'inspector',     label: 'Inspector',      icon: ScanLine,        shortcut: '⌘6' },
-  { mode: 'manager',       label: 'Manager',        icon: CloudDownload,   shortcut: '⌘4' },
-  { mode: 'bridge',        label: 'Bridge',         icon: Network,         shortcut: '⌘5' },
+  { mode: 'interop-flow',  label: 'Flow Designer',  icon: Workflow,        shortcutKey: '2' },
+  { mode: 'control-tower', label: 'Control Tower', icon: Radio,           shortcutKey: '3' },
+  { mode: 'inspector',     label: 'Inspector',      icon: ScanLine,        shortcutKey: '6' },
+  { mode: 'manager',       label: 'Manager',        icon: CloudDownload,   shortcutKey: '4' },
+  { mode: 'bridge',        label: 'Bridge',         icon: Network,         shortcutKey: '5' },
   { mode: 'app-directory', label: 'App Directory',  icon: BookOpen },
   { mode: 'environment',   label: 'Environments',   icon: Globe },
-  { mode: 'launcher',      label: 'App Launcher',   icon: Grid3x3,         shortcut: '⌘0' },
+  { mode: 'launcher',      label: 'App Launcher',   icon: Grid3x3,         shortcutKey: '0' },
   { mode: 'rbac',          label: 'RBAC',           icon: ShieldCheck },
 ];
 
 export function ShellSidebar({ activeMode, onModeChange, expanded }: ShellSidebarProps) {
+  const MODE_ITEMS = MODE_ITEM_DEFS.map((d) => ({
+    ...d,
+    shortcut: d.shortcutKey ? modShortcut(d.shortcutKey) : undefined,
+  }));
+
   return (
     <TooltipProvider delayDuration={300}>
       <aside className={cn(

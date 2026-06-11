@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Bell, BellRing, X, CheckCircle2, AlertTriangle, XCircle, Info, Check, Trash2, Lock, LockOpen, PanelLeft, PanelRight, PanelBottom } from 'lucide-react';
 import type { Fdc3Context, NotificationRaiseInput, NotificationsApi, ShellNotification } from '@fdc3-poc/fdc3-core';
 import { Button } from './ui/button.js';
-import { cn } from '../lib/utils.js';
+import { cn, modShortcut } from '../lib/utils.js';
 
 // ── API helpers ───────────────────────────────────────────────────────────────
 
@@ -356,7 +356,7 @@ export function NotificationsCenter({
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
-        title="Notifications (⌘B)"
+        title={`Notifications (${modShortcut('B')})`}
         className={cn(
           'relative flex h-8 w-8 items-center justify-center rounded-md transition-colors',
           open

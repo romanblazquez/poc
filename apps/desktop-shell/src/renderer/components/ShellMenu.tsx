@@ -4,7 +4,7 @@ import { Button } from './ui/button.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select.js';
 import { Input } from './ui/input.js';
 import { Badge } from './ui/badge.js';
-import { cn } from '../lib/utils.js';
+import { cn, modShortcut } from '../lib/utils.js';
 import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { ThemeName } from '@fdc3-poc/fdc3-core';
 
@@ -295,7 +295,7 @@ export function ShellMenu({ theme, onThemeChange, onOpenHotkeys }: ShellMenuProp
             >
               <Keyboard className="size-3.5 shrink-0 text-muted-foreground" />
               Keyboard shortcuts
-              <span className="ml-auto text-[10px] font-bold text-muted-foreground opacity-60">⌘/</span>
+              <span className="ml-auto text-[10px] font-bold text-muted-foreground opacity-60">{modShortcut('/')}</span>
             </button>
           </div>
 

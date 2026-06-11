@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js';
 import { Input } from './ui/input.js';
 import { Pencil, Trash2, CheckCircle2, RefreshCw, Lock, AlertTriangle, Settings2 } from 'lucide-react';
 import { SetupWizard } from './SetupWizard.js';
+import { EnvSwitchConfirm } from './EnvSwitchConfirm.js';
 
 interface EnvironmentProfile {
   id: string;
@@ -52,6 +53,7 @@ export function Environments() {
   const [form, setForm] = useState<Omit<EnvironmentProfile, 'id'>>(EMPTY_FORM);
   const [toast, setToast] = useState<string | null>(null);
   const [wizardEnv, setWizardEnv] = useState<EnvironmentProfile | null>(null);
+  const [confirmSwitch, setConfirmSwitch] = useState<{ from: EnvironmentProfile; to: EnvironmentProfile } | null>(null);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -98,8 +100,13 @@ export function Environments() {
       setWizardEnv(profile);
       return;
     }
+    if (!isDevLike) {
+      const fromProfile = profiles.find((p) => p.id === activeId) ?? { id: activeId ?? 'dev', name: activeId ?? 'Dev', color: undefined };
+      setConfirmSwitch({ from: fromProfile as EnvironmentProfile, to: profile });
+      return;
+    }
     await doActivate(profile.id);
-  }, [doActivate]);
+  }, [doActivate, profiles, activeId]);
 
   const handleAdd = useCallback(async () => {
     if (!form.name.trim()) return;
@@ -192,6 +199,21 @@ export function Environments() {
 
   return (
     <div style={{ padding: '24px 28px', maxWidth: 760, position: 'relative' }}>
+      {/* Env switch countdown overlay */}
+      {confirmSwitch && (
+        <EnvSwitchConfirm
+          fromName={confirmSwitch.from.name}
+          toName={confirmSwitch.to.name}
+          toColor={confirmSwitch.to.color}
+          onConfirm={async () => {
+            const toId = confirmSwitch.to.id;
+            setConfirmSwitch(null);
+            await doActivate(toId);
+          }}
+          onCancel={() => setConfirmSwitch(null)}
+        />
+      )}
+
       {/* Wizard overlay */}
       {wizardEnv && (
         <SetupWizard

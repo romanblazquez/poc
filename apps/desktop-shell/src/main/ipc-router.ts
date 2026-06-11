@@ -247,6 +247,33 @@ export class IpcRouter {
     return 'debug';
   }
 
+  /** Emit a platform-level audit entry with no associated WebContents (env/config changes). */
+  private emitPlatformLog(input: { level: AppLogLevel; message: string; category?: string; data?: unknown }): void {
+    const event: AppLogEvent = {
+      id: randomUUID(),
+      ts: Date.now(),
+      appId: 'platform',
+      appTitle: 'Desktop Shell',
+      runtime: 'main' as AppLogRuntime,
+      webContentsId: -1,
+      level: input.level,
+      origin: 'platform' as AppLogOrigin,
+      message: input.message,
+      category: input.category,
+      data: input.data,
+    };
+    this.appLogs.unshift(event);
+    if (this.appLogs.length > IpcRouter.APP_LOG_LIMIT) {
+      this.appLogs.length = IpcRouter.APP_LOG_LIMIT;
+    }
+    for (const id of this.windowManager.getAllWebContentsIds()) {
+      if (this.canReceiveAppLog(id, event)) {
+        const wc = webContents.fromId(id);
+        if (wc && !wc.isDestroyed()) wc.send(IpcEvents.APP_LOG, event);
+      }
+    }
+  }
+
   private emitAppLog(
     contents: WebContents,
     input: { level: AppLogLevel; origin: AppLogOrigin; message: string; category?: string; data?: unknown; line?: number; sourceUrl?: string },
@@ -463,7 +490,9 @@ export class IpcRouter {
   private handleBridgeUpdateSettings(): void {
     ipcMain.handle(IpcEvents.BRIDGE_UPDATE_SETTINGS, (_event, patch: Partial<BridgeSettings>) => {
       if (!this.bridgeService) return null;
-      return this.bridgeService.updateSettings(patch ?? {});
+      const result = this.bridgeService.updateSettings(patch ?? {});
+      this.emitPlatformLog({ level: 'info', category: 'config.bridge', message: 'Bridge settings updated', data: patch });
+      return result;
     });
   }
 
@@ -474,28 +503,40 @@ export class IpcRouter {
   private handleBridgeAddProfile(): void {
     ipcMain.handle(IpcEvents.BRIDGE_ADD_PROFILE, (_event, data: Omit<BridgeProfile, 'id'>) => {
       if (!this.bridgeService) return null;
-      return this.bridgeService.addProfile(data);
+      const profile = this.bridgeService.addProfile(data);
+      this.emitPlatformLog({ level: 'info', category: 'config.bridge', message: `Bridge profile created: ${profile.name}`, data: { id: profile.id } });
+      return profile;
     });
   }
 
   private handleBridgeUpdateProfile(): void {
     ipcMain.handle(IpcEvents.BRIDGE_UPDATE_PROFILE, (_event, { id, patch }: { id: string; patch: Partial<Omit<BridgeProfile, 'id'>> }) => {
       if (!this.bridgeService) return null;
-      return this.bridgeService.updateProfile(id, patch ?? {});
+      const profile = this.bridgeService.updateProfile(id, patch ?? {});
+      if (profile) this.emitPlatformLog({ level: 'info', category: 'config.bridge', message: `Bridge profile updated: ${profile.name}`, data: { id, patch } });
+      return profile;
     });
   }
 
   private handleBridgeDeleteProfile(): void {
     ipcMain.handle(IpcEvents.BRIDGE_DELETE_PROFILE, (_event, id: string) => {
       if (!this.bridgeService) return false;
-      return this.bridgeService.deleteProfile(id);
+      const name = this.bridgeService.getProfiles().find((p) => p.id === id)?.name ?? id;
+      const ok = this.bridgeService.deleteProfile(id);
+      if (ok) this.emitPlatformLog({ level: 'warning', category: 'config.bridge', message: `Bridge profile deleted: ${name}`, data: { id } });
+      return ok;
     });
   }
 
   private handleBridgeActivateProfile(): void {
     ipcMain.handle(IpcEvents.BRIDGE_ACTIVATE_PROFILE, (_event, id: string) => {
       if (!this.bridgeService) return null;
-      return this.bridgeService.activateProfile(id);
+      const result = this.bridgeService.activateProfile(id);
+      if (result) {
+        const name = result.profiles?.find((p: { id: string; name: string }) => p.id === id)?.name ?? id;
+        this.emitPlatformLog({ level: 'info', category: 'config.bridge', message: `Bridge profile activated: ${name}`, data: { id } });
+      }
+      return result;
     });
   }
 
@@ -1642,27 +1683,35 @@ export class IpcRouter {
   private handleEnvAdd(): void {
     ipcMain.handle(IpcEvents.ENV_ADD, (_event, data: Omit<EnvironmentProfile, 'id'>) => {
       if (!this.environmentStore) return null;
-      return this.environmentStore.add(data);
+      const profile = this.environmentStore.add(data);
+      this.emitPlatformLog({ level: 'info', category: 'config.env', message: `Environment created: ${profile.name}`, data: { id: profile.id } });
+      return profile;
     });
   }
 
   private handleEnvUpdate(): void {
     ipcMain.handle(IpcEvents.ENV_UPDATE, (_event, { id, patch }: { id: string; patch: Partial<Omit<EnvironmentProfile, 'id'>> }) => {
       if (!this.environmentStore) return null;
-      return this.environmentStore.update(id, patch ?? {});
+      const profile = this.environmentStore.update(id, patch ?? {});
+      if (profile) this.emitPlatformLog({ level: 'info', category: 'config.env', message: `Environment updated: ${profile.name}`, data: { id, patch } });
+      return profile;
     });
   }
 
   private handleEnvDelete(): void {
     ipcMain.handle(IpcEvents.ENV_DELETE, (_event, id: string) => {
       if (!this.environmentStore) return false;
-      return this.environmentStore.delete(id);
+      const name = this.environmentStore.getAll().find((e) => e.id === id)?.name ?? id;
+      const ok = this.environmentStore.delete(id);
+      if (ok) this.emitPlatformLog({ level: 'warning', category: 'config.env', message: `Environment deleted: ${name}`, data: { id } });
+      return ok;
     });
   }
 
   private handleEnvActivate(): void {
     ipcMain.handle(IpcEvents.ENV_ACTIVATE, async (_event, id: string) => {
       if (!this.environmentStore) return null;
+      const prevId = this.environmentStore.getActiveId();
       const profile = this.environmentStore.activate(id);
       if (!profile) return null;
 
@@ -1693,6 +1742,12 @@ export class IpcRouter {
       }
 
       if (envApps) this.replaceRuntimeAppDirectory(envApps);
+      this.emitPlatformLog({
+        level: 'info',
+        category: 'config.env',
+        message: `Environment activated: ${profile.name}`,
+        data: { from: prevId, to: id, appCount: envApps?.length ?? 0, fetchedFromUrl },
+      });
       return { profile, appCount: envApps?.length ?? null, fetchedFromUrl };
     });
   }
