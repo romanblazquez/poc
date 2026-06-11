@@ -6,6 +6,7 @@ type BridgeStatusListener = (status: BridgeStatus) => void;
 
 const PROBE_TIMEOUT_MS = 250;
 const MAX_RANGE_SIZE = 32;
+const POLL_INTERVAL_MS = 15_000;
 
 export class BridgeService {
   private readonly store = new BridgeSettingsStore();
@@ -14,6 +15,15 @@ export class BridgeService {
     lastCheckedAt: null,
     notes: this.defaultNotes(),
   });
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private scanning = false;
+
+  init(): void {
+    if (this.store.get().enabled) {
+      void this.scan();
+      this.startPolling();
+    }
+  }
 
   getSettings(): BridgeSettings {
     return this.store.get();
@@ -61,6 +71,9 @@ export class BridgeService {
     this.emit();
     if (settings.enabled) {
       void this.scan();
+      this.startPolling();
+    } else {
+      this.stopPolling();
     }
     return settings;
   }
@@ -73,10 +86,30 @@ export class BridgeService {
       notes: this.defaultNotes(),
     });
     this.emit();
+    if (settings.enabled) {
+      this.startPolling();
+    } else {
+      this.stopPolling();
+    }
     return this.getStatus();
   }
 
+  destroy(): void {
+    this.stopPolling();
+    this.listeners.clear();
+  }
+
   async scan(): Promise<BridgeStatus> {
+    if (this.scanning) return this.getStatus();
+    this.scanning = true;
+    try {
+      return await this.runScan();
+    } finally {
+      this.scanning = false;
+    }
+  }
+
+  private async runScan(): Promise<BridgeStatus> {
     const settings = this.store.get();
     if (!settings.enabled) {
       this.status = this.makeStatus('disabled', {
@@ -124,6 +157,17 @@ export class BridgeService {
 
     this.emit();
     return this.getStatus();
+  }
+
+  private startPolling(): void {
+    if (this.pollTimer !== null) return;
+    this.pollTimer = setInterval(() => { void this.scan(); }, POLL_INTERVAL_MS);
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer === null) return;
+    clearInterval(this.pollTimer);
+    this.pollTimer = null;
   }
 
   private buildTargets(settings: BridgeSettings): Array<{ host: string; port: number }> {

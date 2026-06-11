@@ -90,6 +90,7 @@ async function bootstrap(): Promise<void> {
   })();
   const managerService = new ManagerService(initialDirectoryFile, 'local');
   const bridgeService = new BridgeService();
+  bridgeService.init();
   const environmentStore = new EnvironmentStore();
   const rbacStore = new RbacStore();
 
