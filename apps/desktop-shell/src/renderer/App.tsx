@@ -789,7 +789,6 @@ export function App() {
               ✦ Ask
               <span className="text-[10px] font-semibold opacity-60">⌘K</span>
             </Button>
-            <WorkspaceToolbar onSave={handleSave} saveStatus={saveStatus} lastSavedAt={lastSavedAt} />
             <ChannelBar
               currentChannel={currentChannel}
               onChannelChange={handleChannelChange}
@@ -930,6 +929,9 @@ export function App() {
                           workspaceName={tab.name}
                           theme={theme}
                           displays={displays}
+                          onSave={handleSave}
+                          saveStatus={saveStatus}
+                          lastSavedAt={lastSavedAt}
                         />
                       </div>
                     );

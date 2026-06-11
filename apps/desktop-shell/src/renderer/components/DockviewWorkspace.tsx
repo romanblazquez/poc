@@ -8,6 +8,7 @@ import type { ThemeName } from '@fdc3-poc/fdc3-core';
 import { LayoutGrid, Plus } from 'lucide-react';
 import { Button } from './ui/button.js';
 import { AppIcon } from './AppIcon.js';
+import { WorkspaceToolbar } from './WorkspaceToolbar.js';
 import 'dockview/dist/styles/dockview.css';
 import '../styles/dockview-override.css';
 
@@ -44,6 +45,9 @@ interface DockviewWorkspaceProps {
    * HWNDs that do not respect CSS display:none on ancestor elements.
    */
   hidden?: boolean;
+  onSave?: () => void;
+  saveStatus?: string;
+  lastSavedAt?: number | null;
 }
 
 export interface DetachedWorkspacePayload {
@@ -321,6 +325,9 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
   headersVisible = false,
   resetKey,
   hidden = false,
+  onSave,
+  saveStatus = '',
+  lastSavedAt,
 }, ref) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const dockApiRef = useRef<DockviewApi | null>(null);
@@ -823,6 +830,9 @@ export const DockviewWorkspace = forwardRef<DockviewWorkspaceHandle, DockviewWor
             </Button>
           )}
           <div className="flex-1" />
+          {onSave && (
+            <WorkspaceToolbar onSave={onSave} saveStatus={saveStatus} lastSavedAt={lastSavedAt} />
+          )}
           <span className="text-[11px] font-extrabold text-muted-foreground">
             {workspaceName ?? 'Workspace'}
           </span>
