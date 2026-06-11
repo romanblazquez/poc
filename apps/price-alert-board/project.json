@@ -1,0 +1,23 @@
+{
+  "name": "price-alert-board",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/price-alert-board/src",
+  "tags": ["type:app", "scope:web", "scope:bridge-demo"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx vite apps/price-alert-board --port=4020 --host=127.0.0.1",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx vite build apps/price-alert-board --outDir=../../dist/apps/price-alert-board",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}

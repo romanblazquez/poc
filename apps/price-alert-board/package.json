@@ -1,0 +1,8 @@
+{
+  "name": "@fdc3-poc/price-alert-board",
+  "version": "0.1.0",
+  "description": "Standalone quote board — demonstrates FDC3 Bridge integration for a non-native FDC3 app",
+  "type": "module",
+  "private": true,
+  "keywords": ["fdc3", "bridge", "demo", "adapter"]
+}

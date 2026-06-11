@@ -1,0 +1,119 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0d0d14;
+  --surface:   #14141e;
+  --border:    rgba(255,255,255,0.08);
+  --text:      #e8e8f0;
+  --muted:     #6b6b84;
+  --accent:    #4f8ef7;
+  --pos:       #40e880;
+  --neg:       #f74f4f;
+  --amber:     #f59e0b;
+  --selected:  rgba(79,142,247,0.10);
+  --selected-b: rgba(79,142,247,0.40);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  color: var(--text);
+}
+
+body { background: var(--bg); }
+
+/* ── Layout ── */
+.app { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.header-left { display: flex; flex-direction: column; gap: 1px; }
+.app-title   { font-size: 14px; font-weight: 800; letter-spacing: -0.01em; }
+.app-subtitle { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+
+.bridge-badge {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 20px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03);
+}
+.bridge-label { font-size: 11px; font-weight: 700; color: var(--muted); }
+
+.dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.dot.green  { background: var(--pos); box-shadow: 0 0 6px var(--pos); }
+.dot.amber  { background: var(--amber); box-shadow: 0 0 6px var(--amber); animation: pulse 1.2s infinite; }
+.dot.red    { background: var(--neg); }
+
+@keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.4 } }
+
+/* ── Board ── */
+.board { flex: 1; overflow: auto; min-height: 0; }
+
+.quote-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.quote-table thead th {
+  position: sticky; top: 0; z-index: 1;
+  padding: 8px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 10px; font-weight: 900;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.quote-table th.num,
+.quote-table td.num { text-align: right; }
+
+.quote-row {
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+.quote-row:hover { background: rgba(255,255,255,0.03); }
+.quote-row.selected {
+  background: var(--selected);
+  outline: 1px solid var(--selected-b);
+  outline-offset: -1px;
+}
+
+.quote-row td { padding: 9px 14px; white-space: nowrap; }
+
+.ticker   { font-size: 12px; font-weight: 900; letter-spacing: 0.02em; color: var(--accent); }
+.name     { color: var(--text); }
+.sector   { font-size: 11px; color: var(--muted); }
+.price    { font-weight: 700; font-variant-numeric: tabular-nums; }
+.change   { font-weight: 700; font-variant-numeric: tabular-nums; }
+.pos      { color: var(--pos); }
+.neg      { color: var(--neg); }
+
+/* ── Bridge status bar ── */
+.bridge-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.bridge-bar-label    { font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; }
+.bridge-bar-endpoint { font-family: monospace; font-size: 11px; color: var(--text); }
+.bridge-bar-sep      { color: var(--border); }
+.bridge-bar-hint     { font-style: italic; }
+.bridge-bar-received { color: var(--text); }
+.bridge-bar-received strong { color: var(--accent); }
+.bridge-bar-error    { color: var(--neg); }
+
+code { font-family: monospace; font-size: 11px; background: rgba(255,255,255,0.07); padding: 1px 4px; border-radius: 3px; }
