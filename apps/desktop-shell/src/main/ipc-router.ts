@@ -1673,7 +1673,7 @@ export class IpcRouter {
       // If no local directory and env has a cloud URL, auto-fetch it.
       if (!envApps && profile.appDirectoryUrl) {
         const url = profile.appDirectoryUrl.trim();
-        if (url) {
+        if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
           try {
             const res = await net.fetch(url);
             if (res.ok) {

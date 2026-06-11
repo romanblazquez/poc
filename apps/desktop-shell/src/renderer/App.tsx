@@ -127,6 +127,11 @@ export interface SmartWorkspaceTemplate {
 
 const WORKSPACE_STORAGE_KEY = 'fdc3.workspace-tabs.v5';
 const LEGACY_WORKSPACE_STATE_STORAGE_KEY = 'fdc3.workspace-tabs.v4';
+const ACTIVE_ENV_STORAGE_KEY = 'fdc3.active-env-id';
+
+function workspaceStorageKey(envId?: string | null): string {
+  return envId ? `fdc3.workspace-tabs.v5.${envId}` : WORKSPACE_STORAGE_KEY;
+}
 
 const DEFAULT_WORKSPACE_TABS: WorkspaceTab[] = [
   {
@@ -156,7 +161,7 @@ function uniquePanelIds(panelIds: string[]): string[] {
   return [...new Set(panelIds.filter((id) => typeof id === 'string' && id.length > 0))];
 }
 
-function readWorkspaceStore(): {
+function readWorkspaceStore(envId?: string | null): {
   tabs: WorkspaceTab[];
   states: Record<string, WorkspaceState>;
   activeWorkspaceId: string;
@@ -170,7 +175,10 @@ function readWorkspaceStore(): {
   };
 
   try {
-    const raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
+    const storageKey = workspaceStorageKey(envId);
+    // Try env-namespaced key first, fall back to legacy shared key
+    const raw = window.localStorage.getItem(storageKey)
+      ?? (envId ? window.localStorage.getItem(WORKSPACE_STORAGE_KEY) : null);
     if (raw) {
       const parsed = JSON.parse(raw) as {
         tabs?: Array<Partial<WorkspaceTab>>;
@@ -263,7 +271,7 @@ function RestoreBanner({ savedAt, onDismiss }: { savedAt: number; onDismiss: () 
 }
 
 export function App() {
-  const initialWorkspaceStore = readWorkspaceStore();
+  const initialWorkspaceStore = readWorkspaceStore(window.localStorage.getItem(ACTIVE_ENV_STORAGE_KEY));
   const [apps, setApps] = useState<AppEntry[]>([]);
   const [preloadPath, setPreloadPath] = useState('');
   const [currentChannel, setCurrentChannel] = useState<UserChannel | null>(null);
@@ -299,6 +307,8 @@ export function App() {
     readSidebarPosition('fdc3.shell.notifications-panel.position'));
   const [hotkeysOpen, setHotkeysOpen] = useState(false);
   const [addAppsOpen, setAddAppsOpen] = useState(false);
+  // Stable ref for current workspace state — read by the env-changed event handler to avoid stale closures
+  const workspaceSnapshotRef = useRef<{ tabs: WorkspaceTab[]; states: Record<string, WorkspaceState>; activeId: string } | null>(null);
   const dockviewRef = useRef<DockviewWorkspaceHandle>(null);
   const [shellManifest, setShellManifest] = useState<ShellManifestView | null>(null);
   const [activeEnv, setActiveEnv] = useState<{ id: string; name: string; color?: string } | null>(null);
@@ -307,6 +317,7 @@ export function App() {
   activeWorkspaceIdRef.current = activeWorkspaceId;
 
   const activeWorkspaceTab = workspaceTabs.find((tab) => tab.id === activeWorkspaceId) ?? workspaceTabs[0];
+  workspaceSnapshotRef.current = { tabs: workspaceTabs, states: workspaceStates, activeId: activeWorkspaceTab.id };
   const activeWorkspaceState = workspaceStates[activeWorkspaceTab.id]
     ?? { channelId: null, theme: globalTheme, layout: null };
   const theme = globalTheme;
@@ -417,6 +428,31 @@ export function App() {
       const found = activeId ? list.find((e) => e.id === activeId) ?? null : null;
       setActiveEnv(found);
     });
+
+    const onEnvChanged = (e: Event) => {
+      const { id, name, color } = (e as CustomEvent<{ id: string; name: string; color?: string }>).detail;
+      // Save current workspace under the OLD env key before switching (use ref for current values)
+      const snap = workspaceSnapshotRef.current;
+      const prevEnvId = window.localStorage.getItem(ACTIVE_ENV_STORAGE_KEY);
+      if (snap) {
+        window.localStorage.setItem(workspaceStorageKey(prevEnvId), JSON.stringify({
+          tabs: snap.tabs,
+          states: snap.states,
+          activeWorkspaceId: snap.activeId,
+          savedAt: Date.now(),
+        }));
+      }
+      // Store new env id and load its workspace
+      window.localStorage.setItem(ACTIVE_ENV_STORAGE_KEY, id);
+      setActiveEnv({ id, name, color });
+      const next = readWorkspaceStore(id);
+      setWorkspaceTabs(next.tabs);
+      setWorkspaceStates(next.states);
+      setActiveWorkspaceId(next.activeWorkspaceId);
+    };
+    window.addEventListener('fdc3-env-changed', onEnvChanged);
+    return () => window.removeEventListener('fdc3-env-changed', onEnvChanged);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -475,7 +511,7 @@ export function App() {
 
   useEffect(() => {
     const ts = Date.now();
-    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({
+    window.localStorage.setItem(workspaceStorageKey(window.localStorage.getItem(ACTIVE_ENV_STORAGE_KEY)), JSON.stringify({
       tabs: workspaceTabs,
       states: workspaceStates,
       activeWorkspaceId: activeWorkspaceTab.id,
@@ -502,7 +538,7 @@ export function App() {
 
   const handleSave = useCallback(async () => {
     const ts = Date.now();
-    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({
+    window.localStorage.setItem(workspaceStorageKey(window.localStorage.getItem(ACTIVE_ENV_STORAGE_KEY)), JSON.stringify({
       tabs: workspaceTabs,
       states: workspaceStates,
       activeWorkspaceId: activeWorkspaceTab.id,

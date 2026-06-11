@@ -77,6 +77,10 @@ export function Environments() {
       const result = await envApi().activate(id);
       if (result) {
         setActiveId(result.profile.id);
+        window.localStorage.setItem('fdc3.active-env-id', id);
+        window.dispatchEvent(new CustomEvent('fdc3-env-changed', {
+          detail: { id: result.profile.id, name: result.profile.name, color: result.profile.color },
+        }));
         const extra = (result as { fetchedFromUrl?: boolean }).fetchedFromUrl ? ' (fetched from URL)' : '';
         const msg = result.appCount != null
           ? `Switched to ${result.profile.name} — ${result.appCount} apps loaded${extra}`
