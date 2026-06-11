@@ -1,0 +1,15 @@
+{
+  "name": "@fdc3-poc/backplane-stub",
+  "version": "0.1.0",
+  "description": "Standalone FINOS Backplane stub for testing the FDC3 Desktop Agent Bridge",
+  "type": "module",
+  "main": "src/main.ts",
+  "bin": {
+    "backplane-stub": "./src/main.ts"
+  },
+  "keywords": ["fdc3", "backplane", "bridge", "stub", "testing"],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

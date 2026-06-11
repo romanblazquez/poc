@@ -1,0 +1,33 @@
+{
+  "name": "backplane-stub",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/backplane-stub/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:node", "scope:stub"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx tsx apps/backplane-stub/src/main.ts",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "serve:port": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx tsx apps/backplane-stub/src/main.ts",
+        "cwd": "{workspaceRoot}",
+        "env": {
+          "PORT": "4475"
+        }
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p apps/backplane-stub/tsconfig.json",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}
