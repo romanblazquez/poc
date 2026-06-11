@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { AppEntry } from '../App.js';
 import { Badge } from './ui/badge.js';
 import { Button } from './ui/button.js';
@@ -7,9 +7,7 @@ import { Input } from './ui/input.js';
 import { cn } from '../lib/utils.js';
 import { IconPicker } from './IconPicker.js';
 import { AppIcon } from './AppIcon.js';
-import { CloudDownload, X } from 'lucide-react';
-import { JsonSampleButton } from './JsonSampleButton.js';
-import { SAMPLES } from '../samples.js';
+import { X } from 'lucide-react';
 
 interface AppDirectoryEditorProps {
   apps: AppEntry[];
@@ -21,17 +19,8 @@ interface AppDirectoryApi {
   fetchRemote(url: string): Promise<{ ok: boolean; apps: unknown[]; error?: string }>;
 }
 
-interface EnvApi {
-  list(): Promise<Array<{ id: string; name: string; appDirectoryUrl?: string }>>;
-  getActiveId(): Promise<string | null>;
-}
-
 function getApi(): AppDirectoryApi | undefined {
   return (window as unknown as { shellChrome?: { appDirectory?: AppDirectoryApi } }).shellChrome?.appDirectory;
-}
-
-function getEnvApi(): EnvApi | undefined {
-  return (window as unknown as { shellChrome?: { environment?: EnvApi } }).shellChrome?.environment;
 }
 
 const CATEGORIES = ['CRM', 'Investments', 'Markets', 'Payments', 'Trading', 'Operations', 'Analytics'];
@@ -384,20 +373,6 @@ export function AppDirectoryEditor({ apps, onAppsChanged }: AppDirectoryEditorPr
   const [filter, setFilter] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [dirty, setDirty] = useState(false);
-  const [appDUrl, setAppDUrl] = useState('');
-  const [importStatus, setImportStatus] = useState<'idle' | 'fetching' | 'error'>('idle');
-  const [importError, setImportError] = useState('');
-
-  // Load the active environment's appDirectoryUrl on mount.
-  useEffect(() => {
-    const envApi = getEnvApi();
-    if (!envApi) return;
-    void (async () => {
-      const [profiles, activeId] = await Promise.all([envApi.list(), envApi.getActiveId()]);
-      const active = profiles.find((p) => p.id === activeId);
-      if (active?.appDirectoryUrl) setAppDUrl(active.appDirectoryUrl);
-    })();
-  }, []);
 
   const applyDraft = useCallback((next: AppEntry[]) => {
     setDraft(next);
@@ -442,30 +417,6 @@ export function AppDirectoryEditor({ apps, onAppsChanged }: AppDirectoryEditorPr
     }
   }, [draft, onAppsChanged]);
 
-  const handleImportFromAppD = useCallback(async () => {
-    const appDirApi = getApi();
-    if (!appDirApi || !appDUrl.trim()) return;
-    setImportStatus('fetching');
-    setImportError('');
-    try {
-      const result = await appDirApi.fetchRemote(appDUrl.trim());
-      if (!result.ok) { setImportStatus('error'); setImportError(result.error ?? 'Unknown error'); return; }
-      const incoming = result.apps as AppEntry[];
-      // Merge: update existing entries by appId, append new ones.
-      const merged = [...draft];
-      for (const app of incoming) {
-        const idx = merged.findIndex((a) => a.appId === app.appId);
-        if (idx >= 0) merged[idx] = { ...merged[idx], ...app };
-        else merged.push(app);
-      }
-      applyDraft(merged);
-      setImportStatus('idle');
-    } catch (e) {
-      setImportStatus('error');
-      setImportError(e instanceof Error ? e.message : String(e));
-    }
-  }, [appDUrl, draft, applyDraft]);
-
   const filtered = draft.filter((a) => {
     const q = filter.toLowerCase();
     return (
@@ -478,33 +429,6 @@ export function AppDirectoryEditor({ apps, onAppsChanged }: AppDirectoryEditorPr
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-      {/* AppD import row */}
-      <div className="flex shrink-0 items-center gap-2 rounded-lg border bg-card px-3 py-2">
-        <CloudDownload className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.07em] text-muted-foreground">AppD URL</span>
-        <Input
-          value={appDUrl}
-          onChange={(e) => setAppDUrl(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') void handleImportFromAppD(); }}
-          placeholder="https://appd.firm.com/v2/apps  or  file.json"
-          className="h-7 flex-1 font-mono text-xs"
-        />
-        <JsonSampleButton {...SAMPLES.appDirectory} />
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-7 shrink-0 text-xs"
-          disabled={!appDUrl.trim() || importStatus === 'fetching'}
-          onClick={() => void handleImportFromAppD()}
-        >
-          {importStatus === 'fetching' ? 'Fetching…' : 'Import'}
-        </Button>
-        {importStatus === 'error' && (
-          <span className="shrink-0 text-[11px] font-bold text-destructive" title={importError}>Import failed</span>
-        )}
-      </div>
-
       {/* Toolbar */}
       <div className="flex shrink-0 items-center gap-2">
         <Input
