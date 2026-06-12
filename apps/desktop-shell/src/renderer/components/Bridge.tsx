@@ -7,7 +7,6 @@ import { Input } from './ui/input.js';
 import { Switch } from './ui/switch.js';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip.js';
 import { AlertCircle, BookOpen, CheckCircle2, Code2, Info, Link2, Pencil, Radio, TriangleAlert, Trash2, Zap } from 'lucide-react';
-import { MermaidDiagram } from './ui/mermaid.js';
 import { cn } from '../lib/utils.js';
 
 // ─── Local types ───────────────────────────────────────────────────────────────
@@ -759,24 +758,11 @@ function GuideSection(): JSX.Element {
             The bridge acts as a <strong className="text-foreground">neutral hub</strong> that routes FDC3 messages between them.
           </p>
 
-          <MermaidDiagram
-            className="mt-4"
-            caption="Topology"
-            definition={`
-flowchart LR
-    BBG["Bloomberg Terminal\\nFDC3 Desktop Agent"]
-    MOB["Mobile App\\nFDC3 Desktop Agent"]
-    SHL["Your Shell\\nFDC3 Desktop Agent"]
-    BRP(["FINOS Backplane\\nBridge Hub"])
-
-    BBG -->|WebSocket| BRP
-    MOB -->|WebSocket| BRP
-    SHL -->|WebSocket| BRP
-    BRP -->|broadcast| BBG
-    BRP -->|broadcast| MOB
-    BRP -->|broadcast| SHL
-            `.trim()}
-          />
+          <div className="mt-4 rounded-lg border border-border bg-muted/10 p-4 text-[11px] leading-5 text-muted-foreground">
+            <div className="mb-2 text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">Topology</div>
+            <p>Bloomberg Terminal DA → WebSocket → FINOS Backplane ← WebSocket ← Mobile App DA ← WebSocket ← Your Shell DA</p>
+            <p className="mt-1">The Backplane broadcasts each message to all connected Desktop Agents simultaneously.</p>
+          </div>
         </CardContent>
       </Card>
 
@@ -835,25 +821,15 @@ flowchart LR
             no user action required, no custom API calls between the two apps.
           </p>
 
-          <MermaidDiagram
-            className="mt-4"
-            caption="Message flow"
-            definition={`
-sequenceDiagram
-    participant BT as Bloomberg Terminal
-    participant BD as Bloomberg DA
-    participant BP as FINOS Backplane
-    participant YS as Your Shell
-    participant MA as Mobile App
-
-    BT->>BD: fdc3.broadcast(fdc3.instrument)
-    BD->>BP: BroadcastRequest (WebSocket)
-    BP->>YS: BroadcastRequest (WebSocket)
-    BP->>MA: BroadcastRequest (WebSocket)
-    MA-->>MA: addContextListener fires
-    YS-->>YS: addContextListener fires
-            `.trim()}
-          />
+          <div className="mt-4 rounded-lg border border-border bg-muted/10 p-4 text-[11px] leading-5 text-muted-foreground">
+            <div className="mb-2 text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">Message flow</div>
+            <ol className="list-decimal pl-4 space-y-1">
+              <li>Bloomberg Terminal calls <GuidePill label="fdc3.broadcast(fdc3.instrument)" /> on its Desktop Agent</li>
+              <li>Bloomberg DA sends a <GuidePill label="BroadcastRequest" /> to the FINOS Backplane via WebSocket</li>
+              <li>Backplane fans out the request to Your Shell and the Mobile App</li>
+              <li>Each recipient fires its local <GuidePill label="addContextListener" /> callbacks</li>
+            </ol>
+          </div>
 
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
             <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
