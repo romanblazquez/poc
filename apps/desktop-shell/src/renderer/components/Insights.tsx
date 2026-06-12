@@ -7,10 +7,11 @@ import type {
   InteropSnapshot,
   PlatformLogsApi,
 } from '@fdc3-poc/fdc3-core';
-import type { AppEntry } from '../App.js';
+import type { AppEntry, WorkspaceTab } from '../App.js';
 import { Button } from './ui/button.js';
 import { Card, CardContent } from './ui/card.js';
 import { Badge } from './ui/badge.js';
+import { DashboardMetric, DashboardMetricGrid } from './ui/dashboard.js';
 import { cn } from '../lib/utils.js';
 import {
   Activity,
@@ -38,6 +39,8 @@ import {
 
 interface InsightsProps {
   apps: AppEntry[];
+  workspaceTabs: WorkspaceTab[];
+  activeWorkspaceId: string;
 }
 
 interface InsightsFdc3Api {
@@ -96,6 +99,10 @@ const BROADCAST_KINDS = new Set<InteropActivityKind>([
   'appChannel.broadcasted',
   'privateChannel.broadcasted',
 ]);
+
+// ─── Section type ────────────────────────────────────────────────────────────
+
+type SectionId = 'activity' | 'channels' | 'intents' | 'app-health' | 'logs';
 
 // ─── Section helper — shadcn Card with row-style iconified header ─────────
 
@@ -237,41 +244,6 @@ function downloadBlob(filename: string, type: string, content: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-// ─── KPI tile ───────────────────────────────────────────────────────────────
-
-interface KpiTileProps {
-  label: string;
-  value: string;
-  hint?: string;
-  accent?: 'good' | 'warn' | 'bad' | 'muted';
-  delta?: { label: string; accent: 'good' | 'bad' | 'muted' };
-}
-function KpiTile({ label, value, hint, accent = 'muted', delta }: KpiTileProps): React.JSX.Element {
-  const color =
-    accent === 'good' ? 'var(--shell-positive)'
-    : accent === 'warn' ? '#f59e0b'
-    : accent === 'bad' ? '#ef4444'
-    : 'var(--shell-text)';
-  const deltaColor =
-    delta?.accent === 'good' ? 'var(--shell-positive)'
-    : delta?.accent === 'bad' ? '#ef4444'
-    : 'var(--shell-muted)';
-  return (
-    <Card className="flex min-h-[78px] flex-col gap-1 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{label}</div>
-        {delta && delta.label !== '·' && (
-          <div className="text-[10px] font-extrabold tabular-nums" style={{ color: deltaColor }}>
-            {delta.label}
-          </div>
-        )}
-      </div>
-      <div className="text-[22px] font-black leading-none tabular-nums" style={{ color }}>{value}</div>
-      {hint && <div className="text-[10px] font-semibold text-muted-foreground">{hint}</div>}
-    </Card>
-  );
-}
-
 // ─── Sparkline ──────────────────────────────────────────────────────────────
 
 interface SparklineProps {
@@ -333,9 +305,23 @@ function Sparkline({ series, height = 48, accent = 'var(--shell-accent)', anomal
   );
 }
 
+// ─── Event kind badge ────────────────────────────────────────────────────────
+
+function KindBadge({ kind }: { kind: InteropActivityKind }): React.JSX.Element {
+  const cls =
+    kind.startsWith('intent') ? 'bg-violet-500/15 text-violet-400'
+    : kind.startsWith('context') || kind.startsWith('appChannel') || kind.startsWith('privateChannel') ? 'bg-sky-500/15 text-sky-400'
+    : 'bg-muted text-muted-foreground';
+  return (
+    <span className={cn('rounded px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.06em]', cls)}>
+      {kind}
+    </span>
+  );
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export function Insights({ apps }: InsightsProps): React.JSX.Element {
+export function Insights({ apps, workspaceTabs, activeWorkspaceId }: InsightsProps): React.JSX.Element {
   const api = getApi();
   const logsApi = getPlatformLogsApi();
 
@@ -351,6 +337,8 @@ export function Insights({ apps }: InsightsProps): React.JSX.Element {
   );
   const [windowKey, setWindowKey] = useState<WindowKey>('5m');
   const [now, setNow] = useState<number>(() => Date.now());
+  const [wsScope, setWsScope] = useState<string>(activeWorkspaceId);
+  const [section, setSection] = useState<SectionId>('activity');
   const eventsRef = useRef<InteropActivityEvent[]>(events);
   const logsRef = useRef<AppLogEvent[]>(logs);
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -446,6 +434,28 @@ export function Insights({ apps }: InsightsProps): React.JSX.Element {
     return () => clearInterval(id);
   }, []);
 
+  // ─── Workspace scope filtering ────────────────────────────────────────────
+
+  const wsScopeApps = useMemo((): Set<string> | null => {
+    if (wsScope === 'all') return null;
+    const tab = workspaceTabs.find((t) => t.id === wsScope);
+    return tab ? new Set(tab.panelIds) : null;
+  }, [workspaceTabs, wsScope]);
+
+  const workspaceScopedEvents = useMemo(() => {
+    if (!wsScopeApps) return events;
+    return events.filter((e) =>
+      (e.sourceAppId && wsScopeApps.has(e.sourceAppId)) ||
+      (e.targetAppId && wsScopeApps.has(e.targetAppId)) ||
+      (e.appId && wsScopeApps.has(e.appId))
+    );
+  }, [events, wsScopeApps]);
+
+  const workspaceScopedLogs = useMemo(() => {
+    if (!wsScopeApps) return logs;
+    return logs.filter((l) => l.appId && wsScopeApps.has(l.appId));
+  }, [logs, wsScopeApps]);
+
   // ─── Filter helpers ───────────────────────────────────────────────────────
 
   const filterActive = !isFilterEmpty(filter);
@@ -453,14 +463,14 @@ export function Insights({ apps }: InsightsProps): React.JSX.Element {
   // Pre-filter every event/log by the drill-down filter ONCE, so every
   // downstream useMemo benefits without re-filtering.
   const filteredEvents = useMemo(() => {
-    if (!filterActive) return events;
-    return events.filter((e) => eventMatchesFilter(e, filter));
-  }, [events, filter, filterActive]);
+    if (!filterActive) return workspaceScopedEvents;
+    return workspaceScopedEvents.filter((e) => eventMatchesFilter(e, filter));
+  }, [workspaceScopedEvents, filter, filterActive]);
 
   const filteredLogs = useMemo(() => {
-    if (!filterActive) return logs;
-    return logs.filter((l) => logMatchesFilter(l, filter));
-  }, [logs, filter, filterActive]);
+    if (!filterActive) return workspaceScopedLogs;
+    return workspaceScopedLogs.filter((l) => logMatchesFilter(l, filter));
+  }, [workspaceScopedLogs, filter, filterActive]);
 
   // ─── Windowed slices ─────────────────────────────────────────────────────
 
@@ -751,20 +761,51 @@ export function Insights({ apps }: InsightsProps): React.JSX.Element {
     }, null, 2));
   }, [windowed, windowKey, windowMs, kpis]);
 
+  // ─── Delta detail helpers for monitor strip ───────────────────────────────
+
+  function deltaSpan(d: { label: string; accent: 'good' | 'bad' | 'muted' } | undefined): React.ReactNode {
+    if (!d || d.label === '·') return undefined;
+    const color = d.accent === 'good' ? 'text-emerald-400' : d.accent === 'bad' ? 'text-rose-400' : 'text-muted-foreground';
+    return <span className={cn('ml-1 text-[10px] font-extrabold tabular-nums', color)}>{d.label}</span>;
+  }
+
   // ─── Layout ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto pr-0.5 scrollbar-thin">
-      {/* Header bar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-baseline gap-2">
-          <Activity className="h-4 w-4 self-center text-[color:var(--shell-accent)]" />
-          <span className="text-base font-black text-foreground">Intelligence</span>
-          <span className="text-[11px] tabular-nums text-muted-foreground">
-            {kpis.total.toLocaleString()} events · live
-          </span>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+
+      {/* Toolbar row */}
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+        {/* Workspace scope selector */}
+        <span className="text-[10px] font-extrabold uppercase tracking-[0.07em] text-muted-foreground">
+          Workspace
+        </span>
+        <div className="inline-flex gap-0.5 rounded-lg border border-border bg-muted p-0.5">
+          <Button
+            key="all"
+            onClick={() => setWsScope('all')}
+            size="xs"
+            variant={wsScope === 'all' ? 'default' : 'ghost'}
+          >
+            All
+          </Button>
+          {workspaceTabs.map((tab) => (
+            <Button
+              key={tab.id}
+              onClick={() => setWsScope(tab.id)}
+              size="xs"
+              variant={wsScope === tab.id ? 'default' : 'ghost'}
+            >
+              {tab.name}
+            </Button>
+          ))}
         </div>
-        <div className="inline-flex gap-0.5 rounded-lg border border-border bg-muted p-1">
+
+        {/* Vertical separator */}
+        <div className="h-5 w-px bg-border" />
+
+        {/* Time window selector */}
+        <div className="inline-flex gap-0.5 rounded-lg border border-border bg-muted p-0.5">
           {(Object.keys(WINDOW_MS) as WindowKey[]).map((k) => (
             <Button
               key={k}
@@ -776,7 +817,10 @@ export function Insights({ apps }: InsightsProps): React.JSX.Element {
             </Button>
           ))}
         </div>
+
         <div className="flex-1" />
+
+        {/* Actions */}
         <Button onClick={exportCsv} size="sm" variant="outline" title="Download windowed activity as CSV">
           <Download /> CSV
         </Button>
@@ -801,294 +845,483 @@ export function Insights({ apps }: InsightsProps): React.JSX.Element {
         </Button>
       </div>
 
-      {/* Drill-down filter chips — render when any filter is active. */}
-      {filterActive && (
-        <Card className="flex flex-wrap items-center gap-2 px-3 py-2">
-          <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-[10px] font-extrabold uppercase tracking-[0.07em] text-muted-foreground">
-            Filter
-          </span>
-          {(['app', 'channel', 'intent', 'contextType'] as const).map((dim) => {
-            const value = filter[dim];
-            if (!value) return null;
-            const label = dim === 'app' ? appLabel(apps, value) : value;
-            return (
-              <Button
-                key={dim}
-                type="button"
-                onClick={() => setFilter((f) => ({ ...f, [dim]: undefined }))}
-                title={`Remove ${dim} filter`}
-                size="xs"
-                variant="outline"
-                className="h-6 rounded-full border-[color:var(--shell-accent-border)] bg-[color:var(--shell-accent-soft)] px-2.5 text-[11px] font-bold text-foreground hover:bg-[color:color-mix(in_srgb,var(--shell-accent)_24%,transparent)]"
-              >
-                <span className="text-[9px] uppercase tracking-[0.06em] text-muted-foreground">{dim}</span>
-                <span className="tabular-nums">{label}</span>
-                <span className="text-muted-foreground">×</span>
-              </Button>
-            );
-          })}
-          <Button type="button" onClick={() => setFilter({})} variant="ghost" size="xs" className="ml-auto">
-            Clear all
-          </Button>
-        </Card>
-      )}
+      {/* Monitor strip — KPI tiles, always visible */}
+      <DashboardMetricGrid className="shrink-0 border-b px-3 py-2.5">
+        <DashboardMetric
+          label="Events/sec"
+          value={kpis.eventsPerSec}
+          detail={<>{kpis.total.toLocaleString()} in {WINDOW_LABELS[windowKey]}{deltaSpan(deltas?.eventsPerSec)}</>}
+          tone="accent"
+        />
+        <DashboardMetric
+          label="Broadcasts"
+          value={kpis.broadcasts.toLocaleString()}
+          detail={<>{kpis.channelCount} channels active{deltaSpan(deltas?.broadcasts)}</>}
+          tone="neutral"
+        />
+        <DashboardMetric
+          label="Intents raised"
+          value={kpis.intentsRaised.toLocaleString()}
+          detail={<>{kpis.intentsDelivered} delivered{deltaSpan(deltas?.intentsRaised)}</>}
+          tone="success"
+        />
+        <DashboardMetric
+          label="Active apps"
+          value={kpis.activeAppCount.toString()}
+          detail={<>{apps.length} registered{deltaSpan(deltas?.activeAppCount)}</>}
+          tone="neutral"
+        />
+        <DashboardMetric
+          label="Blocked"
+          value={kpis.blocked.toLocaleString()}
+          detail={<>{kpis.blockedRate}% of traffic{deltaSpan(deltas?.blocked)}</>}
+          tone={kpis.blocked > 0 ? 'warning' : 'neutral'}
+        />
+        <DashboardMetric
+          label="Errors"
+          value={kpis.errors.toLocaleString()}
+          detail={<>{kpis.errorRate}% error rate{deltaSpan(deltas?.errors)}</>}
+          tone={kpis.errors > 0 ? 'destructive' : 'neutral'}
+        />
+      </DashboardMetricGrid>
 
-      {/* KPI grid */}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2.5">
-        <KpiTile label="Events/sec (60s)" value={kpis.eventsPerSec} hint={`${kpis.total} in ${WINDOW_LABELS[windowKey]}`} accent="good" delta={deltas?.eventsPerSec} />
-        <KpiTile label="Broadcasts" value={kpis.broadcasts.toLocaleString()} hint={`${kpis.channelCount} channels active`} delta={deltas?.broadcasts} />
-        <KpiTile label="Intents raised" value={kpis.intentsRaised.toLocaleString()} hint={`${kpis.intentsDelivered} delivered`} accent="good" delta={deltas?.intentsRaised} />
-        <KpiTile label="Active apps" value={kpis.activeAppCount.toString()} hint={`${apps.length} registered`} delta={deltas?.activeAppCount} />
-        <KpiTile label="Blocked" value={kpis.blocked.toLocaleString()} hint={`${kpis.blockedRate}% of traffic`} accent={kpis.blocked > 0 ? 'warn' : 'muted'} delta={deltas?.blocked} />
-        <KpiTile label="Errors" value={kpis.errors.toLocaleString()} hint={`${kpis.errorRate}% error rate`} accent={kpis.errors > 0 ? 'bad' : 'muted'} delta={deltas?.errors} />
-        <KpiTile label="Log warnings" value={kpis.logWarnings.toLocaleString()} hint={`${kpis.logErrors} errors`} accent={kpis.logWarnings > 0 ? 'warn' : 'muted'} />
-      </div>
+      {/* Sidebar + content */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
 
-      {/* Sparkline */}
-      <InsightsSection
-        title={`Events / 5s · last 5 min`}
-        icon={Activity}
-        meta={
-          <span className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-[color:var(--shell-accent)]" />
-              all
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-rose-500" />
-              errors + blocked
-            </span>
-            {anomalyBuckets.length > 0 && (
-              <Badge variant="destructive" className="gap-1">
-                <TriangleAlert className="h-3 w-3" />
-                {anomalyBuckets.length} anomal{anomalyBuckets.length === 1 ? 'y' : 'ies'}
-              </Badge>
-            )}
-          </span>
-        }
-      >
-        <CardContent className="flex flex-col gap-1">
-          <Sparkline series={sparklineSeries} accent="var(--shell-accent)" height={60} anomalies={anomalyBuckets} gradientId="spark-main" />
-          <Sparkline series={errorSparklineSeries} accent="#ef4444" height={36} gradientId="spark-err" />
-          <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
-            <span>5m ago</span><span>now</span>
+        {/* Left sidebar */}
+        <nav className="flex w-44 shrink-0 flex-col gap-0.5 overflow-y-auto border-r bg-card p-1.5">
+          <div className="px-2 pb-1 pt-2">
+            <div className="text-xs font-black text-muted-foreground uppercase tracking-[0.07em]">Analytics</div>
           </div>
-        </CardContent>
-      </InsightsSection>
 
-      {/* Two-column: Channels + Intents */}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(360px,1fr))] gap-3">
-        {/* Channels */}
-        <InsightsSection
-          title="Channel heatmap"
-          icon={Radio}
-          meta={<span className="tabular-nums">{channels.length} active</span>}
-        >
-          {channels.length === 0 ? (
-            <InsightsEmpty message="No channel traffic in window." />
-          ) : (
-            <div>
-              {channels.map((ch) => {
-                const pct = Math.round((ch.count / maxChannelCount) * 100);
-                const active = filter.channel === ch.channelId;
+          {/* Activity */}
+          <Button
+            type="button"
+            variant={section === 'activity' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setSection('activity')}
+            className={cn('w-full justify-start gap-2', section !== 'activity' && 'text-muted-foreground')}
+          >
+            <Activity className="h-3.5 w-3.5 shrink-0" />
+            <span className="flex-1 text-left">Activity</span>
+            {anomalyBuckets.length > 0 && (
+              <span className={cn('tabular-nums text-[10px] font-bold', section === 'activity' ? 'opacity-70' : 'text-rose-400')}>
+                {anomalyBuckets.length}
+              </span>
+            )}
+          </Button>
+
+          {/* Channels */}
+          <Button
+            type="button"
+            variant={section === 'channels' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setSection('channels')}
+            className={cn('w-full justify-start gap-2', section !== 'channels' && 'text-muted-foreground')}
+          >
+            <Radio className="h-3.5 w-3.5 shrink-0" />
+            <span className="flex-1 text-left">Channels</span>
+            {channels.length > 0 && (
+              <span className={cn('tabular-nums text-[10px] font-bold', section === 'channels' ? 'opacity-70' : 'text-muted-foreground')}>
+                {channels.length}
+              </span>
+            )}
+          </Button>
+
+          {/* Intents */}
+          <Button
+            type="button"
+            variant={section === 'intents' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setSection('intents')}
+            className={cn('w-full justify-start gap-2', section !== 'intents' && 'text-muted-foreground')}
+          >
+            <Zap className="h-3.5 w-3.5 shrink-0" />
+            <span className="flex-1 text-left">Intents</span>
+            {intents.length > 0 && (
+              <span className={cn('tabular-nums text-[10px] font-bold', section === 'intents' ? 'opacity-70' : 'text-muted-foreground')}>
+                {intents.length}
+              </span>
+            )}
+          </Button>
+
+          {/* App Health */}
+          <Button
+            type="button"
+            variant={section === 'app-health' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setSection('app-health')}
+            className={cn('w-full justify-start gap-2', section !== 'app-health' && 'text-muted-foreground')}
+          >
+            <Layers className="h-3.5 w-3.5 shrink-0" />
+            <span className="flex-1 text-left">App Health</span>
+            {appHealth.length > 0 && (
+              <span className={cn('tabular-nums text-[10px] font-bold', section === 'app-health' ? 'opacity-70' : 'text-muted-foreground')}>
+                {appHealth.length}
+              </span>
+            )}
+          </Button>
+
+          {/* Logs */}
+          <Button
+            type="button"
+            variant={section === 'logs' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setSection('logs')}
+            className={cn('w-full justify-start gap-2', section !== 'logs' && 'text-muted-foreground')}
+          >
+            <FileText className="h-3.5 w-3.5 shrink-0" />
+            <span className="flex-1 text-left">Logs</span>
+            {windowedLogs.length > 0 && (
+              <span className={cn('tabular-nums text-[10px] font-bold', section === 'logs' ? 'opacity-70' : 'text-muted-foreground')}>
+                {windowedLogs.length}
+              </span>
+            )}
+          </Button>
+
+          {/* Active filter chips */}
+          {filterActive && (
+            <>
+              <div className="my-1 h-px bg-border" />
+              <div className="px-2 pb-0.5">
+                <div className="text-[9px] font-extrabold uppercase tracking-[0.07em] text-muted-foreground">Filters</div>
+              </div>
+              {(['app', 'channel', 'intent', 'contextType'] as const).map((dim) => {
+                const value = filter[dim];
+                if (!value) return null;
+                const label = dim === 'app' ? appLabel(apps, value) : value;
                 return (
-                  <div
-                    key={ch.channelId}
-                    onClick={() => setFilter((f) => ({ ...f, channel: active ? undefined : ch.channelId }))}
-                    title={active ? 'Click to clear channel filter' : `Filter to channel ${ch.channelId}`}
-                    className={cn(
-                      'relative cursor-pointer border-t border-border transition-colors hover:bg-[color:rgba(255,255,255,0.03)]',
-                      active && 'bg-[color:rgba(64,128,232,0.10)]',
-                    )}
+                  <Button
+                    key={dim}
+                    type="button"
+                    onClick={() => setFilter((f) => ({ ...f, [dim]: undefined }))}
+                    title={`Remove ${dim} filter`}
+                    size="xs"
+                    variant="outline"
+                    className="h-6 w-full justify-start rounded-full border-[color:var(--shell-accent-border)] bg-[color:var(--shell-accent-soft)] px-2 text-[10px] font-bold text-foreground hover:bg-[color:color-mix(in_srgb,var(--shell-accent)_24%,transparent)]"
                   >
-                    <div
-                      className="absolute inset-y-0 left-0 bg-[color:var(--shell-accent-soft)] opacity-50"
-                      style={{ width: `${pct}%` }}
-                    />
-                    <div className="relative grid grid-cols-[1fr_auto_auto] items-center gap-2.5 px-3 py-2 text-xs">
-                      <div className="min-w-0">
-                        <div className="truncate text-xs font-extrabold text-foreground">{ch.channelId}</div>
-                        <div className="truncate text-[10px] text-muted-foreground">
-                          {ch.contextTypes.slice(0, 3).join(' · ') || '—'}
-                          {ch.contextTypes.length > 3 ? ` · +${ch.contextTypes.length - 3} more` : ''}
-                        </div>
-                      </div>
-                      <div className="font-extrabold tabular-nums text-foreground">{ch.count.toLocaleString()}</div>
-                      <div className="min-w-[3.5rem] text-right text-[10px] font-bold text-muted-foreground tabular-nums">
-                        {ch.lastTs ? formatLogTime(ch.lastTs) : '—'}
-                      </div>
-                    </div>
-                  </div>
+                    <span className="flex-1 truncate text-left">{label}</span>
+                    <span className="text-muted-foreground">×</span>
+                  </Button>
                 );
               })}
+              <Button type="button" onClick={() => setFilter({})} variant="ghost" size="xs" className="w-full justify-start text-muted-foreground">
+                <Filter className="h-3 w-3" /> Clear all
+              </Button>
+            </>
+          )}
+
+          {/* Anomaly alert */}
+          {anomalyBuckets.length > 0 && (
+            <div className="mt-auto pt-2">
+              <div className="flex items-center gap-1.5 rounded-md bg-rose-500/10 px-2 py-1.5 text-[10px] font-bold text-rose-400">
+                <TriangleAlert className="h-3 w-3 shrink-0" />
+                {anomalyBuckets.length} spike{anomalyBuckets.length === 1 ? '' : 's'} detected
+              </div>
             </div>
           )}
-        </InsightsSection>
+        </nav>
 
-        {/* Intents */}
-        <InsightsSection
-          title="Intent leaderboard"
-          icon={Zap}
-          meta={<span className="tabular-nums">{kpis.intentsRaised} raised · top 10</span>}
-        >
-          {intents.length === 0 ? (
-            <InsightsEmpty message="No intents raised in window." />
-          ) : (
-            <div>
-              {intents.map((it) => {
-                const success = it.delivered;
-                const broken = it.blocked + it.failed;
-                const successRate = it.total > 0 ? Math.round((success / it.total) * 100) : 0;
-                const active = filter.intent === it.intent;
-                const rateClass =
-                  broken === 0 ? 'text-emerald-500'
-                  : broken > success ? 'text-rose-500'
-                  : 'text-amber-500';
-                return (
-                  <div
-                    key={it.intent}
-                    onClick={() => setFilter((f) => ({ ...f, intent: active ? undefined : it.intent }))}
-                    title={active ? 'Click to clear intent filter' : `Filter to intent ${it.intent}`}
-                    className={cn(
-                      'grid cursor-pointer grid-cols-[1fr_auto_auto] items-center gap-2.5 border-t border-border px-3 py-2 text-xs transition-colors hover:bg-[color:rgba(255,255,255,0.03)]',
-                      active && 'bg-[color:rgba(64,128,232,0.10)]',
+        {/* Section content — scrollable */}
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4 scrollbar-thin">
+
+          {/* ── Activity ── */}
+          {section === 'activity' && (
+            <>
+              <InsightsSection
+                title="Events / 5s · last 5 min"
+                icon={Activity}
+                meta={
+                  <span className="flex items-center gap-3">
+                    <span className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-[color:var(--shell-accent)]" />
+                      all
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-rose-500" />
+                      errors + blocked
+                    </span>
+                    {anomalyBuckets.length > 0 && (
+                      <Badge variant="destructive" className="gap-1">
+                        <TriangleAlert className="h-3 w-3" />
+                        {anomalyBuckets.length} anomal{anomalyBuckets.length === 1 ? 'y' : 'ies'}
+                      </Badge>
                     )}
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-extrabold text-foreground">{it.intent}</div>
-                      <div className="text-[10px] font-bold text-muted-foreground">
-                        raised {it.raised} · delivered {it.delivered}
-                        {it.blocked > 0 ? ` · blocked ${it.blocked}` : ''}
-                        {it.failed > 0 ? ` · failed ${it.failed}` : ''}
-                      </div>
-                    </div>
-                    <div className="text-right font-extrabold tabular-nums text-foreground">{it.total}</div>
-                    <div className={cn('min-w-[3.5rem] text-right text-[11px] font-extrabold tabular-nums', rateClass)}>
-                      {successRate}%
-                    </div>
+                  </span>
+                }
+              >
+                <CardContent className="flex flex-col gap-1">
+                  <Sparkline series={sparklineSeries} accent="var(--shell-accent)" height={60} anomalies={anomalyBuckets} gradientId="spark-main" />
+                  <Sparkline series={errorSparklineSeries} accent="#ef4444" height={36} gradientId="spark-err" />
+                  <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
+                    <span>5m ago</span><span>now</span>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </InsightsSection>
-      </div>
+                </CardContent>
+              </InsightsSection>
 
-      {/* App health */}
-      <InsightsSection
-        title="App health"
-        icon={Layers}
-        meta={<span className="tabular-nums">{appHealth.length} apps active</span>}
-      >
-        {appHealth.length === 0 ? (
-          <InsightsEmpty message="No app activity in window." />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-xs">
-              <thead className="bg-secondary">
-                <tr>
-                  {['App', 'Out', 'In', 'Intents raised', 'Intents handled', 'Errors', 'Blocked', 'Last seen'].map((h) => (
-                    <th
-                      key={h}
-                      className={cn(
-                        'border-b border-border px-3 py-2 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground',
-                        h === 'App' ? 'text-left' : 'text-right',
-                      )}
-                    >{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {appHealth.map((r) => {
-                  const idle = r.lastTs > 0 && now - r.lastTs > 60_000;
-                  const active = filter.app === r.appId;
-                  return (
-                    <tr
-                      key={r.appId}
-                      onClick={() => setFilter((f) => ({ ...f, app: active ? undefined : r.appId }))}
-                      title={active ? 'Click to clear app filter' : `Filter to ${r.title}`}
-                      className={cn(
-                        'cursor-pointer border-b border-border transition-colors hover:bg-[color:rgba(255,255,255,0.03)]',
-                        active && 'bg-[color:rgba(64,128,232,0.10)]',
-                      )}
-                    >
-                      <td className="px-3 py-1.5 font-extrabold text-foreground">
-                        <div className="flex items-center gap-2">
+              {/* Recent events list */}
+              <InsightsSection
+                title="Recent events"
+                icon={Activity}
+                meta={<span className="tabular-nums">{windowed.length} in window</span>}
+              >
+                {windowed.length === 0 ? (
+                  <InsightsEmpty message="No events in window." />
+                ) : (
+                  <div>
+                    {windowed.slice(0, 30).map((e) => {
+                      const errored = isError(e);
+                      const blocked = isBlocked(e);
+                      return (
+                        <div
+                          key={e.id}
+                          className="grid grid-cols-[56px_1fr_auto] items-center gap-2 border-t border-border px-3 py-1.5 text-[11px]"
+                        >
+                          <span className="tabular-nums text-muted-foreground">{formatLogTime(e.ts)}</span>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <KindBadge kind={e.kind} />
+                            <span className="truncate text-foreground">
+                              {e.sourceAppId ? appLabel(apps, e.sourceAppId) : '—'}
+                              {e.targetAppId ? <span className="text-muted-foreground"> → {appLabel(apps, e.targetAppId)}</span> : null}
+                            </span>
+                          </div>
                           <span
                             className={cn(
-                              'h-2 w-2 rounded-full',
-                              idle ? 'bg-muted-foreground' : 'bg-emerald-500',
+                              'h-2 w-2 shrink-0 rounded-full',
+                              errored ? 'bg-rose-500' : blocked ? 'bg-amber-500' : 'bg-emerald-500',
                             )}
+                            title={errored ? 'error' : blocked ? 'blocked' : 'ok'}
                           />
-                          {r.title}
                         </div>
-                      </td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">{r.msgsOut}</td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">{r.msgsIn}</td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">{r.intentsRaised}</td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">{r.intentsHandled}</td>
-                      <td className={cn('px-3 py-1.5 text-right tabular-nums', r.errors > 0 ? 'font-extrabold text-rose-500' : 'text-muted-foreground')}>{r.errors}</td>
-                      <td className={cn('px-3 py-1.5 text-right tabular-nums', r.blocked > 0 ? 'font-extrabold text-amber-500' : 'text-muted-foreground')}>{r.blocked}</td>
-                      <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-                        {r.lastTs > 0 ? formatLogTime(r.lastTs) : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </InsightsSection>
-
-      {/* Log severity */}
-      {logsApi && (
-        <InsightsSection
-          title={`Platform logs · ${WINDOW_LABELS[windowKey]}`}
-          icon={FileText}
-          meta={
-            <span className="flex items-center gap-2">
-              <span className="tabular-nums">{windowedLogs.length} entries</span>
-              {kpis.logErrors > 0 && (
-                <Badge variant="destructive" className="gap-1">
-                  <AlertTriangle className="h-3 w-3" />
-                  {kpis.logErrors}
-                </Badge>
-              )}
-              {kpis.logWarnings > 0 && (
-                <Badge variant="warning" className="gap-1">
-                  <TriangleAlert className="h-3 w-3" />
-                  {kpis.logWarnings}
-                </Badge>
-              )}
-            </span>
-          }
-        >
-          {windowedLogs.length === 0 ? (
-            <InsightsEmpty message="No platform logs in window." />
-          ) : (
-            <div className="max-h-[220px] overflow-y-auto scrollbar-thin">
-              {windowedLogs.slice(0, 100).map((l) => (
-                <div
-                  key={l.id}
-                  className="grid grid-cols-[70px_90px_1fr] gap-2.5 border-t border-border px-3 py-1 text-[11px]"
-                >
-                  <span className="tabular-nums text-muted-foreground">{formatLogTime(l.ts)}</span>
-                  <span
-                    className="text-[10px] font-extrabold uppercase tracking-[0.06em]"
-                    style={{ color: logAccent(l.level) }}
-                  >{l.level}</span>
-                  <span className="truncate text-foreground" title={l.message}>
-                    {l.appTitle ? <span className="mr-1.5 text-muted-foreground">[{l.appTitle}]</span> : null}
-                    {l.message}
-                  </span>
-                </div>
-              ))}
-            </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </InsightsSection>
+            </>
           )}
-        </InsightsSection>
-      )}
+
+          {/* ── Channels ── */}
+          {section === 'channels' && (
+            <InsightsSection
+              title="Channel heatmap"
+              icon={Radio}
+              meta={<span className="tabular-nums">{channels.length} active</span>}
+            >
+              {channels.length === 0 ? (
+                <InsightsEmpty message="No channel traffic in window." />
+              ) : (
+                <div>
+                  {channels.map((ch) => {
+                    const pct = Math.round((ch.count / maxChannelCount) * 100);
+                    const active = filter.channel === ch.channelId;
+                    return (
+                      <div
+                        key={ch.channelId}
+                        onClick={() => setFilter((f) => ({ ...f, channel: active ? undefined : ch.channelId }))}
+                        title={active ? 'Click to clear channel filter' : `Filter to channel ${ch.channelId}`}
+                        className={cn(
+                          'relative cursor-pointer border-t border-border transition-colors hover:bg-[color:rgba(255,255,255,0.03)]',
+                          active && 'bg-[color:rgba(64,128,232,0.10)]',
+                        )}
+                      >
+                        <div
+                          className="absolute inset-y-0 left-0 bg-[color:var(--shell-accent-soft)] opacity-50"
+                          style={{ width: `${pct}%` }}
+                        />
+                        <div className="relative grid grid-cols-[1fr_auto_auto] items-center gap-2.5 px-3 py-2 text-xs">
+                          <div className="min-w-0">
+                            <div className="truncate text-xs font-extrabold text-foreground">{ch.channelId}</div>
+                            <div className="truncate text-[10px] text-muted-foreground">
+                              {ch.contextTypes.slice(0, 3).join(' · ') || '—'}
+                              {ch.contextTypes.length > 3 ? ` · +${ch.contextTypes.length - 3} more` : ''}
+                            </div>
+                          </div>
+                          <div className="font-extrabold tabular-nums text-foreground">{ch.count.toLocaleString()}</div>
+                          <div className="min-w-[3.5rem] text-right text-[10px] font-bold text-muted-foreground tabular-nums">
+                            {ch.lastTs ? formatLogTime(ch.lastTs) : '—'}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </InsightsSection>
+          )}
+
+          {/* ── Intents ── */}
+          {section === 'intents' && (
+            <InsightsSection
+              title="Intent leaderboard"
+              icon={Zap}
+              meta={<span className="tabular-nums">{kpis.intentsRaised} raised · top 10</span>}
+            >
+              {intents.length === 0 ? (
+                <InsightsEmpty message="No intents raised in window." />
+              ) : (
+                <div>
+                  {intents.map((it) => {
+                    const success = it.delivered;
+                    const broken = it.blocked + it.failed;
+                    const successRate = it.total > 0 ? Math.round((success / it.total) * 100) : 0;
+                    const active = filter.intent === it.intent;
+                    const rateClass =
+                      broken === 0 ? 'text-emerald-500'
+                      : broken > success ? 'text-rose-500'
+                      : 'text-amber-500';
+                    return (
+                      <div
+                        key={it.intent}
+                        onClick={() => setFilter((f) => ({ ...f, intent: active ? undefined : it.intent }))}
+                        title={active ? 'Click to clear intent filter' : `Filter to intent ${it.intent}`}
+                        className={cn(
+                          'grid cursor-pointer grid-cols-[1fr_auto_auto] items-center gap-2.5 border-t border-border px-3 py-2 text-xs transition-colors hover:bg-[color:rgba(255,255,255,0.03)]',
+                          active && 'bg-[color:rgba(64,128,232,0.10)]',
+                        )}
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-xs font-extrabold text-foreground">{it.intent}</div>
+                          <div className="text-[10px] font-bold text-muted-foreground">
+                            raised {it.raised} · delivered {it.delivered}
+                            {it.blocked > 0 ? ` · blocked ${it.blocked}` : ''}
+                            {it.failed > 0 ? ` · failed ${it.failed}` : ''}
+                          </div>
+                        </div>
+                        <div className="text-right font-extrabold tabular-nums text-foreground">{it.total}</div>
+                        <div className={cn('min-w-[3.5rem] text-right text-[11px] font-extrabold tabular-nums', rateClass)}>
+                          {successRate}%
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </InsightsSection>
+          )}
+
+          {/* ── App Health ── */}
+          {section === 'app-health' && (
+            <InsightsSection
+              title="App health"
+              icon={Layers}
+              meta={<span className="tabular-nums">{appHealth.length} apps active</span>}
+            >
+              {appHealth.length === 0 ? (
+                <InsightsEmpty message="No app activity in window." />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-xs">
+                    <thead className="bg-secondary">
+                      <tr>
+                        {['App', 'Out', 'In', 'Intents raised', 'Intents handled', 'Errors', 'Blocked', 'Last seen'].map((h) => (
+                          <th
+                            key={h}
+                            className={cn(
+                              'border-b border-border px-3 py-2 text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground',
+                              h === 'App' ? 'text-left' : 'text-right',
+                            )}
+                          >{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {appHealth.map((r) => {
+                        const idle = r.lastTs > 0 && now - r.lastTs > 60_000;
+                        const active = filter.app === r.appId;
+                        return (
+                          <tr
+                            key={r.appId}
+                            onClick={() => setFilter((f) => ({ ...f, app: active ? undefined : r.appId }))}
+                            title={active ? 'Click to clear app filter' : `Filter to ${r.title}`}
+                            className={cn(
+                              'cursor-pointer border-b border-border transition-colors hover:bg-[color:rgba(255,255,255,0.03)]',
+                              active && 'bg-[color:rgba(64,128,232,0.10)]',
+                            )}
+                          >
+                            <td className="px-3 py-1.5 font-extrabold text-foreground">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={cn(
+                                    'h-2 w-2 rounded-full',
+                                    idle ? 'bg-muted-foreground' : 'bg-emerald-500',
+                                  )}
+                                />
+                                {r.title}
+                              </div>
+                            </td>
+                            <td className="px-3 py-1.5 text-right tabular-nums">{r.msgsOut}</td>
+                            <td className="px-3 py-1.5 text-right tabular-nums">{r.msgsIn}</td>
+                            <td className="px-3 py-1.5 text-right tabular-nums">{r.intentsRaised}</td>
+                            <td className="px-3 py-1.5 text-right tabular-nums">{r.intentsHandled}</td>
+                            <td className={cn('px-3 py-1.5 text-right tabular-nums', r.errors > 0 ? 'font-extrabold text-rose-500' : 'text-muted-foreground')}>{r.errors}</td>
+                            <td className={cn('px-3 py-1.5 text-right tabular-nums', r.blocked > 0 ? 'font-extrabold text-amber-500' : 'text-muted-foreground')}>{r.blocked}</td>
+                            <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                              {r.lastTs > 0 ? formatLogTime(r.lastTs) : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </InsightsSection>
+          )}
+
+          {/* ── Logs ── */}
+          {section === 'logs' && logsApi && (
+            <InsightsSection
+              title={`Platform logs · ${WINDOW_LABELS[windowKey]}`}
+              icon={FileText}
+              meta={
+                <span className="flex items-center gap-2">
+                  <span className="tabular-nums">{windowedLogs.length} entries</span>
+                  {kpis.logErrors > 0 && (
+                    <Badge variant="destructive" className="gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      {kpis.logErrors}
+                    </Badge>
+                  )}
+                  {kpis.logWarnings > 0 && (
+                    <Badge variant="warning" className="gap-1">
+                      <TriangleAlert className="h-3 w-3" />
+                      {kpis.logWarnings}
+                    </Badge>
+                  )}
+                </span>
+              }
+            >
+              {windowedLogs.length === 0 ? (
+                <InsightsEmpty message="No platform logs in window." />
+              ) : (
+                <div>
+                  {windowedLogs.map((l) => (
+                    <div
+                      key={l.id}
+                      className="grid grid-cols-[70px_90px_1fr] gap-2.5 border-t border-border px-3 py-1 text-[11px]"
+                    >
+                      <span className="tabular-nums text-muted-foreground">{formatLogTime(l.ts)}</span>
+                      <span
+                        className="text-[10px] font-extrabold uppercase tracking-[0.06em]"
+                        style={{ color: logAccent(l.level) }}
+                      >{l.level}</span>
+                      <span className="truncate text-foreground" title={l.message}>
+                        {l.appTitle ? <span className="mr-1.5 text-muted-foreground">[{l.appTitle}]</span> : null}
+                        {l.message}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </InsightsSection>
+          )}
+          {section === 'logs' && !logsApi && (
+            <InsightsEmpty message="Platform logs API not available in this renderer." />
+          )}
+
+        </div>
+      </div>
     </div>
   );
 }

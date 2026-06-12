@@ -1139,6 +1139,8 @@ const handleDeleteLayout = useCallback(async (id: string) => {
                 currentChannel={currentChannel}
                 onOpen={handleOpen}
                 onComposeWorkspace={handleComposeWorkspace}
+                workspaceTabs={workspaceTabs}
+                activeWorkspaceId={activeWorkspaceId}
               />
             ) : activeMode === 'inspector' ? (
               <ContextInspector />

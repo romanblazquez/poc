@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CommandCenter } from './CommandCenter.js';
 import { Insights } from './Insights.js';
-import type { AppEntry, SmartWorkspaceTemplate } from '../App.js';
+import type { AppEntry, SmartWorkspaceTemplate, WorkspaceTab } from '../App.js';
 import type { UserChannel } from '@fdc3-poc/fdc3-core';
 import { DashboardHeader, DashboardPage, StatusBadge } from './ui/dashboard.js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs.js';
@@ -11,6 +11,8 @@ interface ControlTowerProps {
   currentChannel: UserChannel | null;
   onOpen: (appId: string) => Promise<void>;
   onComposeWorkspace: (template: SmartWorkspaceTemplate) => Promise<void>;
+  workspaceTabs: WorkspaceTab[];
+  activeWorkspaceId: string;
 }
 
 type TowerView = 'live' | 'intelligence';
@@ -20,6 +22,8 @@ export function ControlTower({
   currentChannel,
   onOpen,
   onComposeWorkspace,
+  workspaceTabs,
+  activeWorkspaceId,
 }: ControlTowerProps): JSX.Element {
   const [view, setView] = useState<TowerView>('live');
 
@@ -52,7 +56,7 @@ export function ControlTower({
           />
         </TabsContent>
         <TabsContent value="intelligence" className="min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
-          <Insights apps={apps} />
+          <Insights apps={apps} workspaceTabs={workspaceTabs} activeWorkspaceId={activeWorkspaceId} />
         </TabsContent>
       </DashboardPage>
     </Tabs>
