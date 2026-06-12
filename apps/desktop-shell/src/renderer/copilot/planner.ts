@@ -1,5 +1,5 @@
 /**
- * Interop Copilot — deterministic natural-language → FDC3 plan.
+ * Nexus Copilot — deterministic natural-language → FDC3 plan.
  *
  * Turns a plain-English instruction ("show me apple and pull up the news") into a
  * reviewable list of FDC3 actions (broadcast / open / raiseIntent / joinChannel)

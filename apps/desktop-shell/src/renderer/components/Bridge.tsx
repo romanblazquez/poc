@@ -1050,7 +1050,7 @@ export function Bridge(): JSX.Element {
     <TooltipProvider>
       <DashboardPage>
         <DashboardHeader
-          eyebrow="FDC3 interoperability"
+          eyebrow="FDC3 connectivity"
           title="Desktop Agent Bridge"
           description={
             <>

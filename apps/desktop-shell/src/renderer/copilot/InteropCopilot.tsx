@@ -1,5 +1,5 @@
 /**
- * Interop Copilot — the "Ask the Desktop" command bar.
+ * Nexus Copilot — the "Ask the Desktop" command bar.
  *
  * Cmd/Ctrl-K opens it. Type plain English; it produces a reviewable FDC3 action
  * plan and, on Run, executes each step against the live fleet through window.fdc3.

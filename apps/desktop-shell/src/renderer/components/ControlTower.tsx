@@ -36,7 +36,7 @@ export function ControlTower({
       <DashboardPage>
         <DashboardHeader
           eyebrow="FDC3 operations"
-          title="Interop Control Tower"
+          title="Nexus Control Tower"
           description="Live route governance, workflow replay, channel telemetry, app health, and exportable audit intelligence."
           meta={<StatusBadge label={view === 'live' ? 'Live Ops' : 'Intelligence'} tone="accent" />}
           actions={

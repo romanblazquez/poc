@@ -261,7 +261,7 @@ export function ContextInspector(): JSX.Element {
       <DashboardHeader
         eyebrow="FDC3 observability"
         title="Context Inspector"
-        description="Live DevTools-style panel for all FDC3 interop events — broadcast, intent, channel, and app lifecycle."
+        description="Live DevTools-style panel for all FDC3 Nexus events — broadcast, intent, channel, and app lifecycle."
         meta={
           <StatusBadge
             label={live ? 'Live' : 'Paused'}
@@ -326,7 +326,7 @@ export function ContextInspector(): JSX.Element {
       >
         {filtered.length === 0 ? (
           <div className="flex min-h-32 items-center justify-center text-sm font-bold text-muted-foreground">
-            {events.length === 0 ? 'No interop events recorded yet.' : 'No events match the current filters.'}
+            {events.length === 0 ? 'No Nexus events recorded yet.' : 'No events match the current filters.'}
           </div>
         ) : (
           filtered.map((event) => (
