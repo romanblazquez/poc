@@ -122,15 +122,17 @@ interface InsightsSectionProps {
  */
 function InsightsSection({ title, icon: Icon, meta, children, className }: InsightsSectionProps): React.JSX.Element {
   return (
-    <Card className={cn('flex flex-col gap-0', className)}>
-      <div className="flex items-center justify-between gap-3 border-b px-4 py-2.5">
+    <Card className={cn('flex flex-col gap-0 overflow-hidden', className)}>
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-2.5">
         <div className="flex items-center gap-2">
           <Icon className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-[11px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">{title}</span>
         </div>
         {meta && <div className="text-[11px] font-medium text-muted-foreground">{meta}</div>}
       </div>
-      {children}
+      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+        {children}
+      </div>
     </Card>
   );
 }
@@ -994,12 +996,13 @@ export function Insights({ apps, workspaceTabs, activeWorkspaceId }: InsightsPro
         </nav>
 
         {/* Section content — scrollable */}
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4 scrollbar-thin">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
 
           {/* ── Activity ── */}
           {section === 'activity' && (
-            <>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
               <InsightsSection
+                className="shrink-0"
                 title="Events / 5s · last 5 min"
                 icon={Activity}
                 meta={
@@ -1032,6 +1035,7 @@ export function Insights({ apps, workspaceTabs, activeWorkspaceId }: InsightsPro
 
               {/* Recent events list */}
               <InsightsSection
+                className="min-h-0 flex-1"
                 title="Recent events"
                 icon={Activity}
                 meta={<span className="tabular-nums">{windowed.length} in window</span>}
@@ -1069,12 +1073,13 @@ export function Insights({ apps, workspaceTabs, activeWorkspaceId }: InsightsPro
                   </div>
                 )}
               </InsightsSection>
-            </>
+            </div>
           )}
 
           {/* ── Channels ── */}
           {section === 'channels' && (
             <InsightsSection
+              className="min-h-0 flex-1"
               title="Channel heatmap"
               icon={Radio}
               meta={<span className="tabular-nums">{channels.length} active</span>}
@@ -1124,6 +1129,7 @@ export function Insights({ apps, workspaceTabs, activeWorkspaceId }: InsightsPro
           {/* ── Intents ── */}
           {section === 'intents' && (
             <InsightsSection
+              className="min-h-0 flex-1"
               title="Intent leaderboard"
               icon={Zap}
               meta={<span className="tabular-nums">{kpis.intentsRaised} raised · top 10</span>}
@@ -1174,6 +1180,7 @@ export function Insights({ apps, workspaceTabs, activeWorkspaceId }: InsightsPro
           {/* ── App Health ── */}
           {section === 'app-health' && (
             <InsightsSection
+              className="min-h-0 flex-1"
               title="App health"
               icon={Layers}
               meta={<span className="tabular-nums">{appHealth.length} apps active</span>}
@@ -1243,6 +1250,7 @@ export function Insights({ apps, workspaceTabs, activeWorkspaceId }: InsightsPro
           {/* ── Logs ── */}
           {section === 'logs' && logsApi && (
             <InsightsSection
+              className="min-h-0 flex-1"
               title={`Platform logs · ${WINDOW_LABELS[windowKey]}`}
               icon={FileText}
               meta={
