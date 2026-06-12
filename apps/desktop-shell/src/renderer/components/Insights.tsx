@@ -337,7 +337,6 @@ export function Insights({ apps, workspaceTabs, activeWorkspaceId }: InsightsPro
   );
   const [windowKey, setWindowKey] = useState<WindowKey>('5m');
   const [now, setNow] = useState<number>(() => Date.now());
-  const [wsScope, setWsScope] = useState<string>(activeWorkspaceId);
   const [section, setSection] = useState<SectionId>('activity');
   const eventsRef = useRef<InteropActivityEvent[]>(events);
   const logsRef = useRef<AppLogEvent[]>(logs);
@@ -437,10 +436,10 @@ export function Insights({ apps, workspaceTabs, activeWorkspaceId }: InsightsPro
   // ─── Workspace scope filtering ────────────────────────────────────────────
 
   const wsScopeApps = useMemo((): Set<string> | null => {
-    if (wsScope === 'all') return null;
-    const tab = workspaceTabs.find((t) => t.id === wsScope);
+    if (activeWorkspaceId === 'all') return null;
+    const tab = workspaceTabs.find((t) => t.id === activeWorkspaceId);
     return tab ? new Set(tab.panelIds) : null;
-  }, [workspaceTabs, wsScope]);
+  }, [workspaceTabs, activeWorkspaceId]);
 
   const workspaceScopedEvents = useMemo(() => {
     if (!wsScopeApps) return events;
@@ -772,38 +771,10 @@ export function Insights({ apps, workspaceTabs, activeWorkspaceId }: InsightsPro
   // ─── Layout ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
 
-      {/* Toolbar row */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
-        {/* Workspace scope selector */}
-        <span className="text-[10px] font-extrabold uppercase tracking-[0.07em] text-muted-foreground">
-          Workspace
-        </span>
-        <div className="inline-flex gap-0.5 rounded-lg border border-border bg-muted p-0.5">
-          <Button
-            key="all"
-            onClick={() => setWsScope('all')}
-            size="xs"
-            variant={wsScope === 'all' ? 'default' : 'ghost'}
-          >
-            All
-          </Button>
-          {workspaceTabs.map((tab) => (
-            <Button
-              key={tab.id}
-              onClick={() => setWsScope(tab.id)}
-              size="xs"
-              variant={wsScope === tab.id ? 'default' : 'ghost'}
-            >
-              {tab.name}
-            </Button>
-          ))}
-        </div>
-
-        {/* Vertical separator */}
-        <div className="h-5 w-px bg-border" />
-
+      {/* Toolbar row — time window + exports */}
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         {/* Time window selector */}
         <div className="inline-flex gap-0.5 rounded-lg border border-border bg-muted p-0.5">
           {(Object.keys(WINDOW_MS) as WindowKey[]).map((k) => (
@@ -846,7 +817,7 @@ export function Insights({ apps, workspaceTabs, activeWorkspaceId }: InsightsPro
       </div>
 
       {/* Monitor strip — KPI tiles, always visible */}
-      <DashboardMetricGrid className="shrink-0 border-b px-3 py-2.5">
+      <DashboardMetricGrid className="shrink-0">
         <DashboardMetric
           label="Events/sec"
           value={kpis.eventsPerSec}
@@ -886,10 +857,10 @@ export function Insights({ apps, workspaceTabs, activeWorkspaceId }: InsightsPro
       </DashboardMetricGrid>
 
       {/* Sidebar + content */}
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 gap-3 overflow-hidden">
 
         {/* Left sidebar */}
-        <nav className="flex w-44 shrink-0 flex-col gap-0.5 overflow-y-auto border-r bg-card p-1.5">
+        <nav className="flex w-36 shrink-0 flex-col gap-0.5 overflow-y-auto rounded-lg border bg-card p-1.5">
           <div className="px-2 pb-1 pt-2">
             <div className="text-xs font-black text-muted-foreground uppercase tracking-[0.07em]">Analytics</div>
           </div>
