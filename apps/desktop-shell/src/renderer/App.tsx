@@ -980,7 +980,7 @@ const handleDeleteLayout = useCallback(async (id: string) => {
               <WorkspaceTabButton
                 key={tab.id}
                 active={activeWorkspaceTab.id === tab.id}
-                onClick={() => { setActiveWorkspaceId(tab.id); setActiveMode('workspace'); }}
+                onClick={() => { setActiveWorkspaceId(tab.id); }}
                 onDoubleClick={() => handleWorkspaceRenameStart(tab.id, tab.name)}
                 onClose={workspaceTabs.length > 1 ? () => handleCloseWorkspace(tab.id) : undefined}
                 editing={editingWorkspaceId === tab.id}
