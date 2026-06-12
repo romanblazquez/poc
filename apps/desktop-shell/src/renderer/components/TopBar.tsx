@@ -82,10 +82,7 @@ export function TopBar({ title, subtitle, mark, leftActions, center, actions, si
       }}
     >
       {center && (
-        <div
-          className="pointer-events-none absolute inset-0 flex items-center justify-center"
-          style={noDragStyle}
-        >
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="pointer-events-auto" style={noDragStyle}>{center}</div>
         </div>
       )}
