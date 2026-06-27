@@ -1,0 +1,16 @@
+{
+  "name": "ngx-telemetry",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/ngx-telemetry/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:observability", "platform:browser"],
+  "targets": {
+    "build": {
+      "executor": "@nx/angular:package",
+      "outputs": ["{workspaceRoot}/dist/libs/ngx-telemetry"],
+      "options": {
+        "project": "libs/ngx-telemetry/ng-package.json"
+      }
+    }
+  }
+}

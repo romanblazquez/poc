@@ -1,0 +1,98 @@
+{
+  "uid": "fdc3-telemetry",
+  "title": "FDC3 Desktop Telemetry",
+  "tags": ["fdc3", "otel"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "HTTP Request Rate (obs-sample-api)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "rate(fdc3_http_server_request_duration_milliseconds_count[1m])",
+          "legendFormat": "{{http_route}} {{http_request_method}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": { "mode": "palette-classic" }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "HTTP P95 Latency (obs-sample-api)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(fdc3_http_server_request_duration_milliseconds_bucket[5m])) by (le, http_route))",
+          "legendFormat": "p95 {{http_route}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "color": { "mode": "palette-classic" } }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Frontend Route Changes",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "rate(fdc3_frontend_route_change_total[1m])",
+          "legendFormat": "{{service_name}} → {{route}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "color": { "mode": "palette-classic" } }
+      }
+    },
+    {
+      "id": 4,
+      "title": "FDC3 Intent Rate (by intent)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "rate(fdc3_intent_raised_total[1m])",
+          "legendFormat": "{{fdc3_intent}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "color": { "mode": "palette-classic" } }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Trace Search — All Services",
+      "type": "traces",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 16 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [
+        {
+          "queryType": "traceql",
+          "query": "{ duration > 100ms }",
+          "refId": "A",
+          "limit": 20
+        }
+      ]
+    }
+  ]
+}

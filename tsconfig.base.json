@@ -39,7 +39,8 @@
       "@fdc3-poc/interop-angular/theme": ["libs/interop-angular/theme/src/public-api.ts"],
       "@fdc3-poc/interop-angular/logs": ["libs/interop-angular/logs/src/public-api.ts"],
       "@fdc3-poc/interop-angular/ui": ["libs/interop-angular/ui/src/public-api.ts"],
-      "@fdc3-poc/interop-angular/trader": ["libs/interop-angular/trader/src/public-api.ts"]
+      "@fdc3-poc/interop-angular/trader": ["libs/interop-angular/trader/src/public-api.ts"],
+      "@fdc3-poc/ngx-telemetry": ["libs/ngx-telemetry/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "**/node_modules", "**/dist", "**/out", "**/.nx"]

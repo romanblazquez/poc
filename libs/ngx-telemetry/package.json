@@ -1,0 +1,25 @@
+{
+  "name": "@fdc3-poc/ngx-telemetry",
+  "version": "0.1.0",
+  "description": "OTEL-based observability library for Angular micro-frontends — GTM-style declarative tracking, auto HTTP/router instrumentation, FDC3 intent tracing.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "peerDependencies": {
+    "@angular/common": "^21.0.0",
+    "@angular/core": "^21.0.0",
+    "@angular/router": "^21.0.0",
+    "@opentelemetry/api": "^1.9.0",
+    "rxjs": "^7.8.0"
+  },
+  "dependencies": {
+    "@opentelemetry/core": "^1.30.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.57.0",
+    "@opentelemetry/resources": "^1.30.0",
+    "@opentelemetry/sdk-trace-web": "^1.30.0",
+    "@opentelemetry/semantic-conventions": "^1.28.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

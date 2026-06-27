@@ -1,0 +1,22 @@
+{
+  "name": "obs-sample-api",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/obs-sample-api/src",
+  "projectType": "application",
+  "tags": ["type:api", "scope:observability"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd apps/obs-sample-api && npx tsx watch src/app.ts",
+        "cwd": "../.."
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd apps/obs-sample-api && npx tsc -p tsconfig.json"
+      }
+    }
+  }
+}

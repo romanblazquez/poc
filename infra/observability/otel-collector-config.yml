@@ -1,0 +1,53 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          # Allow browser apps (Angular FE running on any localhost port)
+          allowed_origins:
+            - "http://localhost:*"
+            - "http://127.0.0.1:*"
+          allowed_headers:
+            - "*"
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: "local"
+        action: insert
+
+exporters:
+  # Traces → Tempo
+  otlp/tempo:
+    endpoint: "tempo:4317"
+    tls:
+      insecure: true
+
+  # Metrics → Prometheus pull endpoint
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: fdc3
+
+  # Debug (stdout) — remove in prod
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [otlp/tempo, debug]
+
+    metrics:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [prometheus]

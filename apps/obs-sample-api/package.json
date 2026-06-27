@@ -1,0 +1,28 @@
+{
+  "name": "@fdc3-poc/obs-sample-api",
+  "version": "0.1.0",
+  "description": "Sample Node.js API with OTEL instrumentation — demonstrates traces, metrics and logs flowing into the observability stack.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --import ./dist/tracing.js dist/app.js",
+    "dev": "tsx watch src/app.ts",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.57.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.57.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.57.0",
+    "@opentelemetry/sdk-metrics": "^1.30.0",
+    "@opentelemetry/sdk-node": "^0.57.0",
+    "@opentelemetry/semantic-conventions": "^1.28.0",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.5.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
+  }
+}
