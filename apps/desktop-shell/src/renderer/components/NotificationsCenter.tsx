@@ -56,12 +56,14 @@ interface ToastProps {
   notification: ShellNotification;
   onOpen(n: ShellNotification): void;
   onDismiss(id: string): void;
+  onAction?(n: ShellNotification): void;
 }
 
 
-function NotificationToast({ notification, onOpen, onDismiss }: ToastProps) {
+function NotificationToast({ notification, onOpen, onDismiss, onAction }: ToastProps) {
   const [hovered, setHovered] = useState(false);
   const [progress, setProgress] = useState(100);
+  const [actionFired, setActionFired] = useState(false);
   const startRef = useRef(Date.now());
   const remainingRef = useRef(notification.ttlMs);
   const rafRef = useRef<number>(0);
@@ -132,9 +134,28 @@ function NotificationToast({ notification, onOpen, onDismiss }: ToastProps) {
             </div>
           )}
           {notification.action?.label && (
-            <div className="mt-1.5 text-[11px] font-black tracking-wide" style={{ color: accent }}>
-              {notification.action.label} →
-            </div>
+            onAction
+              ? (
+                <button
+                  type="button"
+                  disabled={actionFired}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (actionFired) return;
+                    setActionFired(true);
+                    onAction(notification);
+                  }}
+                  className="mt-2 inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-black tracking-wide transition-colors hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ background: `color-mix(in srgb, ${accent} 15%, transparent)`, color: accent, border: `1px solid ${accent}55` }}
+                >
+                  {actionFired ? 'Applying…' : `${notification.action.label} →`}
+                </button>
+              )
+              : (
+                <div className="mt-1.5 text-[11px] font-black tracking-wide" style={{ color: accent }}>
+                  {notification.action.label} →
+                </div>
+              )
           )}
         </button>
       </div>
@@ -226,7 +247,7 @@ interface NotificationsCenterProps {
   rightSidebarOpen: boolean;
 }
 
-type FilterTab = 'all' | 'unread' | 'error' | 'warning';
+type FilterTab = 'all' | 'unread' | 'error' | 'warning' | 'history';
 
 export function NotificationsCenter({
   open,
@@ -236,6 +257,7 @@ export function NotificationsCenter({
 }: NotificationsCenterProps): JSX.Element | null {
   const api = getNotificationsApi();
   const [items, setItems] = useState<ShellNotification[]>([]);
+  const [historyItems, setHistoryItems] = useState<ShellNotification[]>([]);
   const [hiddenToastIds, setHiddenToastIds] = useState<Set<string>>(() => new Set());
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [pulse, setPulse] = useState(false);
@@ -293,7 +315,19 @@ export function NotificationsCenter({
     [hiddenToastIds, items],
   );
 
+  // Reload history whenever the history tab becomes active
+  useEffect(() => {
+    if (filterTab !== 'history' || !api) return;
+    let alive = true;
+    void (api as unknown as { listHistory?: (l?: number) => Promise<ShellNotification[]> }).listHistory?.(200)
+      ?.then((h) => { if (alive) setHistoryItems(h ?? []); });
+    return () => { alive = false; };
+  }, [filterTab, api, items]); // re-fetch when items change so history stays fresh
+
   const filteredDrawerItems = useMemo(() => {
+    if (filterTab === 'history') {
+      return historyItems; // all, including dismissed
+    }
     return items.filter((n) => {
       if (n.dismissed) return false;
       if (filterTab === 'unread') return !n.read;
@@ -301,7 +335,7 @@ export function NotificationsCenter({
       if (filterTab === 'warning') return n.severity === 'warning';
       return true;
     });
-  }, [items, filterTab]);
+  }, [items, historyItems, filterTab]);
 
   const hideToast = useCallback((id: string) => {
     setHiddenToastIds((prev) => new Set(prev).add(id));
@@ -309,11 +343,38 @@ export function NotificationsCenter({
 
   const openNotification = useCallback(async (notification: ShellNotification) => {
     hideToast(notification.id);
-    if (!open) onOpenChange(true);
     await api?.markRead(notification.id);
     const action = notification.action;
-    if (action?.intent) {
+    if (action?.shellAction === 'applyUpdate') {
+      const mgr = (window as unknown as { shellChrome?: { manager?: { applyUpdate(): Promise<{ applied: boolean; reason?: string }> } } }).shellChrome?.manager;
+      // Dismiss the notification immediately — it's a one-shot action
+      await api?.dismiss(notification.id);
+      const result = await mgr?.applyUpdate();
+      if (result?.applied) {
+        void getNotificationsApi()?.raise({
+          title: 'App catalogue updated',
+          body: 'The new directory version is now active. Apps opened from the launcher will use the updated catalogue.',
+          severity: 'success',
+          ttlMs: 8000,
+          sourceTitle: 'Distribution Manager',
+        });
+      }
+      // No "no update pending" toast — the notification is already dismissed, silently ignore
+    } else if (action?.shellAction === 'openManager') {
+      window.dispatchEvent(new CustomEvent('shell:openPanel', { detail: { panel: 'manager' } }));
+      if (!open) onOpenChange(true);
+    } else if (action?.shellAction === 'installShellUpdate') {
+      await api?.dismiss(notification.id);
+      const shellChrome = (window as unknown as { shellChrome?: { shellUpdater?: { install(): Promise<boolean> } } }).shellChrome;
+      shellChrome?.shellUpdater?.install();
+    } else if (action?.shellAction === 'openUrl' && action.url) {
+      window.open(action.url, '_blank');
+    } else if (action?.intent) {
       await getFdc3()?.raiseIntent(action.intent, action.context);
+      if (!open) onOpenChange(true);
+    } else {
+      // No action — just open the notification panel to show the full notification
+      if (!open) onOpenChange(true);
     }
   }, [api, hideToast, onOpenChange, open]);
 
@@ -344,10 +405,11 @@ export function NotificationsCenter({
   if (!api) return null;
 
   const TABS: { id: FilterTab; label: string }[] = [
-    { id: 'all', label: 'All' },
+    { id: 'all', label: 'Active' },
     { id: 'unread', label: 'Unread' },
     { id: 'error', label: 'Errors' },
     { id: 'warning', label: 'Warnings' },
+    { id: 'history', label: 'History' },
   ];
 
   return (
@@ -391,6 +453,7 @@ export function NotificationsCenter({
                 notification={n}
                 onOpen={(notif) => { void openNotification(notif); }}
                 onDismiss={(id) => { void dismissNotification(id); }}
+                onAction={n.action?.shellAction ? (notif) => { void openNotification(notif); } : undefined}
               />
             ))}
           </div>
@@ -484,10 +547,10 @@ export function NotificationsCenter({
             </Button>
             <Button
               type="button"
-              onClick={() => { void api.clearAll(); }}
+              onClick={() => { void api.dismissAll(); }}
               size="xs"
               variant="ghost"
-              title="Clear all"
+              title="Dismiss all (kept in history)"
               disabled={items.length === 0}
             >
               <Trash2 className="size-3" />
@@ -505,11 +568,13 @@ export function NotificationsCenter({
         {/* Filter tabs */}
         <div className="flex shrink-0 border-b">
           {TABS.map((tab) => {
-            const count = tab.id === 'all'
-              ? items.filter((n) => !n.dismissed).length
-              : tab.id === 'unread'
-                ? items.filter((n) => !n.read && !n.dismissed).length
-                : items.filter((n) => !n.dismissed && n.severity === (tab.id === 'error' ? 'error' : 'warning')).length;
+            const count = tab.id === 'history'
+              ? historyItems.length
+              : tab.id === 'all'
+                ? items.filter((n) => !n.dismissed).length
+                : tab.id === 'unread'
+                  ? items.filter((n) => !n.read && !n.dismissed).length
+                  : items.filter((n) => !n.dismissed && n.severity === (tab.id === 'error' ? 'error' : 'warning')).length;
 
             return (
               <button
@@ -543,7 +608,7 @@ export function NotificationsCenter({
             <div className="flex flex-col items-center gap-3 py-20 text-center">
               <Bell className="size-8 text-muted-foreground/20" />
               <p className="text-sm font-bold text-muted-foreground">
-                {filterTab === 'all' ? 'No notifications yet' : `No ${filterTab} notifications`}
+                {filterTab === 'history' ? 'No alert history yet' : filterTab === 'all' ? 'No active notifications' : `No ${filterTab} notifications`}
               </p>
             </div>
           ) : (

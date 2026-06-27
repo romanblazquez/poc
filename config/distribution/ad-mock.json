@@ -1,0 +1,15 @@
+{
+  "_comment": "Local Active Directory simulation. Maps users to AD groups. Group→Role mapping is in ad-group-map.json. Used when AD_MODE=mock (default in dev).",
+  "domain": "TRADING.LOCAL",
+  "users": [
+    { "id": "u001", "username": "alice.johnson",  "displayName": "Alice Johnson",   "email": "alice.johnson@trading.local",  "groups": ["GRP-Traders","GRP-Markets"] },
+    { "id": "u002", "username": "bob.smith",       "displayName": "Bob Smith",        "email": "bob.smith@trading.local",       "groups": ["GRP-Sales","GRP-Markets"] },
+    { "id": "u003", "username": "carol.pm",        "displayName": "Carol Ng",         "email": "carol.ng@trading.local",        "groups": ["GRP-PortfolioManagers"] },
+    { "id": "u004", "username": "dan.compliance",  "displayName": "Dan Wright",       "email": "dan.wright@trading.local",      "groups": ["GRP-Compliance","GRP-RiskManagement"] },
+    { "id": "u005", "username": "eve.ops",         "displayName": "Eve Okafor",       "email": "eve.okafor@trading.local",      "groups": ["GRP-Operations","GRP-MiddleOffice"] },
+    { "id": "u006", "username": "frank.risk",      "displayName": "Frank Torres",     "email": "frank.torres@trading.local",    "groups": ["GRP-RiskManagement"] },
+    { "id": "u007", "username": "grace.admin",     "displayName": "Grace Chen",       "email": "grace.chen@trading.local",      "groups": ["GRP-ITAdmin","GRP-Traders","GRP-Compliance"] },
+    { "id": "u008", "username": "henry.auditor",   "displayName": "Henry Davies",     "email": "henry.davies@trading.local",    "groups": ["GRP-Auditors"] },
+    { "id": "u009", "username": "demo.user",       "displayName": "Demo User",        "email": "demo@trading.local",            "groups": ["GRP-Traders"] }
+  ]
+}

@@ -180,6 +180,7 @@ const zoomChangeHandlers = new Set<(factor: number) => void>();
 const fullscreenChangeHandlers = new Set<(fullscreen: boolean) => void>();
 const managerStatusHandlers = new Set<(status: unknown) => void>();
 const bridgeStatusHandlers = new Set<(status: BridgeStatus) => void>();
+const shellUpdaterStatusHandlers = new Set<(status: unknown) => void>();
 
 function applyZoomFactor(factor: number): void {
   try { webFrame.setZoomFactor(factor); } catch { /* SSR / context not ready */ }
@@ -207,6 +208,12 @@ ipcRenderer.on(IpcEvents.MANAGER_STATUS_CHANGED, (_event, status: unknown) => {
 ipcRenderer.on(IpcEvents.BRIDGE_STATUS_CHANGED, (_event, status: BridgeStatus) => {
   for (const handler of bridgeStatusHandlers) {
     try { handler(status); } catch (e) { console.error('[preload bridge] handler threw', e); }
+  }
+});
+
+ipcRenderer.on(IpcEvents.SHELL_UPDATER_STATUS_CHANGED, (_event, status: unknown) => {
+  for (const handler of shellUpdaterStatusHandlers) {
+    try { handler(status); } catch (e) { console.error('[preload shellUpdater] handler threw', e); }
   }
 });
 
@@ -523,6 +530,9 @@ contextBridge.exposeInMainWorld('notifications', {
   list(limit?: number): Promise<ShellNotification[]> {
     return ipcRenderer.invoke(IpcEvents.NOTIFICATIONS_LIST, limit) as Promise<ShellNotification[]>;
   },
+  listHistory(limit?: number): Promise<ShellNotification[]> {
+    return ipcRenderer.invoke(IpcEvents.NOTIFICATIONS_LIST_HISTORY, limit) as Promise<ShellNotification[]>;
+  },
   markRead(id: string): Promise<void> {
     return ipcRenderer.invoke(IpcEvents.NOTIFICATIONS_MARK_READ, id) as Promise<void>;
   },
@@ -532,7 +542,8 @@ contextBridge.exposeInMainWorld('notifications', {
   dismiss(id: string): Promise<void> {
     return ipcRenderer.invoke(IpcEvents.NOTIFICATIONS_DISMISS, id) as Promise<void>;
   },
-  clearAll(): Promise<void> {
+  /** Hides all active notifications — keeps them in history (persisted). */
+  dismissAll(): Promise<void> {
     return ipcRenderer.invoke(IpcEvents.NOTIFICATIONS_CLEAR_ALL) as Promise<void>;
   },
   unreadCount(): Promise<number> {
@@ -718,6 +729,26 @@ contextBridge.exposeInMainWorld('shellChrome', {
     },
     delete(id: string): Promise<boolean> {
       return ipcRenderer.invoke(IpcEvents.LAYOUT_DELETE, id) as Promise<boolean>;
+    },
+  },
+  /**
+   * Shell binary updater — electron-updater wrapper for distributing Electron
+   * installer updates. Only active in packaged builds; returns `state: 'unavailable'`
+   * in development.
+   */
+  shellUpdater: {
+    getStatus(): Promise<unknown> {
+      return ipcRenderer.invoke(IpcEvents.SHELL_UPDATER_GET_STATUS) as Promise<unknown>;
+    },
+    checkForUpdates(): Promise<{ ok: boolean; error?: string }> {
+      return ipcRenderer.invoke(IpcEvents.SHELL_UPDATER_CHECK) as Promise<{ ok: boolean; error?: string }>;
+    },
+    install(): Promise<boolean> {
+      return ipcRenderer.invoke(IpcEvents.SHELL_UPDATER_INSTALL) as Promise<boolean>;
+    },
+    onStatusChanged(handler: (status: unknown) => void): () => void {
+      shellUpdaterStatusHandlers.add(handler);
+      return () => shellUpdaterStatusHandlers.delete(handler);
     },
   },
 });

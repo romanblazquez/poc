@@ -12,14 +12,21 @@ import type { Fdc3Context } from './context.js';
 export type NotificationSeverity = 'info' | 'success' | 'warning' | 'error';
 
 /**
- * Optional intent action attached to a notification. Clicking the toast (or
- * the drawer row) marks the notification read and raises the intent via
- * `window.fdc3.raiseIntent`. Lets a notification be a one-click escalation.
+ * Optional action attached to a notification. Clicking the toast (or the
+ * drawer row) marks the notification read, then executes the action.
+ *
+ * `intent`      — raises a FDC3 intent via `window.fdc3.raiseIntent`.
+ * `shellAction` — triggers a built-in shell command without FDC3.
+ *   'applyUpdate'  — immediately applies the pending directory update.
+ *   'openManager'  — opens the Manager / Distribution console.
+ *   'openUrl'      — opens `url` in the default browser.
  */
 export interface NotificationAction {
-  intent: string;
+  intent?: string;
   context?: Fdc3Context;
   label?: string;
+  shellAction?: 'applyUpdate' | 'openManager' | 'openUrl' | 'installShellUpdate';
+  url?: string;
 }
 
 export interface NotificationRaiseInput {
@@ -56,11 +63,14 @@ export interface ShellNotification {
 export interface NotificationsApi {
   raise(input: NotificationRaiseInput): Promise<string>;
   list(limit?: number): Promise<ShellNotification[]>;
+  /** Returns all notifications including dismissed — for the history/audit view. */
+  listHistory(limit?: number): Promise<ShellNotification[]>;
   markRead(id: string): Promise<void>;
   markAllRead(): Promise<void>;
   dismiss(id: string): Promise<void>;
-  clearAll(): Promise<void>;
+  /** Hides all active notifications from the tray; keeps history. Replaces clearAll. */
+  dismissAll(): Promise<void>;
   unreadCount(): Promise<number>;
-  /** Subscribe to any change (raise / mark / dismiss / clear). Returns unsubscribe fn. */
+  /** Subscribe to any change (raise / mark / dismiss). Returns unsubscribe fn. */
   onChanged(handler: (snapshot: ShellNotification[]) => void): () => void;
 }

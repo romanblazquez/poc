@@ -65,10 +65,12 @@ export const IpcEvents = {
   MANAGER_UPDATE_SETTINGS: 'manager:updateSettings',
   NOTIFICATIONS_RAISE: 'notifications:raise',
   NOTIFICATIONS_LIST: 'notifications:list',
+  NOTIFICATIONS_LIST_HISTORY: 'notifications:listHistory',
   NOTIFICATIONS_MARK_READ: 'notifications:markRead',
   NOTIFICATIONS_MARK_ALL_READ: 'notifications:markAllRead',
   NOTIFICATIONS_DISMISS: 'notifications:dismiss',
   NOTIFICATIONS_CLEAR_ALL: 'notifications:clearAll',
+  NOTIFICATIONS_DISMISS_ALL: 'notifications:dismissAll',
   NOTIFICATIONS_UNREAD_COUNT: 'notifications:unreadCount',
   BRIDGE_GET_STATUS: 'bridge:getStatus',
   BRIDGE_SCAN: 'bridge:scan',
@@ -97,6 +99,9 @@ export const IpcEvents = {
   LAYOUT_SAVE: 'layout:save',
   LAYOUT_UPDATE: 'layout:update',
   LAYOUT_DELETE: 'layout:delete',
+  SHELL_UPDATER_GET_STATUS: 'shell:updaterGetStatus',
+  SHELL_UPDATER_CHECK: 'shell:updaterCheck',
+  SHELL_UPDATER_INSTALL: 'shell:updaterInstall',
 
   // ─── Main → Renderer (webContents.send) ──────────────────────────────────
   INTENT_RESOLVER_REQUEST: 'fdc3:intentResolverRequest',
@@ -118,6 +123,7 @@ export const IpcEvents = {
   NOTIFICATIONS_CHANGED: 'notifications:changed',
   BRIDGE_STATUS_CHANGED: 'bridge:statusChanged',
   WINDOW_FULLSCREEN_CHANGED: 'shell:windowFullscreenChanged',
+  SHELL_UPDATER_STATUS_CHANGED: 'shell:updaterStatusChanged',
 } as const;
 
 export type IpcEventKey = keyof typeof IpcEvents;

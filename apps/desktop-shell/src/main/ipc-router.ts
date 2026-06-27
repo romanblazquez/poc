@@ -26,6 +26,7 @@ import type { ThemeManager } from './theme-manager.js';
 import type { AppDefinition } from '@fdc3-poc/fdc3-core';
 import { ShellAssetsLoader } from './shell-assets-loader.js';
 import type { LayoutsStore } from './layouts-store.js';
+import type { ShellUpdater } from './shell-updater.js';
 
 // ─── FDC3 AppD v2 response mapper ─────────────────────────────────────────────
 
@@ -132,7 +133,10 @@ export class IpcRouter {
     private readonly environmentStore?: EnvironmentStore,
     private readonly rbacStore?: RbacStore,
     private readonly layoutsStore?: LayoutsStore,
+    private readonly shellUpdater?: ShellUpdater,
+    notificationStore?: NotificationStore,
   ) {
+    this.notifications = notificationStore ?? new NotificationStore();
     this.intentResolver = new IntentResolver();
     this.appRegistry = new AppRegistry(appDirectory);
     // Push Manager status changes out to every webContents so the renderer
@@ -161,10 +165,18 @@ export class IpcRouter {
         }
       });
     }
+    if (this.shellUpdater) {
+      this.shellUpdater.subscribe((status) => {
+        for (const wc of webContents.getAllWebContents()) {
+          if (wc.isDestroyed()) continue;
+          try { wc.send(IpcEvents.SHELL_UPDATER_STATUS_CHANGED, status); } catch { /* defensive */ }
+        }
+      });
+    }
   }
 
   /** Shell notification store — exposed via window.notifications. */
-  private readonly notifications = new NotificationStore();
+  private readonly notifications: NotificationStore;
 
   private emitActivity(input: {
     kind: InteropActivityKind;
@@ -450,6 +462,7 @@ export class IpcRouter {
     this.wireManagerAutoApply();
     this.handleNotificationsRaise();
     this.handleNotificationsList();
+    this.handleNotificationsListHistory();
     this.handleNotificationsMarkRead();
     this.handleNotificationsMarkAllRead();
     this.handleNotificationsDismiss();
@@ -479,6 +492,9 @@ export class IpcRouter {
     this.handleLayoutSave();
     this.handleLayoutUpdate();
     this.handleLayoutDelete();
+    this.handleShellUpdaterGetStatus();
+    this.handleShellUpdaterCheck();
+    this.handleShellUpdaterInstall();
   }
 
   // ─── FINOS bridge readiness (non-experimental Backplane discovery) ───────
@@ -570,7 +586,11 @@ export class IpcRouter {
     ipcMain.handle(IpcEvents.NOTIFICATIONS_DISMISS, (_event, id: string) => this.notifications.dismiss(id));
   }
   private handleNotificationsClearAll(): void {
-    ipcMain.handle(IpcEvents.NOTIFICATIONS_CLEAR_ALL, () => { this.notifications.clearAll(); return true; });
+    // "Clear all" = dismiss all (hide from tray) — never hard-deletes; history is preserved.
+    ipcMain.handle(IpcEvents.NOTIFICATIONS_CLEAR_ALL, () => { this.notifications.dismissAll(); return true; });
+  }
+  private handleNotificationsListHistory(): void {
+    ipcMain.handle(IpcEvents.NOTIFICATIONS_LIST_HISTORY, (_event, limit?: number) => this.notifications.listHistory(limit));
   }
   private handleNotificationsUnreadCount(): void {
     ipcMain.handle(IpcEvents.NOTIFICATIONS_UNREAD_COUNT, () => this.notifications.unreadCount());
@@ -1817,6 +1837,27 @@ export class IpcRouter {
       const ok = this.layoutsStore.delete(id);
       if (ok) this.emitPlatformLog({ level: 'warning', category: 'config.layout', message: `Layout deleted`, data: { id } });
       return ok;
+    });
+  }
+
+  // ─── Shell binary updater (electron-updater) ─────────────────────────────
+
+  private handleShellUpdaterGetStatus(): void {
+    ipcMain.handle(IpcEvents.SHELL_UPDATER_GET_STATUS, () => this.shellUpdater?.getStatus() ?? null);
+  }
+
+  private handleShellUpdaterCheck(): void {
+    ipcMain.handle(IpcEvents.SHELL_UPDATER_CHECK, async () => {
+      if (!this.shellUpdater) return { ok: false, error: 'Shell updater not initialised' };
+      await this.shellUpdater.checkForUpdates();
+      return { ok: true };
+    });
+  }
+
+  private handleShellUpdaterInstall(): void {
+    ipcMain.handle(IpcEvents.SHELL_UPDATER_INSTALL, () => {
+      this.shellUpdater?.install();
+      return true;
     });
   }
 

@@ -92,15 +92,19 @@ const NAV: { id: ManagerSection; label: string }[] = [
 ];
 
 const REFRESH_INTERVAL_OPTIONS = [
-  { value: 0,        label: 'Off' },
-  { value: 30_000,   label: '30 sec' },
-  { value: 60_000,   label: '1 min' },
-  { value: 300_000,  label: '5 min' },
-  { value: 900_000,  label: '15 min' },
-  { value: 3_600_000, label: '1 hour' },
+  { value: 0,          label: 'Off' },
+  { value: 5_000,      label: '5 sec' },
+  { value: 15_000,     label: '15 sec' },
+  { value: 30_000,     label: '30 sec' },
+  { value: 60_000,     label: '1 min' },
+  { value: 300_000,    label: '5 min' },
+  { value: 900_000,    label: '15 min' },
+  { value: 3_600_000,  label: '1 hour' },
 ];
 
-const ROLE_OPTIONS = ['default', 'trader', 'pm', 'ops', 'admin'];
+const ROLE_OPTIONS = ['Trader', 'Sales', 'PM', 'Compliance', 'Ops', 'Risk', 'Admin', 'ReadOnly'];
+const ENV_OPTIONS  = ['dev', 'uat', 'prod'];
+const DIR_SERVER_DEFAULT = 'http://127.0.0.1:4476';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -109,21 +113,28 @@ function formatTime(ts: number | null): string {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 }
 
-function sourceLabel(source: ManagerStatus['source']): string {
+function sourceLabel(source: ManagerStatus['source'], hasError: boolean): string {
   switch (source) {
-    case 'remote':   return 'Remote (live)';
-    case 'cached':   return 'Cached (offline)';
+    case 'remote':   return hasError ? 'Remote (server down)' : 'Remote';
+    case 'cached':   return 'Cached (offline fallback)';
     case 'local':    return 'Local bundle';
     case 'embedded': return 'Embedded fallback';
     default:         return source;
   }
 }
 
-function sourceAccent(source: ManagerStatus['source']): string {
-  if (source === 'remote') return 'var(--shell-positive)';
+function sourceAccent(source: ManagerStatus['source'], hasError: boolean): string {
+  if (source === 'remote') return hasError ? '#ef4444' : 'var(--shell-positive)';
   if (source === 'cached') return '#f59e0b';
   if (source === 'embedded') return '#ef4444';
   return 'var(--shell-muted)';
+}
+
+function sourceBadgeVariant(source: ManagerStatus['source'], hasError: boolean): 'success' | 'warning' | 'destructive' | 'secondary' {
+  if (source === 'remote') return hasError ? 'destructive' : 'success';
+  if (source === 'cached') return 'warning';
+  if (source === 'embedded') return 'destructive';
+  return 'secondary';
 }
 
 function shortEtag(etag: string | null): string {
@@ -156,6 +167,30 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
   const [draftRole, setDraftRole] = useState('default');
   const [draftTelemetry, setDraftTelemetry] = useState('');
   const [draftAutoApply, setDraftAutoApply] = useState(false);
+
+  // Quick-connect: role + env selectors that build the directory URL.
+  const [qcServer, setQcServer] = useState(DIR_SERVER_DEFAULT);
+  const [qcRole, setQcRole] = useState('Trader');
+  const [qcEnv, setQcEnv] = useState('dev');
+  const [qcServerOnline, setQcServerOnline] = useState<boolean | null>(null);
+
+  const qcBuiltUrl = `${qcServer.replace(/\/$/, '')}/directory?role=${qcRole}&env=${qcEnv}`;
+
+  const checkQcServer = useCallback(async () => {
+    setQcServerOnline(null);
+    try {
+      const res = await fetch(`${qcServer.replace(/\/$/, '')}/`);
+      setQcServerOnline(res.ok);
+    } catch {
+      setQcServerOnline(false);
+    }
+  }, [qcServer]);
+
+  const applyQuickConnect = useCallback(() => {
+    setDraftUrl(qcBuiltUrl);
+    setDraftInterval((prev) => prev > 0 ? prev : 5_000);
+    setDraftRole(qcRole);
+  }, [qcBuiltUrl, qcRole]);
 
   // Initial fetch + live push subscription.
   useEffect(() => {
@@ -338,15 +373,15 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
           <Card>
             <CardHeader className="flex-row items-center justify-between gap-3 border-b">
               <CardTitle>Applied directory</CardTitle>
-              <Badge variant={status.source === 'remote' ? 'success' : status.source === 'cached' ? 'warning' : status.source === 'embedded' ? 'destructive' : 'secondary'}>
-                <span className="mr-1.5 h-2 w-2 rounded-full" style={{ background: sourceAccent(status.source) }} />
-                {sourceLabel(status.source)}
+              <Badge variant={sourceBadgeVariant(status.source, !!status.lastFetchError)}>
+                <span className="mr-1.5 h-2 w-2 rounded-full" style={{ background: sourceAccent(status.source, !!status.lastFetchError) }} />
+                {sourceLabel(status.source, !!status.lastFetchError)}
               </Badge>
             </CardHeader>
             <CardContent className="pt-4">
               <dl className="grid gap-x-3 gap-y-1 text-sm [grid-template-columns:140px_1fr]">
                 <dt className="text-muted-foreground">Source</dt>
-                <dd className="m-0 font-bold text-foreground">{sourceLabel(status.source)}</dd>
+                <dd className="m-0 font-bold text-foreground">{sourceLabel(status.source, !!status.lastFetchError)}</dd>
                 <dt className="text-muted-foreground">Directory URL</dt>
                 <dd className="m-0 break-all font-bold text-foreground">{status.directoryUrl || '(local bundle)'}</dd>
                 <dt className="text-muted-foreground">Version</dt>
@@ -435,11 +470,75 @@ export function Manager({ apps }: ManagerProps): React.JSX.Element {
               <Badge variant={settingsDirty ? 'warning' : 'secondary'}>{settingsDirty ? 'Unsaved changes' : 'In sync'}</Badge>
             </CardHeader>
             <CardContent className="grid gap-4 pt-4 md:grid-cols-2">
-              <Field label="Directory URL" description="HTTPS endpoint returning a JSON app-directory file. Leave empty to use the local bundle.">
+
+              {/* ── Quick-connect widget ───────────────────────────────── */}
+              <div className="flex flex-col gap-2 rounded-lg border bg-[color:rgba(255,255,255,0.02)] p-3 md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-[0.07em] text-muted-foreground">Quick Connect — Distribution Server</span>
+                  <div className="flex items-center gap-1.5">
+                    {qcServerOnline === true && <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--shell-positive)]" />}
+                    {qcServerOnline === false && <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--shell-negative)]" />}
+                    {qcServerOnline === null && <span className="h-1.5 w-1.5 rounded-full bg-muted animate-pulse" />}
+                    <span className="text-[10px] font-bold text-muted-foreground">
+                      {qcServerOnline === true ? 'Online' : qcServerOnline === false ? 'Offline' : 'Not checked'}
+                    </span>
+                    <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-[10px]" onClick={checkQcServer}>
+                      Ping
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-[1fr_auto_auto_auto] items-end gap-2">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-bold text-muted-foreground">Server URL</span>
+                    <Input
+                      type="text"
+                      value={qcServer}
+                      onChange={(e) => { setQcServer(e.target.value); setQcServerOnline(null); }}
+                      placeholder="http://127.0.0.1:4476"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-bold text-muted-foreground">Role</span>
+                    <Select value={qcRole} onValueChange={setQcRole}>
+                      <SelectTrigger size="sm" className="h-8 w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ROLE_OPTIONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-bold text-muted-foreground">Env</span>
+                    <Select value={qcEnv} onValueChange={setQcEnv}>
+                      <SelectTrigger size="sm" className="h-8 w-24">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ENV_OPTIONS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button type="button" size="sm" className="h-8" onClick={applyQuickConnect}>
+                    Apply
+                  </Button>
+                </div>
+                <div className="font-mono text-[10px] text-muted-foreground">
+                  → <span className="text-foreground">{qcBuiltUrl}</span>
+                </div>
+                {qcServerOnline === false && (
+                  <div className="text-[10px] font-bold text-[color:var(--shell-negative)]">
+                    Server unreachable. Run: <code className="font-mono">npm run dist:server</code>
+                  </div>
+                )}
+              </div>
+
+              <Field label="Directory URL" description="Auto-filled by Quick Connect, or enter manually. Leave empty to use the local bundle.">
                 <div className="flex items-center gap-2">
                   <Input
                     type="text"
-                    placeholder="https://directory.example.com/app-directory.json"
+                    placeholder="http://127.0.0.1:4476/directory?role=Trader&env=dev"
                     value={draftUrl}
                     onChange={(e) => setDraftUrl(e.target.value)}
                   />

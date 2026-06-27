@@ -1,0 +1,56 @@
+{
+  "_role": "Risk",
+  "_description": "Risk management, VAR monitoring, and P&L oversight. Read-only across all asset classes.",
+  "apps": [
+    "market-watch",
+    "portfolio-view",
+    "order-blotter",
+    "chart",
+    "audit-log",
+    "news"
+  ],
+  "rbac": {
+    "allowedChannels": ["channel-1","channel-2","channel-3","channel-4","channel-5","channel-6","channel-7","channel-8"],
+    "blockedApps": ["order-ticket","payment-action","rfq-quote","cloud-trader","funds-allocations","incoming-orders","customer-search","customer-profile","compliance-check","price-alert-board","fdc3-conformance"],
+    "blockedIntentRaise": ["SendOrder","CreateOrder","StartPayment","Allocate","StartChat"],
+    "blockedIntentHandle": ["SendOrder","CreateOrder"]
+  },
+  "shellFeatures": {
+    "appLauncher": true,
+    "workspaceBuilder": false,
+    "channelBar": true,
+    "contextInspector": true,
+    "commandCenter": false,
+    "controlTower": true,
+    "interopFlow": true,
+    "manager": false,
+    "rbacPanel": false,
+    "appDirectoryEditor": false,
+    "bridge": false,
+    "envSwitch": false,
+    "themeToggle": false,
+    "zoomControl": true,
+    "notifications": true,
+    "hotkeyHelp": false,
+    "setupWizard": false,
+    "intelligence": true
+  },
+  "workspace": {
+    "tabs": [
+      {
+        "id": "risk-dashboard",
+        "name": "Risk Dashboard",
+        "channelId": "channel-1",
+        "openAppIds": ["market-watch","portfolio-view","chart"],
+        "activePanelId": "market-watch"
+      },
+      {
+        "id": "audit-trail",
+        "name": "Audit Trail",
+        "channelId": "channel-2",
+        "openAppIds": ["order-blotter","audit-log","news"],
+        "activePanelId": "order-blotter"
+      }
+    ]
+  }
+}

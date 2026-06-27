@@ -1,0 +1,68 @@
+{
+  "_role": "Admin",
+  "_description": "IT Administrator or Super Admin. Full access to all apps, all shell features, and all management tools.",
+  "apps": [
+    "customer-search",
+    "customer-profile",
+    "portfolio-view",
+    "market-watch",
+    "payment-action",
+    "order-ticket",
+    "order-blotter",
+    "chart",
+    "news",
+    "rfq-quote",
+    "cloud-trader",
+    "funds-allocations",
+    "incoming-orders",
+    "audit-log",
+    "theme-toggle",
+    "fdc3-conformance",
+    "price-alert-board",
+    "compliance-check"
+  ],
+  "rbac": {
+    "allowedChannels": ["channel-1","channel-2","channel-3","channel-4","channel-5","channel-6","channel-7","channel-8"],
+    "blockedApps": [],
+    "blockedIntentRaise": [],
+    "blockedIntentHandle": []
+  },
+  "shellFeatures": {
+    "appLauncher": true,
+    "workspaceBuilder": true,
+    "channelBar": true,
+    "contextInspector": true,
+    "commandCenter": true,
+    "controlTower": true,
+    "interopFlow": true,
+    "manager": true,
+    "rbacPanel": true,
+    "appDirectoryEditor": true,
+    "bridge": true,
+    "envSwitch": true,
+    "themeToggle": true,
+    "zoomControl": true,
+    "notifications": true,
+    "hotkeyHelp": true,
+    "setupWizard": true,
+    "intelligence": true
+  },
+  "workspace": {
+    "tabs": [
+      {
+        "id": "admin-overview",
+        "name": "Overview",
+        "channelId": "channel-1",
+        "openAppIds": ["market-watch","customer-search","portfolio-view","audit-log"],
+        "activePanelId": "market-watch"
+      },
+      {
+        "id": "admin-diagnostics",
+        "name": "Diagnostics",
+        "channelId": null,
+        "openAppIds": ["fdc3-conformance","theme-toggle"],
+        "activePanelId": "fdc3-conformance"
+      }
+    ]
+  }
+}

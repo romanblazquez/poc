@@ -7,14 +7,26 @@
       "description": "Search and browse customers by name, ID, or segment.",
       "url": "http://localhost:4001",
       "devPort": 4001,
-      "icon": "🔍",
+      "icon": "\ud83d\udd0d",
       "category": "CRM",
-      "initialLayout": { "x": 50, "y": 80, "width": 480, "height": 560 },
-      "listensForContexts": ["fdc3.contact"],
+      "initialLayout": {
+        "x": 50,
+        "y": 80,
+        "width": 480,
+        "height": 560
+      },
+      "listensForContexts": [
+        "fdc3.contact"
+      ],
       "capabilities": {
-        "broadcasts": ["fdc3.contact"],
+        "broadcasts": [
+          "fdc3.contact"
+        ],
         "listensTo": [],
-        "raisesIntents": ["ViewContact", "ViewPortfolio"],
+        "raisesIntents": [
+          "ViewContact",
+          "ViewPortfolio"
+        ],
         "handlesIntents": []
       }
     },
@@ -24,23 +36,40 @@
       "description": "Full customer profile including KYC, accounts, and recent activity.",
       "url": "http://localhost:4002",
       "devPort": 4002,
-      "icon": "👤",
+      "icon": "\ud83d\udc64",
       "category": "CRM",
-      "initialLayout": { "x": 560, "y": 80, "width": 560, "height": 560 },
-      "listensForContexts": ["fdc3.contact"],
+      "initialLayout": {
+        "x": 560,
+        "y": 80,
+        "width": 560,
+        "height": 560
+      },
+      "listensForContexts": [
+        "fdc3.contact"
+      ],
       "intents": [
         {
           "intent": "ViewContact",
-          "contextTypes": ["fdc3.contact"],
+          "contextTypes": [
+            "fdc3.contact"
+          ],
           "appId": "customer-profile",
           "displayName": "View Customer Profile"
         }
       ],
       "capabilities": {
         "broadcasts": [],
-        "listensTo": ["fdc3.contact", "com.demo.theme"],
-        "raisesIntents": ["StartPayment", "ViewPortfolio"],
-        "handlesIntents": ["ViewContact"]
+        "listensTo": [
+          "fdc3.contact",
+          "com.demo.theme"
+        ],
+        "raisesIntents": [
+          "StartPayment",
+          "ViewPortfolio"
+        ],
+        "handlesIntents": [
+          "ViewContact"
+        ]
       }
     },
     {
@@ -49,23 +78,48 @@
       "description": "Live re-marked portfolio positions, P&L, exposure, and discovered instrument actions.",
       "url": "http://localhost:4003",
       "devPort": 4003,
-      "icon": "📊",
+      "icon": "\ud83d\udcca",
       "category": "Investments",
-      "initialLayout": { "x": 1150, "y": 80, "width": 560, "height": 560 },
-      "listensForContexts": ["fdc3.contact", "fdc3.portfolio"],
+      "initialLayout": {
+        "x": 1150,
+        "y": 80,
+        "width": 560,
+        "height": 560
+      },
+      "listensForContexts": [
+        "fdc3.contact",
+        "fdc3.portfolio"
+      ],
       "intents": [
         {
           "intent": "ViewPortfolio",
-          "contextTypes": ["fdc3.contact"],
+          "contextTypes": [
+            "fdc3.contact"
+          ],
           "appId": "portfolio-view",
           "displayName": "View Portfolio"
         }
       ],
       "capabilities": {
-        "broadcasts": ["fdc3.instrument", "fdc3.portfolio"],
-        "listensTo": ["fdc3.contact", "fdc3.portfolio", "com.demo.theme"],
-        "raisesIntents": ["ViewChart", "CreateOrder", "ViewNews", "ViewInstrument", "Allocate"],
-        "handlesIntents": ["ViewPortfolio"]
+        "broadcasts": [
+          "fdc3.instrument",
+          "fdc3.portfolio"
+        ],
+        "listensTo": [
+          "fdc3.contact",
+          "fdc3.portfolio",
+          "com.demo.theme"
+        ],
+        "raisesIntents": [
+          "ViewChart",
+          "CreateOrder",
+          "ViewNews",
+          "ViewInstrument",
+          "Allocate"
+        ],
+        "handlesIntents": [
+          "ViewPortfolio"
+        ]
       }
     },
     {
@@ -74,23 +128,44 @@
       "description": "Live instrument prices with bid/ask, sparklines, flashing cells, and discovered instrument actions.",
       "url": "http://localhost:4004",
       "devPort": 4004,
-      "icon": "📈",
+      "icon": "\ud83d\udcc8",
       "category": "Markets",
-      "initialLayout": { "x": 50, "y": 680, "width": 700, "height": 460 },
-      "listensForContexts": ["fdc3.instrument"],
+      "initialLayout": {
+        "x": 50,
+        "y": 680,
+        "width": 700,
+        "height": 460
+      },
+      "listensForContexts": [
+        "fdc3.instrument"
+      ],
       "intents": [
         {
           "intent": "ViewInstrument",
-          "contextTypes": ["fdc3.instrument"],
+          "contextTypes": [
+            "fdc3.instrument"
+          ],
           "appId": "market-watch",
           "displayName": "View in Market Watch"
         }
       ],
       "capabilities": {
-        "broadcasts": ["fdc3.instrument"],
-        "listensTo": ["fdc3.instrument", "com.demo.theme"],
-        "raisesIntents": ["ViewChart", "CreateOrder", "ViewNews", "ViewOrders"],
-        "handlesIntents": ["ViewInstrument"]
+        "broadcasts": [
+          "fdc3.instrument"
+        ],
+        "listensTo": [
+          "fdc3.instrument",
+          "com.demo.theme"
+        ],
+        "raisesIntents": [
+          "ViewChart",
+          "CreateOrder",
+          "ViewNews",
+          "ViewOrders"
+        ],
+        "handlesIntents": [
+          "ViewInstrument"
+        ]
       }
     },
     {
@@ -99,54 +174,86 @@
       "description": "Initiate and authorise customer payment instructions.",
       "url": "http://localhost:4005",
       "devPort": 4005,
-      "icon": "💳",
+      "icon": "\ud83d\udcb3",
       "category": "Payments",
-      "initialLayout": { "x": 780, "y": 680, "width": 500, "height": 460 },
+      "initialLayout": {
+        "x": 780,
+        "y": 680,
+        "width": 500,
+        "height": 460
+      },
       "listensForContexts": [],
       "intents": [
         {
           "intent": "StartPayment",
-          "contextTypes": ["com.demo.paymentRequest"],
+          "contextTypes": [
+            "com.demo.paymentRequest"
+          ],
           "appId": "payment-action",
           "displayName": "Start Payment"
         }
       ],
       "capabilities": {
         "broadcasts": [],
-        "listensTo": ["com.demo.theme"],
+        "listensTo": [
+          "com.demo.theme"
+        ],
         "raisesIntents": [],
-        "handlesIntents": ["StartPayment"]
+        "handlesIntents": [
+          "StartPayment"
+        ]
       }
     },
     {
       "appId": "order-ticket",
       "title": "Order Ticket",
-      "description": "Equity order ticket — buy/sell, qty, limit/market, TIF, venue. Streams fills via PrivateChannel.",
+      "description": "Equity order ticket \u2014 buy/sell, qty, limit/market, TIF, venue. Streams fills via PrivateChannel.",
       "url": "http://localhost:4006",
       "devPort": 4006,
-      "icon": "🧾",
+      "icon": "\ud83e\uddfe",
       "category": "Trading",
-      "initialLayout": { "x": 200, "y": 80, "width": 520, "height": 720 },
-      "listensForContexts": ["fdc3.instrument", "com.demo.theme"],
+      "initialLayout": {
+        "x": 200,
+        "y": 80,
+        "width": 520,
+        "height": 720
+      },
+      "listensForContexts": [
+        "fdc3.instrument",
+        "com.demo.theme"
+      ],
       "intents": [
         {
           "intent": "CreateOrder",
-          "contextTypes": ["fdc3.instrument"],
+          "contextTypes": [
+            "fdc3.instrument"
+          ],
           "appId": "order-ticket",
           "displayName": "Trade Instrument"
         },
         {
           "intent": "StartOrder",
-          "contextTypes": ["fdc3.instrument"],
+          "contextTypes": [
+            "fdc3.instrument"
+          ],
           "appId": "order-ticket",
           "displayName": "Open Order Ticket"
         }
       ],
       "capabilities": {
-        "broadcasts": ["com.demo.traderOrder", "com.demo.orderStatus"],
-        "listensTo": ["fdc3.instrument", "com.demo.theme"],
+        "broadcasts": [
+          "com.demo.traderOrder",
+          "com.demo.orderStatus"
+        ],
+        "listensTo": [
+          "fdc3.instrument",
+          "com.demo.theme"
+        ],
         "raisesIntents": [],
-        "handlesIntents": ["CreateOrder", "StartOrder"]
+        "handlesIntents": [
+          "CreateOrder",
+          "StartOrder"
+        ]
       }
     },
     {
@@ -155,23 +262,47 @@
       "description": "AG Grid blotter that listens for trader orders and fills, with cancel and view actions.",
       "url": "http://localhost:4007",
       "devPort": 4007,
-      "icon": "🗒",
+      "icon": "\ud83d\uddd2",
       "category": "Trading",
-      "initialLayout": { "x": 740, "y": 80, "width": 1100, "height": 540 },
-      "listensForContexts": ["com.demo.traderOrder", "com.demo.orderStatus", "fdc3.instrument", "com.demo.theme"],
+      "initialLayout": {
+        "x": 740,
+        "y": 80,
+        "width": 1100,
+        "height": 540
+      },
+      "listensForContexts": [
+        "com.demo.traderOrder",
+        "com.demo.orderStatus",
+        "fdc3.instrument",
+        "com.demo.theme"
+      ],
       "intents": [
         {
           "intent": "ViewOrders",
-          "contextTypes": ["fdc3.instrument"],
+          "contextTypes": [
+            "fdc3.instrument"
+          ],
           "appId": "order-blotter",
           "displayName": "View Orders for Instrument"
         }
       ],
       "capabilities": {
-        "broadcasts": ["fdc3.instrument"],
-        "listensTo": ["com.demo.traderOrder", "com.demo.orderStatus", "fdc3.instrument", "com.demo.theme"],
-        "raisesIntents": ["CancelOrder", "ModifyOrder"],
-        "handlesIntents": ["ViewOrders"]
+        "broadcasts": [
+          "fdc3.instrument"
+        ],
+        "listensTo": [
+          "com.demo.traderOrder",
+          "com.demo.orderStatus",
+          "fdc3.instrument",
+          "com.demo.theme"
+        ],
+        "raisesIntents": [
+          "CancelOrder",
+          "ModifyOrder"
+        ],
+        "handlesIntents": [
+          "ViewOrders"
+        ]
       }
     },
     {
@@ -180,23 +311,42 @@
       "description": "Live SVG price chart that listens to fdc3.instrument and handles ViewChart. Trade-this raises CreateOrder.",
       "url": "http://localhost:4008",
       "devPort": 4008,
-      "icon": "📉",
+      "icon": "\ud83d\udcc9",
       "category": "Markets",
-      "initialLayout": { "x": 200, "y": 80, "width": 900, "height": 560 },
-      "listensForContexts": ["fdc3.instrument", "com.demo.orderStatus", "com.demo.theme"],
+      "initialLayout": {
+        "x": 200,
+        "y": 80,
+        "width": 900,
+        "height": 560
+      },
+      "listensForContexts": [
+        "fdc3.instrument",
+        "com.demo.orderStatus",
+        "com.demo.theme"
+      ],
       "intents": [
         {
           "intent": "ViewChart",
-          "contextTypes": ["fdc3.instrument"],
+          "contextTypes": [
+            "fdc3.instrument"
+          ],
           "appId": "chart",
           "displayName": "View Chart"
         }
       ],
       "capabilities": {
         "broadcasts": [],
-        "listensTo": ["fdc3.instrument", "com.demo.orderStatus", "com.demo.theme"],
-        "raisesIntents": ["CreateOrder"],
-        "handlesIntents": ["ViewChart"]
+        "listensTo": [
+          "fdc3.instrument",
+          "com.demo.orderStatus",
+          "com.demo.theme"
+        ],
+        "raisesIntents": [
+          "CreateOrder"
+        ],
+        "handlesIntents": [
+          "ViewChart"
+        ]
       }
     },
     {
@@ -205,23 +355,45 @@
       "description": "Instrument-driven news feed. Per-headline actions are discovered live via findIntentsByContext.",
       "url": "http://localhost:4009",
       "devPort": 4009,
-      "icon": "📰",
+      "icon": "\ud83d\udcf0",
       "category": "Markets",
-      "initialLayout": { "x": 1140, "y": 80, "width": 560, "height": 700 },
-      "listensForContexts": ["fdc3.instrument", "com.demo.theme"],
+      "initialLayout": {
+        "x": 1140,
+        "y": 80,
+        "width": 560,
+        "height": 700
+      },
+      "listensForContexts": [
+        "fdc3.instrument",
+        "com.demo.theme"
+      ],
       "intents": [
         {
           "intent": "ViewNews",
-          "contextTypes": ["fdc3.instrument"],
+          "contextTypes": [
+            "fdc3.instrument"
+          ],
           "appId": "news",
           "displayName": "View Related News"
         }
       ],
       "capabilities": {
-        "broadcasts": ["fdc3.instrument"],
-        "listensTo": ["fdc3.instrument", "com.demo.theme"],
-        "raisesIntents": ["ViewChart", "CreateOrder", "ViewPortfolio", "ViewInstrument"],
-        "handlesIntents": ["ViewNews"]
+        "broadcasts": [
+          "fdc3.instrument"
+        ],
+        "listensTo": [
+          "fdc3.instrument",
+          "com.demo.theme"
+        ],
+        "raisesIntents": [
+          "ViewChart",
+          "CreateOrder",
+          "ViewPortfolio",
+          "ViewInstrument"
+        ],
+        "handlesIntents": [
+          "ViewNews"
+        ]
       }
     },
     {
@@ -230,13 +402,26 @@
       "description": "Request quotes from N venues over a PrivateChannel. Accept routes a TraderOrder to the blotter.",
       "url": "http://localhost:4010",
       "devPort": 4010,
-      "icon": "💱",
+      "icon": "\ud83d\udcb1",
       "category": "Trading",
-      "initialLayout": { "x": 200, "y": 80, "width": 700, "height": 720 },
-      "listensForContexts": ["fdc3.instrument", "com.demo.theme"],
+      "initialLayout": {
+        "x": 200,
+        "y": 80,
+        "width": 700,
+        "height": 720
+      },
+      "listensForContexts": [
+        "fdc3.instrument",
+        "com.demo.theme"
+      ],
       "capabilities": {
-        "broadcasts": ["com.demo.traderOrder"],
-        "listensTo": ["fdc3.instrument", "com.demo.theme"],
+        "broadcasts": [
+          "com.demo.traderOrder"
+        ],
+        "listensTo": [
+          "fdc3.instrument",
+          "com.demo.theme"
+        ],
         "raisesIntents": [],
         "handlesIntents": []
       }
@@ -247,15 +432,36 @@
       "description": "Proof-of-life Angular app built on @fdc3-poc/interop-angular. Same source runs inside the shell, in an FDC3 web host, or as a plain browser tab via BroadcastChannel fallback.",
       "url": "http://localhost:4016",
       "devPort": 4016,
-      "icon": "☁️",
+      "icon": "\u2601\ufe0f",
       "category": "Trading",
-      "initialLayout": { "x": 200, "y": 80, "width": 980, "height": 720 },
-      "listensForContexts": ["fdc3.instrument", "com.demo.traderOrder", "com.demo.theme"],
+      "initialLayout": {
+        "x": 200,
+        "y": 80,
+        "width": 980,
+        "height": 720
+      },
+      "listensForContexts": [
+        "fdc3.instrument",
+        "com.demo.traderOrder",
+        "com.demo.theme"
+      ],
       "capabilities": {
         "autoWire": false,
-        "broadcasts": ["fdc3.instrument", "com.demo.traderOrder"],
-        "listensTo": ["fdc3.instrument", "com.demo.traderOrder", "com.demo.theme"],
-        "raisesIntents": ["CreateOrder", "ViewChart", "ViewNews", "ViewPortfolio"],
+        "broadcasts": [
+          "fdc3.instrument",
+          "com.demo.traderOrder"
+        ],
+        "listensTo": [
+          "fdc3.instrument",
+          "com.demo.traderOrder",
+          "com.demo.theme"
+        ],
+        "raisesIntents": [
+          "CreateOrder",
+          "ViewChart",
+          "ViewNews",
+          "ViewPortfolio"
+        ],
         "handlesIntents": []
       }
     },
@@ -265,23 +471,42 @@
       "description": "AG Grid allocation monitor for fund weights, drift, risk, and manager ownership.",
       "url": "http://localhost:4011",
       "devPort": 4011,
-      "icon": "▦",
+      "icon": "\u25a6",
       "category": "Funds",
-      "initialLayout": { "x": 930, "y": 80, "width": 780, "height": 620 },
-      "listensForContexts": ["com.demo.theme"],
+      "initialLayout": {
+        "x": 930,
+        "y": 80,
+        "width": 780,
+        "height": 620
+      },
+      "listensForContexts": [
+        "com.demo.theme"
+      ],
       "intents": [
         {
           "intent": "ViewFund",
-          "contextTypes": ["com.demo.fund"],
+          "contextTypes": [
+            "com.demo.fund"
+          ],
           "appId": "funds-allocations",
           "displayName": "View Fund Allocations"
         }
       ],
       "capabilities": {
-        "broadcasts": ["com.demo.fund"],
-        "listensTo": ["com.demo.order", "com.demo.fund", "com.demo.theme"],
-        "raisesIntents": ["ViewFund"],
-        "handlesIntents": ["ViewFund"]
+        "broadcasts": [
+          "com.demo.fund"
+        ],
+        "listensTo": [
+          "com.demo.order",
+          "com.demo.fund",
+          "com.demo.theme"
+        ],
+        "raisesIntents": [
+          "ViewFund"
+        ],
+        "handlesIntents": [
+          "ViewFund"
+        ]
       }
     },
     {
@@ -290,14 +515,30 @@
       "description": "AG Grid blotter for incoming fund orders, filtered by selected fund context.",
       "url": "http://localhost:4012",
       "devPort": 4012,
-      "icon": "≡",
+      "icon": "\u2261",
       "category": "Funds",
-      "initialLayout": { "x": 50, "y": 80, "width": 850, "height": 420 },
-      "listensForContexts": ["com.demo.fund", "com.demo.theme"],
+      "initialLayout": {
+        "x": 50,
+        "y": 80,
+        "width": 850,
+        "height": 420
+      },
+      "listensForContexts": [
+        "com.demo.fund",
+        "com.demo.theme"
+      ],
       "capabilities": {
-        "broadcasts": ["com.demo.order", "com.demo.fund"],
-        "listensTo": ["com.demo.fund", "com.demo.theme"],
-        "raisesIntents": ["ViewOrder"],
+        "broadcasts": [
+          "com.demo.order",
+          "com.demo.fund"
+        ],
+        "listensTo": [
+          "com.demo.fund",
+          "com.demo.theme"
+        ],
+        "raisesIntents": [
+          "ViewOrder"
+        ],
         "handlesIntents": []
       }
     },
@@ -309,13 +550,29 @@
       "devPort": 4013,
       "icon": "!",
       "category": "Funds",
-      "initialLayout": { "x": 50, "y": 530, "width": 850, "height": 420 },
-      "listensForContexts": ["com.demo.fund", "com.demo.order", "com.demo.theme"],
+      "initialLayout": {
+        "x": 50,
+        "y": 530,
+        "width": 850,
+        "height": 420
+      },
+      "listensForContexts": [
+        "com.demo.fund",
+        "com.demo.order",
+        "com.demo.theme"
+      ],
       "capabilities": {
         "broadcasts": [],
-        "listensTo": ["com.demo.order", "com.demo.fund", "com.demo.theme"],
+        "listensTo": [
+          "com.demo.order",
+          "com.demo.fund",
+          "com.demo.theme"
+        ],
         "raisesIntents": [],
-        "handlesIntents": ["OpenAudit", "ViewFund"]
+        "handlesIntents": [
+          "OpenAudit",
+          "ViewFund"
+        ]
       }
     },
     {
@@ -324,47 +581,92 @@
       "description": "Broadcasts workspace theme context so participating apps switch light or dark mode together.",
       "url": "http://localhost:4014",
       "devPort": 4014,
-      "icon": "◐",
+      "icon": "\u25d0",
       "category": "Workspace",
-      "initialLayout": { "x": 930, "y": 730, "width": 360, "height": 220 },
-      "listensForContexts": ["com.demo.theme"],
+      "initialLayout": {
+        "x": 930,
+        "y": 730,
+        "width": 360,
+        "height": 220
+      },
+      "listensForContexts": [
+        "com.demo.theme"
+      ],
       "capabilities": {
-        "broadcasts": ["com.demo.theme"],
-        "listensTo": ["com.demo.theme"],
-        "raisesIntents": ["ApplyTheme"],
-        "handlesIntents": ["ApplyTheme"]
+        "broadcasts": [
+          "com.demo.theme"
+        ],
+        "listensTo": [
+          "com.demo.theme"
+        ],
+        "raisesIntents": [
+          "ApplyTheme"
+        ],
+        "handlesIntents": [
+          "ApplyTheme"
+        ]
       }
     },
     {
       "appId": "fdc3-conformance",
       "title": "FDC3 Conformance Console",
-      "description": "Vanilla web app (no shell dependencies) that discovers the agent via getAgent() and live-tests the standard FDC3 2.0 surface — proves any third-party FDC3 app interoperates here.",
+      "description": "Vanilla web app (no shell dependencies) that discovers the agent via getAgent() and live-tests the standard FDC3 2.0 surface \u2014 proves any third-party FDC3 app interoperates here.",
       "url": "http://localhost:4015",
       "devPort": 4015,
-      "icon": "✓",
+      "icon": "\u2713",
       "category": "Diagnostics",
-      "initialLayout": { "x": 240, "y": 120, "width": 920, "height": 680 },
-      "listensForContexts": ["fdc3.instrument", "fdc3.contact"],
+      "initialLayout": {
+        "x": 240,
+        "y": 120,
+        "width": 920,
+        "height": 680
+      },
+      "listensForContexts": [
+        "fdc3.instrument",
+        "fdc3.contact"
+      ],
       "capabilities": {
-        "broadcasts": ["fdc3.instrument", "fdc3.contact"],
-        "listensTo": ["fdc3.instrument", "fdc3.contact"],
-        "raisesIntents": ["ViewInstrument"],
+        "broadcasts": [
+          "fdc3.instrument",
+          "fdc3.contact"
+        ],
+        "listensTo": [
+          "fdc3.instrument",
+          "fdc3.contact"
+        ],
+        "raisesIntents": [
+          "ViewInstrument"
+        ],
         "handlesIntents": []
       }
     },
     {
       "appId": "external-app",
       "title": "External FDC3 App (slot)",
-      "description": "Drop-in slot for testing ANY external FDC3 app. Swap the url for the app you want to evaluate; if it speaks FDC3 it interoperates with the fleet with no code changes. Default points at the FINOS FDC3 Workbench — a real third-party FDC3 app you can broadcast to / receive from.",
+      "description": "Drop-in slot for testing ANY external FDC3 app. Swap the url for the app you want to evaluate; if it speaks FDC3 it interoperates with the fleet with no code changes. Default points at the FINOS FDC3 Workbench \u2014 a real third-party FDC3 app you can broadcast to / receive from.",
       "url": "https://fdc3.finos.org/toolbox/fdc3-workbench/",
       "devPort": 0,
-      "icon": "🌐",
+      "icon": "\ud83c\udf10",
       "category": "External",
-      "initialLayout": { "x": 220, "y": 140, "width": 1180, "height": 820 },
-      "listensForContexts": ["fdc3.instrument", "fdc3.contact"],
+      "initialLayout": {
+        "x": 220,
+        "y": 140,
+        "width": 1180,
+        "height": 820
+      },
+      "listensForContexts": [
+        "fdc3.instrument",
+        "fdc3.contact"
+      ],
       "capabilities": {
-        "broadcasts": ["fdc3.instrument", "fdc3.contact"],
-        "listensTo": ["fdc3.instrument", "fdc3.contact"],
+        "broadcasts": [
+          "fdc3.instrument",
+          "fdc3.contact"
+        ],
+        "listensTo": [
+          "fdc3.instrument",
+          "fdc3.contact"
+        ],
         "raisesIntents": [],
         "handlesIntents": []
       }
@@ -372,14 +674,39 @@
     {
       "appId": "cloud-sample",
       "title": "Cloud App",
-      "description": "Sample cloud-hosted app loaded directly from a remote URL — demonstrates embedding external web content.",
+      "description": "Sample cloud-hosted app loaded directly from a remote URL \u2014 demonstrates embedding external web content.",
       "url": "https://example.com",
       "devPort": 0,
-      "icon": "☁",
+      "icon": "\u2601",
       "category": "Cloud",
-      "initialLayout": { "x": 200, "y": 200, "width": 1100, "height": 760 },
+      "initialLayout": {
+        "x": 200,
+        "y": 200,
+        "width": 1100,
+        "height": 760
+      },
       "listensForContexts": [],
       "capabilities": {
+        "broadcasts": [],
+        "listensTo": [],
+        "raisesIntents": [],
+        "handlesIntents": []
+      }
+    },
+    {
+      "appId": "distribution-console",
+      "title": "Distribution Console",
+      "description": "Super Admin: push version updates, manage role app access, and monitor connected shells.",
+      "url": "http://127.0.0.1:4476/admin",
+      "devPort": 4476,
+      "icon": "\ud83d\ude80",
+      "iconColor": "#6366f1",
+      "category": "Administration",
+      "roles": [
+        "Admin"
+      ],
+      "capabilities": {
+        "autoWire": false,
         "broadcasts": [],
         "listensTo": [],
         "raisesIntents": [],

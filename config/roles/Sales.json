@@ -1,0 +1,58 @@
+{
+  "_role": "Sales",
+  "_description": "Relationship Manager or Sales coverage. Focused on customer-facing workflows: profile, portfolio, RFQ, and market context.",
+  "apps": [
+    "customer-search",
+    "customer-profile",
+    "portfolio-view",
+    "market-watch",
+    "chart",
+    "news",
+    "rfq-quote",
+    "price-alert-board"
+  ],
+  "rbac": {
+    "allowedChannels": ["channel-1","channel-2","channel-3","channel-4","channel-5","channel-6","channel-7","channel-8"],
+    "blockedApps": ["order-ticket","order-blotter","audit-log","payment-action","funds-allocations","incoming-orders","cloud-trader","compliance-check","fdc3-conformance"],
+    "blockedIntentRaise": ["SendOrder","CreateOrder"],
+    "blockedIntentHandle": ["SendOrder"]
+  },
+  "shellFeatures": {
+    "appLauncher": true,
+    "workspaceBuilder": true,
+    "channelBar": true,
+    "contextInspector": false,
+    "commandCenter": true,
+    "controlTower": false,
+    "interopFlow": false,
+    "manager": false,
+    "rbacPanel": false,
+    "appDirectoryEditor": false,
+    "bridge": false,
+    "envSwitch": false,
+    "themeToggle": true,
+    "zoomControl": true,
+    "notifications": true,
+    "hotkeyHelp": true,
+    "setupWizard": false,
+    "intelligence": false
+  },
+  "workspace": {
+    "tabs": [
+      {
+        "id": "client-view",
+        "name": "Client View",
+        "channelId": "channel-1",
+        "openAppIds": ["customer-search","customer-profile","portfolio-view"],
+        "activePanelId": "customer-search"
+      },
+      {
+        "id": "market-context",
+        "name": "Market Context",
+        "channelId": "channel-2",
+        "openAppIds": ["market-watch","chart","news","rfq-quote"],
+        "activePanelId": "market-watch"
+      }
+    ]
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "_role": "Ops",
+  "_description": "Middle office, operations, or settlement team. Focused on payment processing, order lifecycle, and fund reconciliation.",
+  "apps": [
+    "payment-action",
+    "order-blotter",
+    "incoming-orders",
+    "audit-log",
+    "funds-allocations",
+    "customer-search",
+    "customer-profile"
+  ],
+  "rbac": {
+    "allowedChannels": ["channel-1","channel-2","channel-3","channel-4","channel-5","channel-6","channel-7","channel-8"],
+    "blockedApps": ["order-ticket","market-watch","rfq-quote","chart","news","cloud-trader","portfolio-view","price-alert-board","compliance-check","fdc3-conformance"],
+    "blockedIntentRaise": ["SendOrder","CreateOrder","ViewChart","ViewInstrument"],
+    "blockedIntentHandle": ["SendOrder"]
+  },
+  "shellFeatures": {
+    "appLauncher": true,
+    "workspaceBuilder": false,
+    "channelBar": true,
+    "contextInspector": false,
+    "commandCenter": false,
+    "controlTower": false,
+    "interopFlow": false,
+    "manager": false,
+    "rbacPanel": false,
+    "appDirectoryEditor": false,
+    "bridge": false,
+    "envSwitch": false,
+    "themeToggle": true,
+    "zoomControl": true,
+    "notifications": true,
+    "hotkeyHelp": true,
+    "setupWizard": false,
+    "intelligence": false
+  },
+  "workspace": {
+    "tabs": [
+      {
+        "id": "operations",
+        "name": "Operations",
+        "channelId": "channel-1",
+        "openAppIds": ["incoming-orders","order-blotter","payment-action"],
+        "activePanelId": "incoming-orders"
+      },
+      {
+        "id": "reconciliation",
+        "name": "Reconciliation",
+        "channelId": "channel-2",
+        "openAppIds": ["funds-allocations","audit-log","customer-search"],
+        "activePanelId": "funds-allocations"
+      }
+    ]
+  }
+}

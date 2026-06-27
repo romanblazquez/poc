@@ -1,0 +1,59 @@
+{
+  "_role": "PM",
+  "_description": "Portfolio Manager or Fund Manager. Focused on portfolio construction, fund allocation, and position monitoring.",
+  "apps": [
+    "portfolio-view",
+    "market-watch",
+    "chart",
+    "news",
+    "order-blotter",
+    "rfq-quote",
+    "funds-allocations",
+    "incoming-orders",
+    "customer-profile"
+  ],
+  "rbac": {
+    "allowedChannels": ["channel-1","channel-2","channel-3","channel-4","channel-5","channel-6","channel-7","channel-8"],
+    "blockedApps": ["order-ticket","audit-log","payment-action","customer-search","cloud-trader","compliance-check","price-alert-board","fdc3-conformance"],
+    "blockedIntentRaise": ["SendOrder"],
+    "blockedIntentHandle": ["SendOrder"]
+  },
+  "shellFeatures": {
+    "appLauncher": true,
+    "workspaceBuilder": true,
+    "channelBar": true,
+    "contextInspector": false,
+    "commandCenter": true,
+    "controlTower": false,
+    "interopFlow": false,
+    "manager": false,
+    "rbacPanel": false,
+    "appDirectoryEditor": false,
+    "bridge": false,
+    "envSwitch": false,
+    "themeToggle": true,
+    "zoomControl": true,
+    "notifications": true,
+    "hotkeyHelp": true,
+    "setupWizard": false,
+    "intelligence": false
+  },
+  "workspace": {
+    "tabs": [
+      {
+        "id": "portfolio",
+        "name": "Portfolio",
+        "channelId": "channel-1",
+        "openAppIds": ["portfolio-view","funds-allocations","incoming-orders"],
+        "activePanelId": "portfolio-view"
+      },
+      {
+        "id": "market-analysis",
+        "name": "Market Analysis",
+        "channelId": "channel-2",
+        "openAppIds": ["market-watch","chart","news","rfq-quote"],
+        "activePanelId": "market-watch"
+      }
+    ]
+  }
+}

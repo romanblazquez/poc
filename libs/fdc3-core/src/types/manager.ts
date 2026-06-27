@@ -84,6 +84,19 @@ export interface ManagerStatus {
     fetchedAt: number;
     appCount: number;
     diff: ManagerDirectoryDiff;
+    /**
+     * When true this update was flagged as mandatory by the distribution admin.
+     * If `mandatoryDeadline` is set and in the future, the renderer shows a
+     * soft dismissable notice. Once the deadline has passed (or if no deadline
+     * is set), a full blocking modal with countdown auto-applies.
+     */
+    mandatory: boolean;
+    mandatoryCountdownSecs: number;
+    /**
+     * ISO-8601 date-time after which the update becomes a hard block.
+     * null means "block immediately" (classic immediate mandatory).
+     */
+    mandatoryDeadline: string | null;
   } | null;
   settings: ManagerSettings;
   /** Identity used for entitlement gating. */

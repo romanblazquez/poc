@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FDC3 Desktop — Distribution Console</title>
+<style>
+  :root {
+    --bg: #0d0e11;
+    --bg2: #13151a;
+    --bg3: #1c1f27;
+    --border: #2a2d38;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --accent: #6366f1;
+    --accent-dim: rgba(99,102,241,0.15);
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.12);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245,158,11,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --blue: #3b82f6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; line-height: 1.5; min-height: 100vh; }
+
+  /* Layout */
+  .topbar { display: flex; align-items: center; gap: 12px; padding: 0 24px; height: 52px; background: var(--bg2); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+  .topbar .logo { font-size: 13px; font-weight: 800; letter-spacing: -0.01em; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .topbar .logo span { color: var(--accent); }
+  .topbar .spacer { flex: 1; }
+  .server-status { display: flex; align-items: center; gap-6px; gap: 6px; font-size: 11px; font-weight: 700; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+  .dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+  .dot.offline { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+  .main { display: grid; grid-template-columns: 1fr 320px; gap: 0; min-height: calc(100vh - 52px); }
+  .content { padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+  .sidebar { border-left: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; background: var(--bg2); }
+
+  /* Headings */
+  h2 { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 12px; }
+
+  /* Push All */
+  .push-all-bar { display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; }
+  .push-all-bar .title { font-size: 13px; font-weight: 700; flex: 1; }
+  .push-all-bar .subtitle { font-size: 11px; color: var(--muted); }
+
+  /* Cards */
+  .roles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+
+  .role-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; transition: border-color .15s; }
+  .role-card:hover { border-color: #3a3d4a; }
+  .role-card.has-update { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-dim); }
+
+  .role-card .card-header { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px 12px; border-bottom: 1px solid var(--border); }
+  .role-icon { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .role-card .role-name { font-size: 14px; font-weight: 800; line-height: 1.2; }
+  .role-card .role-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .role-card .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 700; flex-shrink: 0; margin-left: auto; }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-amber { background: var(--amber-dim); color: var(--amber); }
+  .badge-muted { background: var(--bg3); color: var(--muted); border: 1px solid var(--border); }
+
+  .role-card .card-meta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+  .meta-item { padding: 10px 16px; border-right: 1px solid var(--border); }
+  .meta-item:last-child { border-right: none; }
+  .meta-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 3px; }
+  .meta-value { font-size: 15px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+  .meta-value.version { font-size: 13px; }
+
+  .role-card .card-actions { display: flex; align-items: center; gap: 8px; padding: 10px 14px; }
+  .role-card .card-actions .spacer { flex: 1; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; border: none; cursor: pointer; transition: opacity .12s, background .12s; line-height: 1; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: #4f52e8; }
+  .btn-ghost { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover:not(:disabled) { background: #23262f; }
+  .btn-danger { background: var(--red-dim); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+  .btn-sm { padding: 4px 10px; font-size: 11px; }
+  .btn-push-all { background: var(--accent); color: #fff; padding: 8px 20px; font-size: 13px; }
+  .btn-push-all:hover:not(:disabled) { background: #4f52e8; }
+
+  /* Modal */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+  .modal-backdrop.hidden { display: none; }
+  .modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; width: 480px; max-width: 95vw; }
+  .modal-header { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .modal-title { font-size: 15px; font-weight: 800; flex: 1; }
+  .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+  .close-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 4px; }
+  .close-btn:hover { color: var(--text); }
+
+  /* Form */
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+  .field input, .field select, .field textarea { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; font-family: inherit; padding: 8px 10px; outline: none; transition: border-color .12s; }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* Changelog / sidebar */
+  .changelog { display: flex; flex-direction: column; gap: 8px; }
+  .change-item { padding: 10px 12px; background: var(--bg3); border-radius: 8px; border: 1px solid var(--border); }
+  .change-item .change-header { display: flex; align-items: center; gap-6px; gap: 6px; }
+  .change-version { font-size: 12px; font-weight: 800; color: var(--accent); }
+  .change-role-tag { font-size: 10px; font-weight: 700; background: var(--accent-dim); color: var(--accent); padding: 1px 6px; border-radius: 99px; }
+  .change-date { font-size: 10px; color: var(--muted); margin-left: auto; }
+  .change-notes { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  .clients-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--bg3); border-radius: 8px; border: 1px solid var(--border); }
+  .clients-count { font-size: 20px; font-weight: 800; color: var(--green); font-variant-numeric: tabular-nums; }
+  .clients-label { font-size: 11px; color: var(--muted); }
+
+  /* Toast */
+  .toast-stack { position: fixed; bottom: 20px; right: 20px; z-index: 300; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .toast { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 16px; font-size: 12px; font-weight: 700; max-width: 320px; animation: slide-in .2s ease; pointer-events: auto; }
+  .toast.ok { border-color: var(--green); color: var(--green); }
+  .toast.err { border-color: var(--red); color: var(--red); }
+  @keyframes slide-in { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  .empty-state { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; font-weight: 600; }
+  .env-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+  .env-tab { padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); background: var(--bg3); color: var(--muted); cursor: pointer; transition: all .12s; }
+  .env-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .info-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 11px; }
+  .info-row:last-child { border: none; }
+  .info-row .k { color: var(--muted); font-weight: 600; }
+  .info-row .v { font-weight: 700; color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="logo"><span>FDC3</span> Distribution Console</div>
+  <div class="spacer"></div>
+  <div class="server-status">
+    <div class="dot" id="serverDot"></div>
+    <span id="serverStatusText">Connecting…</span>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: main content -->
+  <div class="content">
+    <!-- Env tabs + push all bar -->
+    <div>
+      <div class="env-tabs">
+        <button class="env-tab active" data-env="dev" onclick="setEnv('dev')">dev</button>
+        <button class="env-tab" data-env="uat" onclick="setEnv('uat')">uat</button>
+        <button class="env-tab" data-env="prod" onclick="setEnv('prod')">prod</button>
+      </div>
+      <div class="push-all-bar">
+        <div>
+          <div class="title">Push to all roles</div>
+          <div class="subtitle" id="globalVersion">Loading…</div>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn btn-push-all" onclick="openPushModal(null)">Push All Roles</button>
+      </div>
+    </div>
+
+    <!-- Role cards -->
+    <div>
+      <h2>Roles</h2>
+      <div class="roles-grid" id="rolesGrid">
+        <div class="empty-state">Loading roles…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: sidebar -->
+  <div class="sidebar">
+    <!-- Server info -->
+    <div>
+      <h2>Server</h2>
+      <div id="serverInfo">
+        <div class="info-row"><span class="k">URL</span><span class="v" id="si-url">—</span></div>
+        <div class="info-row"><span class="k">Global version</span><span class="v" id="si-version">—</span></div>
+        <div class="info-row"><span class="k">Uptime</span><span class="v" id="si-uptime">—</span></div>
+      </div>
+    </div>
+
+    <!-- Connected shells -->
+    <div>
+      <h2>Connected Shells</h2>
+      <div class="clients-row">
+        <div class="clients-count" id="clientCount">—</div>
+        <div>
+          <div class="clients-label">shells listening</div>
+          <div class="clients-label" style="color:var(--green);font-size:10px" id="sseStatus">SSE stream</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Changelog -->
+    <div style="flex:1;min-height:0;display:flex;flex-direction:column;">
+      <h2>Recent Pushes</h2>
+      <div class="changelog" id="changelog">
+        <div class="empty-state">No pushes yet</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Build modal -->
+<div class="modal-backdrop hidden" id="buildModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Build &amp; Publish — <span id="buildModalRole"></span></div>
+      <button class="close-btn" onclick="closeBuildModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">
+        Runs <code style="background:var(--bg3);padding:1px 5px;border-radius:4px">electron-builder</code> for this role,
+        copies artefacts to <code style="background:var(--bg3);padding:1px 5px;border-radius:4px">releases/&lt;role&gt;/&lt;version&gt;/</code>,
+        writes <code style="background:var(--bg3);padding:1px 5px;border-radius:4px">latest.json</code>,
+        and optionally pushes a version notification to all connected shells.
+      </p>
+      <div class="field-row">
+        <div class="field">
+          <label>Version</label>
+          <input type="text" id="buildVersion" placeholder="e.g. 1.2.0" />
+        </div>
+        <div class="field">
+          <label>Environment</label>
+          <select id="buildEnv">
+            <option value="dev">dev</option>
+            <option value="uat">uat</option>
+            <option value="prod" selected>prod</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Release notes</label>
+        <textarea id="buildNotes" placeholder="What's new in this build?"></textarea>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:600;">
+        <input type="checkbox" id="buildAutoPush" style="accent-color:var(--accent);" checked />
+        Notify shells after build (calls /push automatically)
+      </label>
+      <div id="buildStatus" style="margin-top:10px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeBuildModal()">Cancel</button>
+      <button class="btn btn-primary" id="buildConfirmBtn" onclick="confirmBuild()" style="background:var(--green);border-color:var(--green);">⚙ Start Build</button>
+    </div>
+  </div>
+</div>
+
+<!-- Push modal -->
+<div class="modal-backdrop hidden" id="pushModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Push update</div>
+      <button class="close-btn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-row">
+        <div class="field">
+          <label>Role</label>
+          <select id="pushRole">
+            <option value="">All roles</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Environment</label>
+          <select id="pushEnv">
+            <option value="dev">dev</option>
+            <option value="uat">uat</option>
+            <option value="prod">prod</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Version</label>
+        <input type="text" id="pushVersion" placeholder="e.g. 1.2.0" />
+      </div>
+      <div class="field">
+        <label>Release notes</label>
+        <textarea id="pushNotes" placeholder="What changed in this version?"></textarea>
+      </div>
+
+      <!-- Mandatory toggle -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+          <input type="checkbox" id="pushMandatory" style="width:16px;height:16px;accent-color:var(--red);cursor:pointer;" onchange="onMandatoryToggle()" />
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text)">Mandatory update</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Shells show a blocking modal — cannot be dismissed. Auto-applies after countdown.</div>
+          </div>
+        </label>
+        <div id="mandatoryOptions" style="display:none;padding-left:26px;display:none;flex-direction:column;gap:10px;">
+          <div class="field-row">
+            <div class="field">
+              <label>Countdown (seconds)</label>
+              <input type="number" id="pushCountdown" value="60" min="10" max="3600" style="width:120px;" />
+            </div>
+            <div class="field" style="flex:1">
+              <label>Grace period deadline <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+              <input type="datetime-local" id="pushDeadline" style="width:100%;" />
+              <div style="font-size:10px;color:var(--muted);margin-top:3px;">If set: users see a notification with defer option until this date. After: hard block.</div>
+            </div>
+          </div>
+          <div style="padding:10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:6px;font-size:11px;font-weight:700;color:var(--red);">
+            ⚠ Mandatory updates block the app until updated. Without a deadline: immediate hard block. With a deadline: users can defer until that date.
+          </div>
+        </div>
+      </div>
+
+      <div id="pushPreview" style="background:var(--bg3);border-radius:6px;padding:10px;font-size:11px;color:var(--muted);display:none;">
+        Connected shells will be notified within their configured refresh interval.
+        They will show an "Update available" banner requiring operator approval (unless auto-apply is on).
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="pushConfirmBtn" onclick="confirmPush()">Push version</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast stack -->
+<div class="toast-stack" id="toastStack"></div>
+
+<script>
+const BASE = window.location.origin; // http://127.0.0.1:4476
+const TOKEN = 'dev-admin-token'; // match ADMIN_TOKEN env var
+
+let currentEnv = 'dev';
+let manifest = null;
+let roles = [];
+let serverOnline = false;
+
+// ─── Role display metadata ─────────────────────────────────────────────────
+
+const ROLE_META = {
+  Trader:     { icon: '📈', color: '#6366f1', bg: 'rgba(99,102,241,0.12)' },
+  Sales:      { icon: '🤝', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+  PM:         { icon: '📊', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)' },
+  Compliance: { icon: '⚖️',  color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+  Ops:        { icon: '⚙️',  color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
+  Risk:       { icon: '🛡️',  color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+  Admin:      { icon: '🔑', color: '#f97316', bg: 'rgba(249,115,22,0.12)' },
+  ReadOnly:   { icon: '👁️',  color: '#6b7280', bg: 'rgba(107,114,128,0.12)' },
+};
+
+// ─── Fetch helpers ─────────────────────────────────────────────────────────
+
+async function api(path, opts = {}) {
+  const res = await fetch(BASE + path, opts);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function pushVersion(role, env, version, notes, mandatory = false, mandatoryCountdownSecs = 60, mandatoryDeadline = null) {
+  const res = await fetch(`${BASE}/push`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-admin-token': TOKEN },
+    body: JSON.stringify({ role: role || undefined, env, version, notes, mandatory, mandatoryCountdownSecs, mandatoryDeadline }),
+  });
+  return res.json();
+}
+
+// ─── Environment tabs ─────────────────────────────────────────────────────
+
+function setEnv(env) {
+  currentEnv = env;
+  document.querySelectorAll('.env-tab').forEach(t => t.classList.toggle('active', t.dataset.env === env));
+  renderRoles();
+}
+
+// ─── Data loading ──────────────────────────────────────────────────────────
+
+async function loadAll() {
+  try {
+    const [statusData, rolesData, manifestData] = await Promise.all([
+      api('/'),
+      api('/roles'),
+      api('/manifest'),
+    ]);
+    serverOnline = true;
+    manifest = manifestData;
+    roles = rolesData.roles ?? [];
+
+    // Server dot
+    document.getElementById('serverDot').className = 'dot online';
+    document.getElementById('serverStatusText').textContent = 'Server online';
+
+    // Sidebar info
+    document.getElementById('si-url').textContent = BASE;
+    document.getElementById('si-version').textContent = manifest.versions?.global ?? '—';
+    document.getElementById('si-uptime').textContent = formatUptime(statusData.uptime ?? 0);
+    document.getElementById('clientCount').textContent = statusData.connectedClients ?? 0;
+    document.getElementById('globalVersion').textContent =
+      `Global: v${manifest.versions?.global ?? '?'} · ${roles.length} roles · Last updated: ${formatDate(manifest.updatedAt)}`;
+
+    renderRoles();
+    renderChangelog();
+  } catch {
+    serverOnline = false;
+    document.getElementById('serverDot').className = 'dot offline';
+    document.getElementById('serverStatusText').textContent = 'Server offline';
+    document.getElementById('globalVersion').textContent = 'Cannot reach distribution server at ' + BASE;
+  }
+}
+
+// ─── Render roles grid ─────────────────────────────────────────────────────
+
+function renderRoles() {
+  const grid = document.getElementById('rolesGrid');
+  if (!roles.length) { grid.innerHTML = '<div class="empty-state">No roles configured</div>'; return; }
+
+  grid.innerHTML = roles.map(role => {
+    const meta = ROLE_META[role.role] ?? { icon: '•', color: '#6b7280', bg: 'rgba(107,114,128,0.1)' };
+    const version = manifest?.versions?.roles?.[role.role] ?? manifest?.versions?.global ?? '—';
+    const featureCount = Object.values(role.shellFeatures ?? {}).filter(Boolean).length;
+    const totalFeatures = Object.keys(role.shellFeatures ?? {}).length;
+
+    return `
+    <div class="role-card" id="card-${role.role}">
+      <div class="card-header">
+        <div class="role-icon" style="background:${meta.bg}">${meta.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div class="role-name">${role.role}</div>
+          <div class="role-desc">${truncate(role.description, 55)}</div>
+        </div>
+        <div class="badge badge-muted">v${version}</div>
+      </div>
+      <div class="card-meta">
+        <div class="meta-item">
+          <div class="meta-label">Apps</div>
+          <div class="meta-value">${role.appCount}</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Features</div>
+          <div class="meta-value">${featureCount}/${totalFeatures}</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Version</div>
+          <div class="meta-value version" style="color:${meta.color}">${version}</div>
+        </div>
+      </div>
+      <div class="card-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openRoleDetail('${role.role}')">Details</button>
+        <div class="spacer"></div>
+        <button class="btn btn-ghost btn-sm" onclick="openBuildModal('${role.role}')" title="Build & publish installer">⚙ Build</button>
+        <button class="btn btn-primary btn-sm" onclick="openPushModal('${role.role}')">Push</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── Changelog ────────────────────────────────────────────────────────────
+
+function renderChangelog() {
+  const el = document.getElementById('changelog');
+  const log = manifest?.changelog ?? [];
+  if (!log.length) { el.innerHTML = '<div class="empty-state">No pushes yet</div>'; return; }
+
+  el.innerHTML = log.slice(0, 12).map(entry => `
+    <div class="change-item">
+      <div class="change-header">
+        <span class="change-version">v${entry.version}</span>
+        <span class="change-role-tag">${(entry.roles ?? ['*']).join(', ')}</span>
+        ${entry.mandatory ? '<span style="font-size:9px;font-weight:800;background:rgba(239,68,68,0.15);color:var(--red);padding:1px 6px;border-radius:99px;text-transform:uppercase;letter-spacing:0.06em;">mandatory</span>' : ''}
+        <span class="change-date">${formatDate(entry.date)}</span>
+      </div>
+      ${entry.notes ? `<div class="change-notes">${entry.notes}</div>` : ''}
+    </div>`).join('');
+}
+
+// ─── Push modal ────────────────────────────────────────────────────────────
+
+function openPushModal(role) {
+  const modal = document.getElementById('pushModal');
+  modal.classList.remove('hidden');
+
+  // Populate role selector
+  const roleSelect = document.getElementById('pushRole');
+  roleSelect.innerHTML = '<option value="">All roles</option>' +
+    roles.map(r => `<option value="${r.role}" ${r.role === role ? 'selected' : ''}>${r.role}</option>`).join('');
+
+  // Pre-fill env
+  document.getElementById('pushEnv').value = currentEnv;
+
+  // Auto-suggest next patch version
+  const currentVersion = role
+    ? (manifest?.versions?.roles?.[role] ?? manifest?.versions?.global ?? '0.0.0')
+    : (manifest?.versions?.global ?? '0.0.0');
+  const next = bumpPatch(currentVersion);
+  document.getElementById('pushVersion').value = next;
+  document.getElementById('pushNotes').value = '';
+
+  const title = role ? `Push update — ${role}` : 'Push update — All roles';
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('pushPreview').style.display = 'block';
+}
+
+function closeModal() {
+  document.getElementById('pushModal').classList.add('hidden');
+}
+
+function onMandatoryToggle() {
+  const checked = document.getElementById('pushMandatory').checked;
+  document.getElementById('mandatoryOptions').style.display = checked ? 'flex' : 'none';
+  document.getElementById('pushConfirmBtn').style.background = checked ? 'var(--red)' : '';
+  document.getElementById('pushConfirmBtn').textContent = checked ? '⚠ Push Mandatory Update' : 'Push version';
+}
+
+async function confirmPush() {
+  const role = document.getElementById('pushRole').value;
+  const env = document.getElementById('pushEnv').value;
+  const version = document.getElementById('pushVersion').value.trim();
+  const notes = document.getElementById('pushNotes').value.trim();
+  const mandatory = document.getElementById('pushMandatory').checked;
+  const mandatoryCountdownSecs = parseInt(document.getElementById('pushCountdown')?.value ?? '60', 10);
+  const deadlineRaw = document.getElementById('pushDeadline')?.value ?? '';
+  const mandatoryDeadline = mandatory && deadlineRaw ? new Date(deadlineRaw).toISOString() : null;
+
+  if (!version) { toast('Version is required', 'err'); return; }
+
+  const btn = document.getElementById('pushConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Pushing…';
+
+  try {
+    const result = await pushVersion(role || null, env, version, notes, mandatory, mandatoryCountdownSecs, mandatoryDeadline);
+    if (result.ok) {
+      toast(`v${version} pushed${role ? ' to ' + role : ' to all roles'}`, 'ok');
+      closeModal();
+      await loadAll();
+    } else {
+      toast(result.error ?? 'Push failed', 'err');
+    }
+  } catch (e) {
+    toast(e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = mandatory ? '⚠ Push Mandatory Update' : 'Push version';
+  }
+}
+
+// ─── Build trigger ────────────────────────────────────────────────────────
+
+let buildModalRole = null;
+
+function openBuildModal(role) {
+  buildModalRole = role;
+  document.getElementById('buildModalRole').textContent = role;
+  const verEl = document.getElementById('buildVersion');
+  const curVer = manifest?.versions?.roles?.[role] ?? manifest?.versions?.global ?? '0.0.0';
+  verEl.value = bumpPatch(curVer);
+  document.getElementById('buildNotes').value = '';
+  document.getElementById('buildStatus').innerHTML = '';
+  document.getElementById('buildModal').classList.remove('hidden');
+}
+
+function closeBuildModal() {
+  document.getElementById('buildModal').classList.add('hidden');
+  buildModalRole = null;
+}
+
+async function confirmBuild() {
+  const role = buildModalRole;
+  const version = document.getElementById('buildVersion').value.trim();
+  const notes = document.getElementById('buildNotes').value.trim();
+  const env = document.getElementById('buildEnv').value;
+  const autoPush = document.getElementById('buildAutoPush').checked;
+  if (!version) { toast('Version required', 'err'); return; }
+
+  const btn = document.getElementById('buildConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Triggering build…';
+  const statusEl = document.getElementById('buildStatus');
+  statusEl.innerHTML = '<div style="color:var(--amber);font-weight:700;font-size:11px;">⚙ Build started — watch for SSE completion event…</div>';
+
+  try {
+    const res = await fetch(`${BASE}/build`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': TOKEN },
+      body: JSON.stringify({ role, version, env, notes, mandatory: false, push: autoPush }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      statusEl.innerHTML = `<div style="color:var(--green);font-weight:700;font-size:11px;">✓ Build ${data.buildId} queued. SSE will notify on completion.</div>`;
+      toast(`Build started for ${role} v${version}`, 'ok');
+    } else {
+      statusEl.innerHTML = `<div style="color:var(--red);font-size:11px;">${data.error ?? 'Build failed'}</div>`;
+      toast(data.error ?? 'Build failed', 'err');
+    }
+  } catch(e) {
+    statusEl.innerHTML = `<div style="color:var(--red);font-size:11px;">${e.message}</div>`;
+    toast(e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Start Build';
+  }
+}
+
+// ─── Role detail (opens in sidebar — simple alert for now) ────────────────
+
+async function openRoleDetail(role) {
+  try {
+    const cfg = await api(`/roles/${role}`);
+    const lines = [
+      `Role: ${role}`,
+      `Apps (${cfg.apps?.length ?? 0}): ${(cfg.apps ?? []).join(', ')}`,
+      '',
+      'Shell features ON:',
+      Object.entries(cfg.shellFeatures ?? {}).filter(([,v]) => v).map(([k]) => `  • ${k}`).join('\n'),
+      '',
+      'Shell features OFF:',
+      Object.entries(cfg.shellFeatures ?? {}).filter(([,v]) => !v).map(([k]) => `  • ${k}`).join('\n'),
+    ].join('\n');
+    alert(lines);
+  } catch(e) {
+    toast('Could not load role details', 'err');
+  }
+}
+
+// ─── SSE client count refresh ─────────────────────────────────────────────
+
+function startSseMonitor() {
+  const es = new EventSource(`${BASE}/events`);
+  es.addEventListener('connected', () => {
+    document.getElementById('sseStatus').textContent = 'Admin connected';
+    document.getElementById('sseStatus').style.color = 'var(--green)';
+  });
+  es.addEventListener('update', (e) => {
+    const data = JSON.parse(e.data);
+    toast(`v${data.version} pushed to ${data.role}`, 'ok');
+    loadAll();
+  });
+  es.onerror = () => {
+    document.getElementById('sseStatus').textContent = 'SSE reconnecting…';
+    document.getElementById('sseStatus').style.color = 'var(--amber)';
+  };
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────
+
+function toast(msg, kind = 'ok') {
+  const stack = document.getElementById('toastStack');
+  const el = document.createElement('div');
+  el.className = `toast ${kind}`;
+  el.textContent = msg;
+  stack.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' +
+    d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function formatUptime(secs) {
+  if (secs < 60) return `${secs}s`;
+  if (secs < 3600) return `${Math.floor(secs/60)}m`;
+  return `${Math.floor(secs/3600)}h ${Math.floor((secs%3600)/60)}m`;
+}
+
+function bumpPatch(v) {
+  const parts = String(v).split('.').map(Number);
+  while (parts.length < 3) parts.push(0);
+  parts[2]++;
+  return parts.join('.');
+}
+
+function truncate(str, n) {
+  if (!str) return '';
+  return str.length <= n ? str : str.slice(0, n) + '…';
+}
+
+// Close modal on backdrop click
+document.getElementById('pushModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+document.getElementById('buildModal').addEventListener('click', function(e) {
+  if (e.target === this) closeBuildModal();
+});
+
+// ─── Boot ─────────────────────────────────────────────────────────────────
+
+loadAll();
+setInterval(loadAll, 8000); // refresh every 8s
+startSseMonitor();
+</script>
+</body>
+</html>

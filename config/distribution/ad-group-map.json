@@ -1,0 +1,25 @@
+{
+  "_comment": "Maps Active Directory groups to shell roles. Priority order matters — first match wins when a user is in multiple groups. Edit to match your org's AD schema.",
+  "groupToRole": {
+    "GRP-ITAdmin":           "Admin",
+    "GRP-Traders":           "Trader",
+    "GRP-Sales":             "Sales",
+    "GRP-PortfolioManagers": "PM",
+    "GRP-Compliance":        "Compliance",
+    "GRP-Operations":        "Ops",
+    "GRP-MiddleOffice":      "Ops",
+    "GRP-RiskManagement":    "Risk",
+    "GRP-Auditors":          "ReadOnly"
+  },
+  "priorityOrder": [
+    "GRP-ITAdmin",
+    "GRP-Compliance",
+    "GRP-RiskManagement",
+    "GRP-Auditors",
+    "GRP-Traders",
+    "GRP-PortfolioManagers",
+    "GRP-Sales",
+    "GRP-Operations",
+    "GRP-MiddleOffice"
+  ]
+}

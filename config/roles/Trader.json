@@ -1,0 +1,60 @@
+{
+  "_role": "Trader",
+  "_description": "Flow trader, sales trader, or algo trader. Full trading suite with order entry, blotter, market data, and position management.",
+  "apps": [
+    "market-watch",
+    "order-ticket",
+    "order-blotter",
+    "rfq-quote",
+    "cloud-trader",
+    "chart",
+    "news",
+    "portfolio-view",
+    "customer-profile",
+    "price-alert-board"
+  ],
+  "rbac": {
+    "allowedChannels": ["channel-1","channel-2","channel-3","channel-4","channel-5","channel-6","channel-7","channel-8"],
+    "blockedApps": ["audit-log","payment-action","customer-search","funds-allocations","incoming-orders","compliance-check","fdc3-conformance"],
+    "blockedIntentRaise": [],
+    "blockedIntentHandle": []
+  },
+  "shellFeatures": {
+    "appLauncher": true,
+    "workspaceBuilder": true,
+    "channelBar": true,
+    "contextInspector": true,
+    "commandCenter": true,
+    "controlTower": false,
+    "interopFlow": false,
+    "manager": false,
+    "rbacPanel": false,
+    "appDirectoryEditor": false,
+    "bridge": false,
+    "envSwitch": false,
+    "themeToggle": true,
+    "zoomControl": true,
+    "notifications": true,
+    "hotkeyHelp": true,
+    "setupWizard": false,
+    "intelligence": false
+  },
+  "workspace": {
+    "tabs": [
+      {
+        "id": "trading-desk",
+        "name": "Trading Desk",
+        "channelId": "channel-1",
+        "openAppIds": ["market-watch","order-ticket","order-blotter","chart"],
+        "activePanelId": "market-watch"
+      },
+      {
+        "id": "positions",
+        "name": "Positions",
+        "channelId": "channel-2",
+        "openAppIds": ["portfolio-view","rfq-quote","news"],
+        "activePanelId": "portfolio-view"
+      }
+    ]
+  }
+}

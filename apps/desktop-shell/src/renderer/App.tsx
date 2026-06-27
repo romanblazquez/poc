@@ -29,6 +29,7 @@ import { WorkspaceDashboard } from './components/WorkspaceDashboard.js';
 import { RbacPanel } from './components/RbacPanel.js';
 import { AddAppsDialog } from './components/AddAppsDialog.js';
 import { ShellMenu } from './components/ShellMenu.js';
+import { MandatoryUpdateModal } from './components/MandatoryUpdateModal.js';
 import type { Fdc3Context, LayoutDefinition, UserChannel } from '@fdc3-poc/fdc3-core';
 import { THEMES } from '@fdc3-poc/fdc3-core';
 import type { FlowPolicy, ThemeName } from '@fdc3-poc/fdc3-core';
@@ -314,6 +315,152 @@ export function App() {
   const [hotkeysOpen, setHotkeysOpen] = useState(false);
   const [addAppsOpen, setAddAppsOpen] = useState(false);
   const [layouts, setLayouts] = useState<LayoutDefinition[]>([]);
+
+  // Mandatory update — subscribe to manager status at the root so the blocking
+  // modal / banner can appear regardless of which sidebar panel is active.
+  const [mandatoryUpdate, setMandatoryUpdate] = useState<{
+    version: string | null; label: string | null; appCount: number;
+    mandatoryCountdownSecs: number;
+    mandatoryDeadline: string | null;
+    diff: { addedApps: string[]; removedApps: string[]; changedApps: string[] };
+  } | null>(null);
+
+  type MgrApi = {
+    getStatus(): Promise<unknown | null>;
+    checkUpdates(): Promise<unknown>;
+    applyUpdate(): Promise<{ applied: boolean }>;
+    onStatusChanged(h: (s: unknown) => void): () => void;
+  };
+  type MgrStatus = {
+    available?: {
+      mandatory?: boolean;
+      mandatoryCountdownSecs?: number;
+      mandatoryDeadline?: string | null;
+      version?: string | null;
+      label?: string | null;
+      appCount?: number;
+      diff?: { addedApps: string[]; removedApps: string[]; changedApps: string[] };
+    } | null;
+    settings?: { directoryUrl?: string };
+  } | null;
+
+  const mgrRef = useRef<MgrApi | null>(null);
+
+  useEffect(() => {
+    const mgr = (window as unknown as { shellChrome?: { manager?: MgrApi } }).shellChrome?.manager ?? null;
+    mgrRef.current = mgr;
+    if (!mgr) return;
+
+    type NotifyApi = { raise(i: { title: string; body?: string; severity?: string; ttlMs?: number; sourceTitle?: string; action?: { shellAction?: string; label?: string } }): Promise<string> };
+    const notifyApi = (window as unknown as { notifications?: NotifyApi }).notifications;
+
+    // Persist notified versions in localStorage so refreshes don't re-raise the same alert.
+    const wasNotified = (ver: string) => !!localStorage.getItem(`dist_notified_v${ver}`);
+    const markNotified = (ver: string) => localStorage.setItem(`dist_notified_v${ver}`, '1');
+    const clearNotified = (ver: string) => localStorage.removeItem(`dist_notified_v${ver}`);
+
+    const check = (s: unknown) => {
+      const status = s as MgrStatus;
+      const av = status?.available;
+      if (av?.mandatory) {
+        const ver = av.version ?? 'new';
+        if (notifyApi && !wasNotified(ver)) {
+          markNotified(ver);
+          const deadline = av.mandatoryDeadline;
+          void notifyApi.raise({
+            title: `Mandatory update v${ver} required`,
+            body: deadline
+              ? `Must be applied before ${new Date(deadline).toLocaleDateString()}. App will be blocked after deadline.`
+              : 'Apply now — the app will be locked until this update is installed.',
+            severity: 'error',
+            ttlMs: 0,
+            sourceTitle: 'Distribution Manager',
+            action: { shellAction: 'applyUpdate', label: 'Apply Now' },
+          });
+        }
+        setMandatoryUpdate({
+          version: av.version ?? null,
+          label: av.label ?? null,
+          appCount: av.appCount ?? 0,
+          mandatoryCountdownSecs: av.mandatoryCountdownSecs ?? 60,
+          mandatoryDeadline: av.mandatoryDeadline ?? null,
+          diff: av.diff ?? { addedApps: [], removedApps: [], changedApps: [] },
+        });
+      } else if (av && !av.mandatory) {
+        const ver = av.version ?? 'new';
+        if (notifyApi && !wasNotified(ver)) {
+          markNotified(ver);
+          void notifyApi.raise({
+            title: `Update available: v${ver}`,
+            body: `${av.appCount ?? 0} apps updated. Click to apply immediately.`,
+            severity: 'info',
+            ttlMs: 0,
+            sourceTitle: 'Distribution Manager',
+            action: { shellAction: 'applyUpdate', label: 'Apply Now' },
+          });
+        }
+        setMandatoryUpdate(null);
+      } else {
+        // Update was applied — clear the notification tracking for the current version
+        const appliedVer = (status as { currentVersion?: string })?.currentVersion;
+        if (appliedVer) clearNotified(appliedVer);
+        setMandatoryUpdate(null);
+      }
+    };
+
+    void mgr.getStatus().then(check);
+    return mgr.onStatusChanged(check);
+  }, []);
+
+  // SSE subscription — when the dist server pushes a version event, immediately
+  // trigger checkUpdates() so the mandatory modal fires without waiting for the
+  // next poll interval.
+  useEffect(() => {
+    const mgr = mgrRef.current;
+    if (!mgr) return;
+
+    let es: EventSource | null = null;
+    let connectedOrigin: string | null = null;
+
+    const connect = (directoryUrl: string | null | undefined) => {
+      if (!directoryUrl) return;
+      let origin: string;
+      try { origin = new URL(directoryUrl).origin; } catch { return; }
+      if (origin === connectedOrigin) return;
+      es?.close();
+      connectedOrigin = origin;
+      const src = new EventSource(`${origin}/events`);
+      src.addEventListener('update', () => {
+        void mgr.checkUpdates();
+      });
+      // Build completed — trigger binary shell update check
+      src.addEventListener('build', () => {
+        const updater = (window as unknown as { shellChrome?: { shellUpdater?: { checkForUpdates(): Promise<{ ok: boolean }> } } }).shellChrome?.shellUpdater;
+        void updater?.checkForUpdates();
+      });
+      // Reconnect on error (server restart etc.)
+      src.addEventListener('error', () => {
+        connectedOrigin = null;
+        src.close();
+      });
+      es = src;
+    };
+
+    // Bootstrap from current status
+    void mgr.getStatus().then((s: unknown) => {
+      connect((s as MgrStatus)?.settings?.directoryUrl);
+    });
+
+    // Track URL changes (user switches server in Manager settings)
+    const unsub = mgr.onStatusChanged((s: unknown) => {
+      connect((s as MgrStatus)?.settings?.directoryUrl);
+    });
+
+    return () => {
+      unsub();
+      es?.close();
+    };
+  }, []);
   // Layout editor — ephemeral dockview instance for creating layouts from scratch
   const [layoutEditorPanelIds, setLayoutEditorPanelIds] = useState<string[]>([]);
   const [layoutEditorDockviewLayout, setLayoutEditorDockviewLayout] = useState<unknown | null>(null);
@@ -897,6 +1044,15 @@ const handleDeleteLayout = useCallback(async (id: string) => {
     <div
       className="flex h-screen flex-col bg-background text-foreground"
     >
+      {mandatoryUpdate && (
+        <MandatoryUpdateModal
+          update={mandatoryUpdate}
+          onApply={async () => {
+            await mgrRef.current?.applyUpdate();
+            setMandatoryUpdate(null);
+          }}
+        />
+      )}
       <TopBar
         title={shellManifest?.title ?? 'FDC3 Desktop Shell'}
         subtitle={shellManifest?.subtitle ?? 'TRADER WORKSTATION'}

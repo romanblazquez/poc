@@ -1,0 +1,47 @@
+{
+  "_role": "ReadOnly",
+  "_description": "Auditor, board-level view, or external observer. No trading actions. Read-only across a minimal app set.",
+  "apps": [
+    "market-watch",
+    "portfolio-view",
+    "order-blotter",
+    "news"
+  ],
+  "rbac": {
+    "allowedChannels": [],
+    "blockedApps": ["order-ticket","payment-action","rfq-quote","cloud-trader","funds-allocations","incoming-orders","customer-search","audit-log","chart","customer-profile","price-alert-board","compliance-check","fdc3-conformance"],
+    "blockedIntentRaise": ["SendOrder","CreateOrder","StartPayment","Allocate","ViewChart","StartChat","ViewContact","ViewPortfolio","ViewOrders","ViewNews","ViewInstrument"],
+    "blockedIntentHandle": ["SendOrder","CreateOrder","StartPayment","Allocate"]
+  },
+  "shellFeatures": {
+    "appLauncher": false,
+    "workspaceBuilder": false,
+    "channelBar": false,
+    "contextInspector": false,
+    "commandCenter": false,
+    "controlTower": false,
+    "interopFlow": false,
+    "manager": false,
+    "rbacPanel": false,
+    "appDirectoryEditor": false,
+    "bridge": false,
+    "envSwitch": false,
+    "themeToggle": false,
+    "zoomControl": true,
+    "notifications": true,
+    "hotkeyHelp": false,
+    "setupWizard": false,
+    "intelligence": false
+  },
+  "workspace": {
+    "tabs": [
+      {
+        "id": "readonly-view",
+        "name": "Market Overview",
+        "channelId": null,
+        "openAppIds": ["market-watch","portfolio-view","order-blotter","news"],
+        "activePanelId": "market-watch"
+      }
+    ]
+  }
+}

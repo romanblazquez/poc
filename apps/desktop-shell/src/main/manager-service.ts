@@ -39,6 +39,9 @@ interface AvailableUpdate {
     removedApps: string[];
     changedApps: string[];
   };
+  mandatory: boolean;
+  mandatoryCountdownSecs: number;
+  mandatoryDeadline: string | null;
 }
 
 export class ManagerService {
@@ -124,6 +127,9 @@ export class ManagerService {
             fetchedAt: this.available.fetchedAt,
             appCount: this.available.appCount,
             diff: this.available.diff,
+            mandatory: this.available.mandatory,
+            mandatoryCountdownSecs: this.available.mandatoryCountdownSecs,
+            mandatoryDeadline: this.available.mandatoryDeadline,
           }
         : null,
       settings,
@@ -168,6 +174,8 @@ export class ManagerService {
       this.available = null;
       this.emit();
     } else {
+      const fetchedAny = result.file as AppDirectoryFile & { mandatory?: boolean; mandatoryCountdownSecs?: number; mandatoryDeadline?: string };
+      const isMandatory = fetchedAny.mandatory === true;
       this.available = {
         file: result.file,
         version: result.file.directoryVersion ?? null,
@@ -176,8 +184,12 @@ export class ManagerService {
         fetchedAt: result.fetchedAt,
         appCount: result.file.applications.length,
         diff,
+        mandatory: isMandatory,
+        mandatoryCountdownSecs: fetchedAny.mandatoryCountdownSecs ?? 60,
+        mandatoryDeadline: fetchedAny.mandatoryDeadline ?? null,
       };
-      if (this.settingsStore.get().autoApply) {
+      // mandatory = renderer shows blocking modal with countdown; auto-apply bypasses review silently.
+      if (!isMandatory && this.settingsStore.get().autoApply) {
         const applyResult = this.applyAvailable();
         if (applyResult.applied) {
           for (const l of this.autoApplyListeners) {

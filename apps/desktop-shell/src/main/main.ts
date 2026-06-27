@@ -30,6 +30,8 @@ import { EnvironmentStore } from './environment-store.js';
 import { loadBootstrapConfig } from './bridge-settings.js';
 import { RbacStore } from './rbac-store.js';
 import { LayoutsStore } from './layouts-store.js';
+import { ShellUpdater } from './shell-updater.js';
+import { NotificationStore } from './notification-store.js';
 import { ChannelManager } from '@fdc3-poc/channel-engine';
 import { IntentRegistry } from '@fdc3-poc/intent-engine';
 import type { AppDirectoryFile } from '@fdc3-poc/app-registry';
@@ -94,6 +96,8 @@ async function bootstrap(): Promise<void> {
   const bootstrap = loadBootstrapConfig(configRoot);
 
   const managerService = new ManagerService(initialDirectoryFile, 'local');
+  const notificationStore = new NotificationStore();
+  const shellUpdater = new ShellUpdater(managerService, notificationStore);
   const bridgeService = new BridgeService(configRoot, bootstrap);
   const environmentStore = new EnvironmentStore(configRoot, bootstrap);
   const rbacStore = new RbacStore();
@@ -142,6 +146,8 @@ async function bootstrap(): Promise<void> {
     environmentStore,
     rbacStore,
     layoutsStore,
+    shellUpdater,
+    notificationStore,
   );
   ipcRouter.register();
 

@@ -1,0 +1,92 @@
+{
+  "_role": "Compliance",
+  "_description": "Compliance officer or risk officer. Read-access surveillance tools. Cannot initiate trades or raise SendOrder.",
+  "apps": [
+    "audit-log",
+    "order-blotter",
+    "market-watch",
+    "portfolio-view",
+    "customer-profile",
+    "compliance-check",
+    "news"
+  ],
+  "rbac": {
+    "allowedChannels": [
+      "channel-1",
+      "channel-2",
+      "channel-3",
+      "channel-4",
+      "channel-5",
+      "channel-6",
+      "channel-7",
+      "channel-8"
+    ],
+    "blockedApps": [
+      "order-ticket",
+      "payment-action",
+      "rfq-quote",
+      "cloud-trader",
+      "funds-allocations",
+      "incoming-orders",
+      "customer-search",
+      "price-alert-board",
+      "fdc3-conformance"
+    ],
+    "blockedIntentRaise": [
+      "SendOrder",
+      "CreateOrder",
+      "StartPayment",
+      "Allocate"
+    ],
+    "blockedIntentHandle": [
+      "SendOrder",
+      "CreateOrder"
+    ]
+  },
+  "shellFeatures": {
+    "appLauncher": true,
+    "workspaceBuilder": false,
+    "channelBar": true,
+    "contextInspector": true,
+    "commandCenter": false,
+    "controlTower": true,
+    "interopFlow": true,
+    "manager": false,
+    "rbacPanel": false,
+    "appDirectoryEditor": false,
+    "bridge": false,
+    "envSwitch": false,
+    "themeToggle": false,
+    "zoomControl": true,
+    "notifications": true,
+    "hotkeyHelp": false,
+    "setupWizard": false,
+    "intelligence": true
+  },
+  "workspace": {
+    "tabs": [
+      {
+        "id": "surveillance",
+        "name": "Surveillance",
+        "channelId": "channel-1",
+        "openAppIds": [
+          "audit-log",
+          "order-blotter",
+          "compliance-check"
+        ],
+        "activePanelId": "audit-log"
+      },
+      {
+        "id": "market-monitor",
+        "name": "Market Monitor",
+        "channelId": "channel-2",
+        "openAppIds": [
+          "market-watch",
+          "portfolio-view",
+          "news"
+        ],
+        "activePanelId": "market-watch"
+      }
+    ]
+  }
+}
