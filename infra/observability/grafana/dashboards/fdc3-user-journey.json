@@ -1,0 +1,579 @@
+{
+  "uid": "fdc3-user-journey",
+  "title": "FDC3 Desktop — User Journey & Frontend Performance",
+  "description": "End-to-end user journey across market-watch and FDC3 micro-frontends. Click any trace row or metric series to drill into the full Tempo trace waterfall.",
+  "tags": ["fdc3", "user-journey", "frontend", "otel"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "15s",
+  "time": { "from": "now-1h", "to": "now" },
+
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "custom",
+        "current": { "text": "market-watch", "value": "market-watch" },
+        "options": [
+          { "selected": true,  "text": "market-watch",   "value": "market-watch" },
+          { "selected": false, "text": "obs-sample-api", "value": "obs-sample-api" }
+        ],
+        "query": "market-watch,obs-sample-api",
+        "hide": 0
+      },
+      {
+        "name": "slow_ms",
+        "label": "Slow threshold",
+        "type": "custom",
+        "current": { "text": "200ms", "value": "200ms" },
+        "options": [
+          { "selected": false, "text": "100ms", "value": "100ms" },
+          { "selected": true,  "text": "200ms", "value": "200ms" },
+          { "selected": false, "text": "500ms", "value": "500ms" }
+        ],
+        "query": "100ms,200ms,500ms",
+        "hide": 0
+      }
+    ]
+  },
+
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+
+  "panels": [
+
+    {
+      "id": 1,
+      "title": "UI Interactions (window)",
+      "description": "Ribbon clicks + action button clicks in the selected time window.",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(traces_spanmetrics_calls_total{service_name=\"$service\", span_name=~\"ribbon\\\\.*|ui\\\\.action.*\"}[$__range]))",
+          "legendFormat": "Interactions",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "fixed", "fixedColor": "blue" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        }
+      }
+    },
+
+    {
+      "id": 2,
+      "title": "FDC3 Intents Raised (window)",
+      "description": "Total raiseIntent calls in the selected time window.",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(traces_spanmetrics_calls_total{service_name=\"$service\", span_name=~\"fdc3\\\\.raiseIntent.*\"}[$__range]))",
+          "legendFormat": "Intents",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "fixed", "fixedColor": "purple" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] }
+        }
+      }
+    },
+
+    {
+      "id": 3,
+      "title": "HTTP Error Rate",
+      "description": "Error spans as % of total spans for the selected service.",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "100 * sum(rate(traces_spanmetrics_calls_total{service_name=\"$service\", status_code=\"STATUS_CODE_ERROR\"}[5m])) / sum(rate(traces_spanmetrics_calls_total{service_name=\"$service\"}[5m]))",
+          "legendFormat": "Error %",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red",    "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 4,
+      "title": "P95 Intent Latency",
+      "description": "95th-percentile end-to-end duration for FDC3 intent spans.",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_duration_milliseconds_bucket{service_name=\"$service\", span_name=~\"fdc3.*\"}[5m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "yellow", "value": 150 },
+              { "color": "red",    "value": 500 }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 5,
+      "title": "User Interaction Rate — by Event Type",
+      "description": "Rate of every tracked UI event stacked by type. Ribbon clicks, action buttons, FDC3 broadcasts. Click a series label → open matching traces in Tempo Explore.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (span_name) (rate(traces_spanmetrics_calls_total{service_name=\"$service\", span_name=~\"ribbon\\\\.*|ui\\\\.action.*|fdc3\\\\.broadcast.*\"}[2m]))",
+          "legendFormat": "{{span_name}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max", "sum"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "opacity",
+            "stacking": { "mode": "normal", "group": "A" }
+          },
+          "color": { "mode": "palette-classic" },
+          "links": [
+            {
+              "title": "Open Tempo traces → ${__series.name}",
+              "url": "/explore?orgId=1&left={\"datasource\":\"tempo\",\"queries\":[{\"queryType\":\"traceql\",\"query\":\"{ service.name = \\\"$service\\\" && name = \\\"${__series.name}\\\" }\",\"refId\":\"A\",\"limit\":25}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+              "targetBlank": true
+            }
+          ]
+        }
+      }
+    },
+
+    {
+      "id": 6,
+      "title": "HTTP Request Rate — by Endpoint",
+      "description": "Requests/sec for every HTTP span. FE spans = XHR calls; BE spans = Express route handlers. Click a series → matching traces.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (span_name, service_name) (rate(traces_spanmetrics_calls_total{span_name=~\"HTTP .*\"}[2m]))",
+          "legendFormat": "[{{service_name}}] {{span_name}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "color": { "mode": "palette-classic" },
+          "links": [
+            {
+              "title": "Open traces → ${__series.name}",
+              "url": "/explore?orgId=1&left={\"datasource\":\"tempo\",\"queries\":[{\"queryType\":\"traceql\",\"query\":\"{ name = \\\"${__series.name}\\\" }\",\"refId\":\"A\",\"limit\":20}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+              "targetBlank": true
+            }
+          ]
+        }
+      }
+    },
+
+    {
+      "id": 7,
+      "title": "HTTP Latency — P50 / P95 / P99",
+      "description": "Flat P50 + rising P99 = tail latency. Click the red zone or the legend → open all slow HTTP traces in Tempo.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(traces_spanmetrics_duration_milliseconds_bucket{service_name=\"$service\", span_name=~\"HTTP .*\"}[5m])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_duration_milliseconds_bucket{service_name=\"$service\", span_name=~\"HTTP .*\"}[5m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(traces_spanmetrics_duration_milliseconds_bucket{service_name=\"$service\", span_name=~\"HTTP .*\"}[5m])))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "lineWidth": 2, "fillOpacity": 6 },
+          "color": { "mode": "palette-classic" },
+          "links": [
+            {
+              "title": "Open slow HTTP traces (> $slow_ms)",
+              "url": "/explore?orgId=1&left={\"datasource\":\"tempo\",\"queries\":[{\"queryType\":\"traceql\",\"query\":\"{ name =~ \\\"HTTP .*\\\" && duration > $slow_ms }\",\"refId\":\"A\",\"limit\":20}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+              "targetBlank": true
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "p95" },
+            "properties": [{ "id": "custom.lineWidth", "value": 2.5 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p99" },
+            "properties": [{ "id": "custom.lineStyle", "value": { "dash": [8, 4], "fill": "dash" } }]
+          }
+        ]
+      }
+    },
+
+    {
+      "id": 8,
+      "title": "FDC3 Intent Rate — by Intent Type",
+      "description": "How often each intent is raised. Expected pattern after a row click: ViewChart or ViewInstrument spikes. Click a series → traces for that intent.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (span_name) (rate(traces_spanmetrics_calls_total{service_name=\"$service\", span_name=~\"fdc3\\\\.raiseIntent.*\"}[2m]))",
+          "legendFormat": "{{span_name}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "sum"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "lineWidth": 2, "fillOpacity": 12 },
+          "color": { "mode": "palette-classic" },
+          "links": [
+            {
+              "title": "Open intent traces → ${__series.name}",
+              "url": "/explore?orgId=1&left={\"datasource\":\"tempo\",\"queries\":[{\"queryType\":\"traceql\",\"query\":\"{ service.name = \\\"$service\\\" && name = \\\"${__series.name}\\\" }\",\"refId\":\"A\",\"limit\":20}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+              "targetBlank": true
+            }
+          ]
+        }
+      }
+    },
+
+    {
+      "id": 9,
+      "title": "FDC3 Context Flow — Broadcasts vs Received",
+      "description": "Divergence between broadcast and contextReceived = some apps aren't listening on that channel. Click → FDC3 context traces.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (span_name) (rate(traces_spanmetrics_calls_total{service_name=\"$service\", span_name=~\"fdc3\\\\.broadcast.*\"}[2m]))",
+          "legendFormat": "broadcast / {{span_name}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (span_name) (rate(traces_spanmetrics_calls_total{service_name=\"$service\", span_name=~\"fdc3\\\\.contextReceived.*\"}[2m]))",
+          "legendFormat": "received / {{span_name}}",
+          "refId": "B"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "sum"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "color": { "mode": "palette-classic" },
+          "links": [
+            {
+              "title": "Open FDC3 context traces",
+              "url": "/explore?orgId=1&left={\"datasource\":\"tempo\",\"queries\":[{\"queryType\":\"traceql\",\"query\":\"{ service.name = \\\"$service\\\" && name =~ \\\"fdc3\\\\\\\\.broadcast.*|fdc3\\\\\\\\.contextReceived.*\\\" }\",\"refId\":\"A\",\"limit\":20}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+              "targetBlank": true
+            }
+          ]
+        }
+      }
+    },
+
+    {
+      "id": 10,
+      "title": "User Journey Traces — click any row to open full trace",
+      "description": "All UI interaction + FDC3 traces for the selected service. Click a row → Tempo trace waterfall. Sort by Duration to find slowest user actions.",
+      "type": "traces",
+      "gridPos": { "h": 14, "w": 14, "x": 0, "y": 28 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [
+        {
+          "queryType": "traceql",
+          "query": "{ service.name = \"$service\" && name =~ \"ribbon\\\\.*|ui\\.action.*|fdc3\\.raiseIntent.*|fdc3\\.broadcast.*\" }",
+          "limit": 25,
+          "refId": "A",
+          "tableType": "traces"
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableNodeGraph": true,
+        "sortBy": [{ "displayName": "Duration", "desc": true }]
+      },
+      "fieldConfig": { "defaults": {}, "overrides": [] }
+    },
+
+    {
+      "id": 11,
+      "title": "Slow Spans — duration > $slow_ms",
+      "description": "Every span exceeding the threshold, all services. Click a row → trace waterfall. Use the variable selector to change the threshold.",
+      "type": "traces",
+      "gridPos": { "h": 14, "w": 10, "x": 14, "y": 28 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [
+        {
+          "queryType": "traceql",
+          "query": "{ duration > $slow_ms }",
+          "limit": 20,
+          "refId": "A",
+          "tableType": "traces"
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableNodeGraph": false,
+        "sortBy": [{ "displayName": "Duration", "desc": true }]
+      },
+      "fieldConfig": { "defaults": {}, "overrides": [] }
+    },
+
+    {
+      "id": 12,
+      "title": "HTTP Traces — FE → BE call chain",
+      "description": "All HTTP + navigation spans. Click a row to see the distributed trace: Angular XHR span → W3C traceparent propagation → Express handler span in obs-sample-api — the full request waterfall.",
+      "type": "traces",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 42 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [
+        {
+          "queryType": "traceql",
+          "query": "{ name =~ \"HTTP .*|navigation .*\" }",
+          "limit": 30,
+          "refId": "A",
+          "tableType": "traces"
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableNodeGraph": true,
+        "sortBy": [{ "displayName": "Duration", "desc": true }]
+      },
+      "fieldConfig": { "defaults": {}, "overrides": [] }
+    },
+
+    {
+      "id": 13,
+      "title": "Span Summary — RED metrics by span name",
+      "description": "Rate, Errors, Duration aggregated per span name via Tempo span-metrics → Prometheus. Click a Span Name cell → open all matching traces in Tempo Explore.",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 54 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (span_name) (rate(traces_spanmetrics_calls_total{service_name=\"$service\"}[5m]))",
+          "legendFormat": "{{span_name}}",
+          "refId": "calls",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "expr": "sum by (span_name) (rate(traces_spanmetrics_calls_total{service_name=\"$service\", status_code=\"STATUS_CODE_ERROR\"}[5m]))",
+          "legendFormat": "{{span_name}}",
+          "refId": "errors",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by (span_name, le) (rate(traces_spanmetrics_duration_milliseconds_bucket{service_name=\"$service\"}[5m])))",
+          "legendFormat": "{{span_name}}",
+          "refId": "p50",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (span_name, le) (rate(traces_spanmetrics_duration_milliseconds_bucket{service_name=\"$service\"}[5m])))",
+          "legendFormat": "{{span_name}}",
+          "refId": "p95",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "span_name":    "Span Name",
+              "Value #calls":  "Rate (req/s)",
+              "Value #errors": "Errors (req/s)",
+              "Value #p50":    "P50 (ms)",
+              "Value #p95":    "P95 (ms)"
+            },
+            "excludeByName": { "Time": true }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": { "fields": [{ "desc": true, "displayName": "Rate (req/s)" }] }
+        }
+      ],
+      "options": { "footer": { "show": false }, "showHeader": true, "cellHeight": "sm" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "P95 (ms)" },
+            "properties": [
+              { "id": "unit", "value": "ms" },
+              { "id": "custom.displayMode", "value": "color-background" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green",  "value": null },
+                    { "color": "yellow", "value": 200 },
+                    { "color": "red",    "value": 1000 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Errors (req/s)" },
+            "properties": [
+              { "id": "unit", "value": "reqps" },
+              { "id": "custom.displayMode", "value": "color-background" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "red",   "value": 0.001 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Span Name" },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open traces for ${__value.text}",
+                    "url": "/explore?orgId=1&left={\"datasource\":\"tempo\",\"queries\":[{\"queryType\":\"traceql\",\"query\":\"{ service.name = \\\"$service\\\" && name = \\\"${__value.text}\\\" }\",\"refId\":\"A\",\"limit\":20}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+  ]
+}
