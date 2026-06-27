@@ -14,6 +14,7 @@ import {
   InteropStatusBadgeComponent,
   InteropWorkstationHeaderComponent,
 } from '@fdc3-poc/interop-angular/ui';
+import { TelemetryService, Fdc3TracerService, TrackDirective } from '@fdc3-poc/ngx-telemetry';
 import { MarketDataFeed } from '../../services/market-data-feed';
 import type { MarketRow } from '../../services/market-data-feed';
 
@@ -26,6 +27,7 @@ import type { MarketRow } from '../../services/market-data-feed';
     InteropChannelPickerComponent,
     InteropStatusBadgeComponent,
     InteropWorkstationHeaderComponent,
+    TrackDirective,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './market-watch.component.html',
@@ -135,6 +137,8 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly interop: InteropService,
+    private readonly telemetry: TelemetryService,
+    private readonly fdc3Tracer: Fdc3TracerService,
     private cdr: ChangeDetectorRef,
     private zone: NgZone,
   ) {
@@ -148,6 +152,9 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // Patch window.fdc3 so all broadcasts/intents automatically become OTEL spans.
+    this.fdc3Tracer.attach();
+
     this.unsubFeed = this.feed.subscribe((rows) => {
       this.rows = rows;
       if (this.gridApi) this.gridApi.applyTransactionAsync({ update: rows });
@@ -170,6 +177,7 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.feed.stop();
     this.unsubFeed?.();
+    this.fdc3Tracer.detach();
   }
 
   onGridReady(e: GridReadyEvent<MarketRow>): void {
@@ -265,6 +273,11 @@ export class MarketWatchComponent implements OnInit, OnDestroy {
       btn.title = `Raise ${ai.intent.name}`;
       btn.onclick = (ev) => {
         ev.stopPropagation();   // don't fall through to row-click broadcast
+        this.telemetry.recordEvent('ui.action.clicked', {
+          'fdc3.intent': ai.intent.name,
+          'fdc3.instrument.ticker': row.ticker,
+          'fdc3.instrument.id.ISIN': row.isin,
+        });
         void this.raiseRowIntent(row, ai);
       };
       wrap.appendChild(btn);

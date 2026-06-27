@@ -2,17 +2,15 @@ import { Injectable, inject, OnDestroy } from '@angular/core';
 import { trace, SpanStatusCode, SpanKind, type Span } from '@opentelemetry/api';
 import { NGX_TELEMETRY_CONFIG } from '../telemetry.config';
 
-/** Minimal FDC3 surface needed for instrumentation — avoids a hard dep on @fdc3-poc/fdc3-core. */
+/** Minimal read-only view of window.fdc3 needed for instrumentation checks. */
 interface MinimalFdc3 {
-  raiseIntent(intent: string, context: { type: string; [k: string]: unknown }, ...rest: unknown[]): Promise<unknown>;
-  broadcast(context: { type: string; [k: string]: unknown }): Promise<void>;
-  addContextListener(contextTypeOrHandler: string | ((ctx: unknown, metadata?: unknown) => void), handler?: (ctx: unknown, metadata?: unknown) => void): Promise<unknown>;
+  raiseIntent: (...args: unknown[]) => Promise<unknown>;
+  broadcast: (...args: unknown[]) => Promise<unknown>;
+  addContextListener: (...args: unknown[]) => unknown;
 }
 
-declare global {
-  interface Window {
-    fdc3?: MinimalFdc3;
-  }
+function getWindowFdc3(): MinimalFdc3 | undefined {
+  return (window as unknown as { fdc3?: MinimalFdc3 }).fdc3;
 }
 
 /**
@@ -33,9 +31,8 @@ declare global {
 export class Fdc3TracerService implements OnDestroy {
   private readonly _config = inject(NGX_TELEMETRY_CONFIG);
   private _attached = false;
-  private _originalRaiseIntent?: MinimalFdc3['raiseIntent'];
-  private _originalBroadcast?: MinimalFdc3['broadcast'];
-  private _originalAddContextListener?: MinimalFdc3['addContextListener'];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _originals: Record<string, (...args: any[]) => unknown> = {};
 
   private get _tracer() {
     return trace.getTracer(this._config.serviceName);
@@ -43,9 +40,8 @@ export class Fdc3TracerService implements OnDestroy {
 
   /** Monkey-patches window.fdc3 to add OTEL spans. Safe to call multiple times. */
   attach(): void {
-    if (this._attached || typeof window === 'undefined' || !window.fdc3) return;
+    if (this._attached || typeof window === 'undefined' || !getWindowFdc3()) return;
     this._attached = true;
-
     this._patchRaiseIntent();
     this._patchBroadcast();
     this._patchAddContextListener();
@@ -53,10 +49,14 @@ export class Fdc3TracerService implements OnDestroy {
 
   /** Restores original window.fdc3 methods. */
   detach(): void {
-    if (!this._attached || typeof window === 'undefined' || !window.fdc3) return;
-    if (this._originalRaiseIntent) window.fdc3.raiseIntent = this._originalRaiseIntent;
-    if (this._originalBroadcast) window.fdc3.broadcast = this._originalBroadcast;
-    if (this._originalAddContextListener) window.fdc3.addContextListener = this._originalAddContextListener;
+    if (!this._attached || typeof window === 'undefined') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fdc3 = getWindowFdc3() as any;
+    if (!fdc3) return;
+    for (const key of ['raiseIntent', 'broadcast', 'addContextListener'] as const) {
+      if (this._originals[key]) fdc3[key] = this._originals[key];
+    }
+    this._originals = {};
     this._attached = false;
   }
 
@@ -93,12 +93,13 @@ export class Fdc3TracerService implements OnDestroy {
   }
 
   private _patchRaiseIntent(): void {
-    const fdc3 = window.fdc3!;
-    const original = fdc3.raiseIntent.bind(fdc3);
-    this._originalRaiseIntent = original;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fdc3 = getWindowFdc3() as any;
+    const original = fdc3.raiseIntent.bind(fdc3) as (...args: unknown[]) => Promise<unknown>;
+    this._originals['raiseIntent'] = original;
     const tracer = this._tracer;
 
-    fdc3.raiseIntent = async (intent, ctx, ...rest) => {
+    fdc3.raiseIntent = async (intent: string, ctx: { type?: string }, ...rest: unknown[]) => {
       const span = tracer.startSpan(`fdc3.raiseIntent/${intent}`, {
         kind: SpanKind.CLIENT,
         attributes: {
@@ -121,12 +122,13 @@ export class Fdc3TracerService implements OnDestroy {
   }
 
   private _patchBroadcast(): void {
-    const fdc3 = window.fdc3!;
-    const original = fdc3.broadcast.bind(fdc3);
-    this._originalBroadcast = original;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fdc3 = getWindowFdc3() as any;
+    const original = fdc3.broadcast.bind(fdc3) as (...args: unknown[]) => Promise<unknown>;
+    this._originals['broadcast'] = original;
     const tracer = this._tracer;
 
-    fdc3.broadcast = async (ctx) => {
+    fdc3.broadcast = async (ctx: { type?: string }) => {
       const span = tracer.startSpan(`fdc3.broadcast/${ctx?.type ?? 'unknown'}`, {
         kind: SpanKind.CLIENT,
         attributes: { 'fdc3.context.type': ctx?.type ?? 'unknown' },
@@ -145,9 +147,10 @@ export class Fdc3TracerService implements OnDestroy {
   }
 
   private _patchAddContextListener(): void {
-    const fdc3 = window.fdc3!;
-    const original = fdc3.addContextListener.bind(fdc3);
-    this._originalAddContextListener = original;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fdc3 = getWindowFdc3() as any;
+    const original = fdc3.addContextListener.bind(fdc3) as (...args: unknown[]) => unknown;
+    this._originals['addContextListener'] = original;
     const tracer = this._tracer;
 
     fdc3.addContextListener = (
@@ -176,10 +179,9 @@ export class Fdc3TracerService implements OnDestroy {
         }
       };
 
-      if (typeof contextTypeOrHandler === 'function') {
-        return original(wrappedHandler);
-      }
-      return original(contextTypeOrHandler, wrappedHandler);
+      return typeof contextTypeOrHandler === 'function'
+        ? original(wrappedHandler)
+        : original(contextTypeOrHandler, wrappedHandler);
     };
   }
 }

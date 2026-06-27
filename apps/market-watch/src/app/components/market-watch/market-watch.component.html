@@ -13,6 +13,8 @@
     <span style="color:var(--ws-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700">Gainers</span>
     <div *ngFor="let r of topGainers; trackBy: trackByRow"
          (click)="pickRow(r)"
+         [track]="'ribbon.gainer.click'"
+         [trackData]="{ 'fdc3.instrument.ticker': r.ticker, 'fdc3.instrument.changePct': r.changePct }"
          style="display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;background:rgba(64,192,128,.12);cursor:pointer">
       <strong>{{ r.ticker }}</strong>
       <span style="color:var(--ws-positive);font-weight:700">+{{ r.changePct | number:'1.2-2' }}%</span>
@@ -20,6 +22,8 @@
     <span style="color:var(--ws-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-left:12px">Losers</span>
     <div *ngFor="let r of topLosers; trackBy: trackByRow"
          (click)="pickRow(r)"
+         [track]="'ribbon.loser.click'"
+         [trackData]="{ 'fdc3.instrument.ticker': r.ticker, 'fdc3.instrument.changePct': r.changePct }"
          style="display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;background:rgba(232,64,64,.12);cursor:pointer">
       <strong>{{ r.ticker }}</strong>
       <span style="color:var(--ws-negative);font-weight:700">{{ r.changePct | number:'1.2-2' }}%</span>
