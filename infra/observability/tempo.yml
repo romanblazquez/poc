@@ -18,11 +18,6 @@ compactor:
   compaction:
     block_retention: 48h
 
-# ─── Metrics Generator ──────────────────────────────────────────────────────
-# Generates Prometheus RED metrics from trace data.
-# span-metrics  → calls_total + duration histogram per span name
-# service-graphs → request rate + error rate between services
-# local-blocks  → enables TraceQL metrics queries from Grafana
 metrics_generator:
   registry:
     external_labels:
@@ -38,15 +33,11 @@ metrics_generator:
   processor:
     local_blocks:
       filter_server_spans: false
-      flush_to_storage: true
     service_graphs:
       dimensions:
         - service.name
         - http.method
         - http.status_code
-      peer_attributes:
-        - db.name
-        - messaging.system
     span_metrics:
       dimensions:
         - service.name
@@ -67,12 +58,8 @@ querier:
   frontend_worker:
     frontend_address: 127.0.0.1:9095
 
-# Enable metrics generator for the default (anonymous) tenant
 overrides:
-  defaults:
-    metrics_generator:
-      processors:
-        - local-blocks
-        - service-graphs
-        - span-metrics
-      generate_native_histograms: both
+  metrics_generator_processors:
+    - local-blocks
+    - service-graphs
+    - span-metrics

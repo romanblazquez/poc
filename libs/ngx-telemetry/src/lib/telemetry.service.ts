@@ -15,12 +15,16 @@ export class TelemetryService {
    * Equivalent to GTM's `dataLayer.push({ event: 'name' })`.
    */
   recordEvent(name: string, attributes?: Attributes): void {
+    const startTime = Date.now();
     const span = this._tracer.startSpan(name, {
       kind: SpanKind.CLIENT,
       attributes,
+      startTime,
     });
     span.setStatus({ code: SpanStatusCode.OK });
-    span.end();
+    // End 1ms after start so Tempo records a non-zero durationMs
+    // (zero-duration spans are excluded from Grafana's trace list panel)
+    span.end(startTime + 1);
   }
 
   /**

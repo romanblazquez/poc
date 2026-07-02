@@ -1,37 +1,19 @@
-import {
-  APP_INITIALIZER,
-  EnvironmentProviders,
-  makeEnvironmentProviders,
-} from '@angular/core';
+import { EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
 import { NGX_TELEMETRY_CONFIG, type NgxTelemetryConfig } from './telemetry.config';
-import { telemetryInitializer } from './telemetry.initializer';
+import { initTelemetry } from './telemetry.initializer';
 
 /**
  * Primary standalone setup — add once to your application providers.
  *
+ * OTEL is initialized synchronously here, before Angular's DI machinery runs,
+ * to avoid CJS class-constructor issues with esbuild bundling.
+ *
  * HTTP auto-instrumentation: add telemetryHttpInterceptor to your own
  * provideHttpClient(withInterceptors([telemetryHttpInterceptor])) call.
- *
- * @example
- * // main.ts
- * bootstrapApplication(AppComponent, {
- *   providers: [
- *     provideHttpClient(withInterceptors([telemetryHttpInterceptor])),
- *     provideNgxTelemetry({
- *       serviceName: 'market-watch',
- *       collectorUrl: 'http://localhost:4318',
- *       environment: 'dev',
- *     }),
- *   ],
- * });
  */
 export function provideNgxTelemetry(config: NgxTelemetryConfig): EnvironmentProviders {
+  initTelemetry(config); // runs before Angular DI — avoids esbuild CJS runInitializers issue
   return makeEnvironmentProviders([
     { provide: NGX_TELEMETRY_CONFIG, useValue: config },
-    {
-      provide: APP_INITIALIZER,
-      useFactory: telemetryInitializer,
-      multi: true,
-    },
   ]);
 }

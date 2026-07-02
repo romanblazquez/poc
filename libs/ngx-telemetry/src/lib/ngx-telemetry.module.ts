@@ -1,6 +1,6 @@
-import { NgModule, ModuleWithProviders, APP_INITIALIZER } from '@angular/core';
+import { NgModule, ModuleWithProviders } from '@angular/core';
 import { NGX_TELEMETRY_CONFIG, type NgxTelemetryConfig } from './telemetry.config';
-import { telemetryInitializer } from './telemetry.initializer';
+import { initTelemetry } from './telemetry.initializer';
 import { TrackDirective } from './directives/track.directive';
 
 /**
@@ -19,15 +19,11 @@ import { TrackDirective } from './directives/track.directive';
 })
 export class NgxTelemetryModule {
   static forRoot(config: NgxTelemetryConfig): ModuleWithProviders<NgxTelemetryModule> {
+    initTelemetry(config);
     return {
       ngModule: NgxTelemetryModule,
       providers: [
         { provide: NGX_TELEMETRY_CONFIG, useValue: config },
-        {
-          provide: APP_INITIALIZER,
-          useFactory: telemetryInitializer,
-          multi: true,
-        },
       ],
     };
   }

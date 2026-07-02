@@ -1,7 +1,5 @@
-import { inject } from '@angular/core';
 import { WebTracerProvider } from '@opentelemetry/sdk-trace-web';
 import { BatchSpanProcessor, ConsoleSpanExporter } from '@opentelemetry/sdk-trace-web';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { Resource } from '@opentelemetry/resources';
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { propagation, trace } from '@opentelemetry/api';
@@ -10,7 +8,8 @@ import {
   ATTR_SERVICE_VERSION,
 } from '@opentelemetry/semantic-conventions';
 import { TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-web';
-import { NGX_TELEMETRY_CONFIG, type NgxTelemetryConfig } from './telemetry.config';
+import { type NgxTelemetryConfig } from './telemetry.config';
+import { FetchOtlpExporter } from './fetch-otlp-exporter';
 
 let _provider: WebTracerProvider | null = null;
 
@@ -25,7 +24,7 @@ export function initTelemetry(config: NgxTelemetryConfig): void {
     'deployment.environment': config.environment ?? 'development',
   });
 
-  const exporter = new OTLPTraceExporter({ url: `${collectorUrl}/v1/traces` });
+  const exporter = new FetchOtlpExporter(`${collectorUrl}/v1/traces`);
 
   _provider = new WebTracerProvider({
     resource,
@@ -47,9 +46,4 @@ export function initTelemetry(config: NgxTelemetryConfig): void {
   });
 
   trace.setGlobalTracerProvider(_provider);
-}
-
-export function telemetryInitializer() {
-  const config = inject(NGX_TELEMETRY_CONFIG);
-  return () => initTelemetry(config);
 }

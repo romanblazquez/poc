@@ -96,7 +96,7 @@
       "targets": [
         {
           "queryType": "metrics",
-          "query": "{ name =~ \"fdc3\\.raiseIntent.*\" } | rate() by (name)",
+          "query": "{ name =~ \"fdc3[.]raiseIntent.*\" } | rate() by (name)",
           "refId": "A"
         }
       ],
@@ -122,10 +122,10 @@
       "targets": [
         {
           "queryType": "traceql",
-          "query": "{ duration > 10ms }",
+          "query": "{ duration >= 1ms }",
           "limit": 20,
           "refId": "A",
-          "tableType": "traces"
+          "tableType": "spans"
         }
       ],
       "options": {
