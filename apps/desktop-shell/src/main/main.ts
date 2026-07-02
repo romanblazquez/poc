@@ -20,6 +20,7 @@ import path from 'path';
 import { setupSecurity, configureSession } from './security.js';
 import { AppRegistryLoader } from './app-registry-loader.js';
 import { WindowManager } from './window-manager.js';
+import { injectAppAdapter } from './adapter-injector.js';
 import { IpcRouter } from './ipc-router.js';
 import { WorkspaceManager } from './workspace-manager.js';
 import { ThemeManager } from './theme-manager.js';
@@ -161,8 +162,12 @@ async function bootstrap(): Promise<void> {
   // the first scan fires and emits BRIDGE_STATUS_CHANGED.
   bridgeService.init();
 
-  // Clean up engine state when a window closes
+  // Clean up engine state when a window closes; inject declarative FDC3
+  // adapters into non-FDC3 apps on every page load (windows and webviews).
   app.on('web-contents-created', (_, wc) => {
+    wc.on('did-finish-load', () => {
+      injectAppAdapter(wc, appDefs);
+    });
     wc.on('destroyed', () => {
       ipcRouter.cleanupWindow(wc.id);
     });

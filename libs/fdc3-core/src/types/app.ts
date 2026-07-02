@@ -70,6 +70,65 @@ export interface ImplementationMetadata {
   };
 }
 
+/**
+ * Declarative interop adapter for apps that have no FDC3 code of their own.
+ * The shell injects a small runtime into the app's page that translates DOM
+ * events into FDC3 calls (emit rules) and incoming FDC3 contexts into DOM
+ * updates (listen rules). This lets a plain web app participate in context
+ * sharing and intent routing without modifying its source.
+ */
+export interface AdapterEmitRule {
+  /** DOM trigger — delegated listener, so late-rendered elements still match */
+  on: {
+    /** CSS selector matched via Element.closest() from the event target */
+    selector: string;
+    /** DOM event name, e.g. "click", "dblclick", "change" */
+    event: string;
+  };
+  /** What to do when the trigger fires (default: "broadcast") */
+  action?: 'broadcast' | 'raiseIntent';
+  /** Intent name — required when action is "raiseIntent" */
+  intent?: string;
+  context: {
+    /** FDC3 context type, e.g. "fdc3.instrument" */
+    type: string;
+    /** Static fields merged into every emitted context */
+    template?: Record<string, unknown>;
+    /**
+     * Context field path → element accessor.
+     * Accessors: "dataset.<key>", "textContent", "value", or "attr:<name>".
+     * Example: { "id.ticker": "dataset.ticker", "name": "textContent" }
+     */
+    map?: Record<string, string>;
+  };
+}
+
+export interface AdapterListenStep {
+  /** Context field path to read, e.g. "id.ticker" */
+  from: string;
+  /** CSS selector of the element to update */
+  selector: string;
+  /** How to apply the value (default: "value" — sets input value) */
+  set?: 'value' | 'textContent';
+  /** Event to dispatch on the element after applying, e.g. "input", "change" */
+  thenDispatch?: string;
+}
+
+export interface AdapterListenRule {
+  /** FDC3 context type to subscribe to */
+  contextType: string;
+  apply: AdapterListenStep[];
+  /** CSS selector to click once all steps have been applied (e.g. a submit button) */
+  thenClick?: string;
+}
+
+export interface AppAdapterConfig {
+  /** Set false to keep the config but skip injection */
+  enabled?: boolean;
+  emit?: AdapterEmitRule[];
+  listen?: AdapterListenRule[];
+}
+
 export interface AppDefinition {
   /** Unique, stable identifier */
   appId: string;
@@ -115,4 +174,11 @@ export interface AppDefinition {
    * are a UI surface, not an interop boundary.
    */
   roles?: string[];
+  /**
+   * Declarative interop adapter for non-FDC3 apps. When present (and not
+   * disabled), the shell injects a runtime that bridges the app's DOM to
+   * FDC3 broadcasts/intents according to the rules. The app's declared
+   * `capabilities` should describe what the adapter emits and listens to.
+   */
+  adapter?: AppAdapterConfig;
 }

@@ -111,6 +111,10 @@ export function validateAppDirectory(file: unknown): ValidationResult {
       }
     }
 
+    if (app.adapter !== undefined) {
+      validateAdapter(app.adapter, id, errors);
+    }
+
     if (app.intents !== undefined) {
       if (!Array.isArray(app.intents)) {
         errors.push(`${id}.intents: must be an array if present`);
@@ -132,6 +136,74 @@ export function validateAppDirectory(file: unknown): ValidationResult {
   });
 
   return { valid: errors.length === 0, errors, warnings };
+}
+
+function validateAdapter(adapter: unknown, id: string, errors: string[]): void {
+  if (!adapter || typeof adapter !== 'object') {
+    errors.push(`${id}.adapter: must be an object if present`);
+    return;
+  }
+  const a = adapter as { emit?: unknown; listen?: unknown };
+
+  if (a.emit !== undefined) {
+    if (!Array.isArray(a.emit)) {
+      errors.push(`${id}.adapter.emit: must be an array if present`);
+    } else {
+      a.emit.forEach((rule, i) => {
+        const where = `${id}.adapter.emit[${i}]`;
+        const r = rule as { on?: { selector?: unknown; event?: unknown }; action?: unknown; intent?: unknown; context?: { type?: unknown } };
+        if (!r || typeof r !== 'object') {
+          errors.push(`${where}: not an object`);
+          return;
+        }
+        if (typeof r.on?.selector !== 'string' || !r.on.selector.trim()) {
+          errors.push(`${where}.on.selector: required non-empty string`);
+        }
+        if (typeof r.on?.event !== 'string' || !r.on.event.trim()) {
+          errors.push(`${where}.on.event: required non-empty string`);
+        }
+        if (typeof r.context?.type !== 'string' || !r.context.type.trim()) {
+          errors.push(`${where}.context.type: required non-empty string`);
+        }
+        if (r.action !== undefined && r.action !== 'broadcast' && r.action !== 'raiseIntent') {
+          errors.push(`${where}.action: must be "broadcast" or "raiseIntent"`);
+        }
+        if (r.action === 'raiseIntent' && (typeof r.intent !== 'string' || !r.intent.trim())) {
+          errors.push(`${where}.intent: required when action is "raiseIntent"`);
+        }
+      });
+    }
+  }
+
+  if (a.listen !== undefined) {
+    if (!Array.isArray(a.listen)) {
+      errors.push(`${id}.adapter.listen: must be an array if present`);
+    } else {
+      a.listen.forEach((rule, i) => {
+        const where = `${id}.adapter.listen[${i}]`;
+        const r = rule as { contextType?: unknown; apply?: unknown };
+        if (!r || typeof r !== 'object') {
+          errors.push(`${where}: not an object`);
+          return;
+        }
+        if (typeof r.contextType !== 'string' || !r.contextType.trim()) {
+          errors.push(`${where}.contextType: required non-empty string`);
+        }
+        if (!Array.isArray(r.apply)) {
+          errors.push(`${where}.apply: required array of steps`);
+        } else {
+          (r.apply as Array<{ from?: unknown; selector?: unknown }>).forEach((step, j) => {
+            if (typeof step?.from !== 'string' || !step.from.trim()) {
+              errors.push(`${where}.apply[${j}].from: required non-empty string`);
+            }
+            if (typeof step?.selector !== 'string' || !step.selector.trim()) {
+              errors.push(`${where}.apply[${j}].selector: required non-empty string`);
+            }
+          });
+        }
+      });
+    }
+  }
 }
 
 export function formatValidationResult(result: ValidationResult): string {
