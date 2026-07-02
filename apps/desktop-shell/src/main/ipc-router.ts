@@ -844,9 +844,9 @@ export class IpcRouter {
   private handleRaiseIntent(): void {
     ipcMain.handle(
       IpcEvents.RAISE_INTENT,
-      async (event, { intent, context }: { intent: string; context?: Fdc3Context }) => {
+      async (event, { intent, context, awaitResult }: { intent: string; context?: Fdc3Context; awaitResult?: boolean }) => {
         const senderAppId = this.getAppIdForWebContents(event.sender.id);
-        const expectsCompletion = intent === 'StartPayment';
+        const expectsCompletion = intent === 'StartPayment' || awaitResult === true;
         const requestId = expectsCompletion ? randomUUID() : undefined;
         const parentWindow = BrowserWindow.fromWebContents(event.sender) ?? undefined;
         this.emitActivity({
@@ -1010,6 +1010,14 @@ export class IpcRouter {
 
         const result = await new Promise<Fdc3Context | undefined>((resolve) => {
           this.pendingIntentResults.set(requestId, resolve);
+          // Generic awaitResult callers (glue.interop.invoke) must not hang
+          // forever on a handler that never completes. StartPayment keeps its
+          // original wait-indefinitely semantics.
+          if (awaitResult === true && intent !== 'StartPayment') {
+            setTimeout(() => {
+              if (this.pendingIntentResults.has(requestId)) resolve(undefined);
+            }, 10_000);
+          }
         });
 
         this.pendingIntentResults.delete(requestId);

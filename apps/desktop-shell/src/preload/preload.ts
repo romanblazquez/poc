@@ -19,6 +19,7 @@
 
 import { contextBridge, ipcRenderer, webFrame } from 'electron';
 import { IpcEvents } from '@fdc3-poc/interop-electron-adapter';
+import { exposeGlue42Compat } from './glue42-compat.js';
 import type { AppIntent, AppLogEvent, AppLogLevel, BridgeProfile, BridgeSettings, BridgeStatus, Channel, ChannelDisplayMetadata, ChannelListener, ContextMetadata, Fdc3Context, Fdc3EventHandler, Fdc3EventType, FlowPolicy, ImplementationMetadata, IntentInvocationMetadata, IntentResolution, InteropActivityEvent, InteropSnapshot, NotificationRaiseInput, ShellNotification, PrivateChannel, PrivateChannelEventListener, PrivateChannelMarker, UserChannel, ThemeName } from '@fdc3-poc/fdc3-core';
 import { isPrivateChannelMarker } from '@fdc3-poc/fdc3-core';
 
@@ -1152,6 +1153,12 @@ contextBridge.exposeInMainWorld('fdc3', {
     return ipcRenderer.invoke(IpcEvents.INTENT_RESOLVER_CANCEL) as Promise<void>;
   },
 });
+
+// ─── Glue42 / io.Connect compatibility ──────────────────────────────────────
+// Exposes window.glue (+ factories and the glue42gd marker) mapped onto the
+// same FDC3 IPC, so unmodified Glue42-style apps interoperate with FDC3 apps.
+
+exposeGlue42Compat();
 
 // ─── FDC3 2.0 fdc3Ready ────────────────────────────────────────────────────
 // Apps following the spec do:
