@@ -73,6 +73,8 @@ function AppForm({
   const [draft, setDraft] = useState<AppEntry>(initial);
   const [newIntent, setNewIntent] = useState<IntentDraft>(BLANK_INTENT);
   const [ctxInput, setCtxInput] = useState('');
+  const [broadcastInput, setBroadcastInput] = useState('');
+  const [raisesIntentInput, setRaisesIntentInput] = useState('');
 
   const set = (key: keyof AppEntry, value: string | number) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -115,6 +117,50 @@ function AppForm({
   const removeCtx = (type: string) =>
     setDraft((prev) => ({ ...prev, listensForContexts: (prev.listensForContexts ?? []).filter((t) => t !== type) }));
 
+  const commitBroadcastInput = (raw: string) => {
+    const types = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    if (!types.length) return;
+    setDraft((prev) => ({
+      ...prev,
+      capabilities: {
+        ...prev.capabilities,
+        broadcasts: [...new Set([...(prev.capabilities?.broadcasts ?? []), ...types])],
+      },
+    }));
+    setBroadcastInput('');
+  };
+
+  const removeBroadcast = (type: string) =>
+    setDraft((prev) => ({
+      ...prev,
+      capabilities: {
+        ...prev.capabilities,
+        broadcasts: (prev.capabilities?.broadcasts ?? []).filter((t) => t !== type),
+      },
+    }));
+
+  const commitRaisesIntentInput = (raw: string) => {
+    const names = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    if (!names.length) return;
+    setDraft((prev) => ({
+      ...prev,
+      capabilities: {
+        ...prev.capabilities,
+        raisesIntents: [...new Set([...(prev.capabilities?.raisesIntents ?? []), ...names])],
+      },
+    }));
+    setRaisesIntentInput('');
+  };
+
+  const removeRaisesIntent = (name: string) =>
+    setDraft((prev) => ({
+      ...prev,
+      capabilities: {
+        ...prev.capabilities,
+        raisesIntents: (prev.capabilities?.raisesIntents ?? []).filter((n) => n !== name),
+      },
+    }));
+
   const saveDraft = () => {
     const normalizedIntents = draft.intents?.map((intent) => ({
       ...intent,
@@ -131,6 +177,8 @@ function AppForm({
       capabilities: {
         ...draft.capabilities,
         handlesIntents: normalizedIntents?.map((intent) => intent.intent) ?? [],
+        broadcasts: draft.capabilities?.broadcasts ?? [],
+        raisesIntents: draft.capabilities?.raisesIntents ?? [],
       },
     });
   };
@@ -350,6 +398,126 @@ function AppForm({
               className="h-7 shrink-0 text-xs"
               disabled={!ctxInput.trim()}
               onClick={() => commitCtxInput(ctxInput)}
+            >
+              Add
+            </Button>
+          </div>
+        </div>
+
+        {/* ── Broadcasts contexts ──────────────────────────────────── */}
+        <div className="col-span-2 flex flex-col gap-2">
+          <label className="text-[10px] font-black uppercase tracking-[0.07em] text-muted-foreground">
+            Broadcasts contexts
+            <span className="ml-1 font-normal normal-case text-muted-foreground/60">(outputs — contexts this app produces)</span>
+          </label>
+
+          {(draft.capabilities?.broadcasts ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {(draft.capabilities?.broadcasts ?? []).map((ctx) => (
+                <span
+                  key={ctx}
+                  className="flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 font-mono text-[10px] text-foreground"
+                >
+                  {ctx}
+                  <button
+                    type="button"
+                    onClick={() => removeBroadcast(ctx)}
+                    className="flex h-3 w-3 items-center justify-center rounded-full text-muted-foreground hover:text-destructive"
+                  >
+                    <X size={8} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <select
+              value=""
+              onChange={(e) => { if (e.target.value) { commitBroadcastInput(e.target.value); e.target.value = ''; } }}
+              className="h-7 min-w-0 flex-1 rounded-md border bg-background px-2 font-mono text-xs text-foreground"
+            >
+              <option value="">— Quick add —</option>
+              {STANDARD_CONTEXT_TYPES
+                .filter((t) => !(draft.capabilities?.broadcasts ?? []).includes(t))
+                .map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <Input
+              value={broadcastInput}
+              onChange={(e) => setBroadcastInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); commitBroadcastInput(broadcastInput); }
+              }}
+              placeholder="fdc3.instrument or custom.type"
+              className="h-7 flex-[2] font-mono text-xs"
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 shrink-0 text-xs"
+              disabled={!broadcastInput.trim()}
+              onClick={() => commitBroadcastInput(broadcastInput)}
+            >
+              Add
+            </Button>
+          </div>
+        </div>
+
+        {/* ── Raises intents ───────────────────────────────────────── */}
+        <div className="col-span-2 flex flex-col gap-2">
+          <label className="text-[10px] font-black uppercase tracking-[0.07em] text-muted-foreground">
+            Raises intents
+            <span className="ml-1 font-normal normal-case text-muted-foreground/60">(outputs — intents this app raises)</span>
+          </label>
+
+          {(draft.capabilities?.raisesIntents ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {(draft.capabilities?.raisesIntents ?? []).map((name) => (
+                <span
+                  key={name}
+                  className="flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 font-mono text-[10px] text-foreground"
+                >
+                  {name}
+                  <button
+                    type="button"
+                    onClick={() => removeRaisesIntent(name)}
+                    className="flex h-3 w-3 items-center justify-center rounded-full text-muted-foreground hover:text-destructive"
+                  >
+                    <X size={8} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <select
+              value=""
+              onChange={(e) => { if (e.target.value) { commitRaisesIntentInput(e.target.value); e.target.value = ''; } }}
+              className="h-7 min-w-0 flex-1 rounded-md border bg-background px-2 font-mono text-xs text-foreground"
+            >
+              <option value="">— Quick add —</option>
+              {STANDARD_INTENTS
+                .filter((n) => !(draft.capabilities?.raisesIntents ?? []).includes(n))
+                .map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <Input
+              value={raisesIntentInput}
+              onChange={(e) => setRaisesIntentInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); commitRaisesIntentInput(raisesIntentInput); }
+              }}
+              placeholder="MyCustomIntent"
+              className="h-7 flex-[2] font-mono text-xs"
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 shrink-0 text-xs"
+              disabled={!raisesIntentInput.trim()}
+              onClick={() => commitRaisesIntentInput(raisesIntentInput)}
             >
               Add
             </Button>
