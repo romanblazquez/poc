@@ -1,8 +1,10 @@
 import net from 'net';
-import type { BridgeCandidate, BridgeProfile, BridgeSettings, BridgeStatus, FDC3BootstrapConfig } from '@fdc3-poc/fdc3-core';
+import type { BridgeCandidate, BridgeProfile, BridgeSettings, BridgeStatus, Fdc3Context, FDC3BootstrapConfig } from '@fdc3-poc/fdc3-core';
 import { BridgeSettingsStore, WELL_KNOWN_BRIDGE_PORTS } from './bridge-settings.js';
+import { BridgeTransport, type BridgeInboundBroadcast } from './bridge-transport.js';
 
 type BridgeStatusListener = (status: BridgeStatus) => void;
+type BridgeInboundHandler = (inbound: BridgeInboundBroadcast) => void;
 
 const PROBE_TIMEOUT_MS = 250;
 const MAX_RANGE_SIZE = 32;
@@ -11,16 +13,37 @@ const POLL_INTERVAL_MS = 15_000;
 export class BridgeService {
   private readonly store: BridgeSettingsStore;
   private readonly listeners = new Set<BridgeStatusListener>();
+  private readonly transport: BridgeTransport;
+  private inboundHandler: BridgeInboundHandler | null = null;
   private status: BridgeStatus;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private scanning = false;
 
   constructor(configRoot: string, bootstrap?: FDC3BootstrapConfig) {
     this.store = new BridgeSettingsStore(configRoot, bootstrap);
+    this.transport = new BridgeTransport(
+      (inbound) => this.inboundHandler?.(inbound),
+      () => this.refreshConnectionInfo(),
+    );
     this.status = this.makeStatus('disabled', {
       lastCheckedAt: null,
       notes: this.defaultNotes(),
     });
+  }
+
+  /** IpcRouter registers here to inject inbound bridge contexts locally. */
+  setInboundHandler(handler: BridgeInboundHandler): void {
+    this.inboundHandler = handler;
+  }
+
+  /** Relay a local context broadcast out to the bridge (no-op when not connected). */
+  forwardBroadcast(context: Fdc3Context, channelId: string | null): void {
+    this.transport.forwardBroadcast(context, channelId);
+  }
+
+  private refreshConnectionInfo(): void {
+    this.status = { ...this.status, connection: this.transport.getInfo() };
+    this.emit();
   }
 
   init(): void {
@@ -79,6 +102,7 @@ export class BridgeService {
       this.startPolling();
     } else {
       this.stopPolling();
+      this.transport.disconnect();
     }
     return settings;
   }
@@ -93,14 +117,17 @@ export class BridgeService {
     this.emit();
     if (settings.enabled) {
       this.startPolling();
+      void this.scan();
     } else {
       this.stopPolling();
+      this.transport.disconnect();
     }
     return this.getStatus();
   }
 
   destroy(): void {
     this.stopPolling();
+    this.transport.disconnect();
     this.listeners.clear();
   }
 
@@ -117,6 +144,7 @@ export class BridgeService {
   private async runScan(): Promise<BridgeStatus> {
     const settings = this.store.get();
     if (!settings.enabled) {
+      this.transport.disconnect();
       this.status = this.makeStatus('disabled', {
         lastCheckedAt: Date.now(),
         notes: this.defaultNotes(),
@@ -145,13 +173,21 @@ export class BridgeService {
     try {
       const probed = await Promise.all(targets.map((target) => probeTcp(target.host, target.port)));
       const candidates = probed.filter((candidate): candidate is BridgeCandidate => candidate !== null);
+      const selected = candidates[0] ?? null;
       this.status = this.makeStatus(candidates.length > 0 ? 'available' : 'unavailable', {
         candidates,
-        selected: candidates[0] ?? null,
+        selected,
         lastCheckedAt: Date.now(),
         lastError: candidates.length > 0 ? null : 'No local FINOS Backplane endpoint detected',
         notes: this.defaultNotes(),
       });
+      // "Easy" contract: detection implies connection. As soon as a bridge is
+      // reachable the relay attaches; when it disappears, it detaches.
+      if (selected) {
+        this.transport.connect(selected.endpointUrl);
+      } else {
+        this.transport.disconnect();
+      }
     } catch (error) {
       this.status = this.makeStatus('error', {
         lastCheckedAt: Date.now(),
@@ -202,6 +238,7 @@ export class BridgeService {
       settings,
       candidates: opts.candidates ?? [],
       selected: opts.selected ?? null,
+      connection: this.transport?.getInfo() ?? null,
       lastCheckedAt: opts.lastCheckedAt ?? this.status?.lastCheckedAt ?? null,
       lastError: opts.lastError ?? null,
       notes: opts.notes ?? this.defaultNotes(),
@@ -210,9 +247,9 @@ export class BridgeService {
 
   private defaultNotes(): string[] {
     return [
-      'FINOS Backplane readiness only: scans for a local bridge service on loopback.',
-      'FDC3 Desktop Agent Bridging remains disabled because the official DAB protocol is experimental.',
-      'DesktopAgentBridging stays false in fdc3.getInfo() until a standards-safe DAB implementation is added.',
+      'Scans loopback for a local bridge service and auto-attaches the context relay when one is found.',
+      'The relay speaks a DAB-shaped envelope (handshake / broadcastRequest); context broadcasts flow both ways.',
+      'DesktopAgentBridging stays false in fdc3.getInfo() — the official DAB protocol is still experimental.',
     ];
   }
 
@@ -273,6 +310,7 @@ function cloneStatus(status: BridgeStatus): BridgeStatus {
     settings: { ...status.settings },
     candidates: status.candidates.map((candidate) => ({ ...candidate })),
     selected: status.selected ? { ...status.selected } : null,
+    connection: status.connection ? { ...status.connection, remoteAgents: [...status.connection.remoteAgents] } : null,
     notes: [...status.notes],
   };
 }

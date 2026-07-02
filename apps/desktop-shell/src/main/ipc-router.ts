@@ -164,6 +164,10 @@ export class IpcRouter {
           try { wc.send(IpcEvents.BRIDGE_STATUS_CHANGED, status); } catch { /* defensive */ }
         }
       });
+      // Inbound bridge contexts re-enter the local fabric as broadcasts.
+      this.bridgeService.setInboundHandler((inbound) => {
+        this.broadcastFromBridge(inbound.context, inbound.channelId, inbound.sourceAgent);
+      });
     }
     if (this.shellUpdater) {
       this.shellUpdater.subscribe((status) => {
@@ -720,6 +724,35 @@ export class IpcRouter {
 
   // ─── Context broadcasting ─────────────────────────────────────────────────
 
+  /**
+   * Deliver a context that arrived over the bridge to every local window.
+   * Mirrors handleBroadcast's delivery but never relays back out — the
+   * transport's echo suppression plus this one-way injection prevent loops.
+   */
+  broadcastFromBridge(context: Fdc3Context, channelId: string | null, sourceAgent: string): void {
+    const sourceMetadata = { source: { appId: `bridge:${sourceAgent}` } };
+    this.emitActivity({
+      kind: 'context.broadcasted',
+      status: 'ok',
+      sourceAppId: 'bridge',
+      channelId: channelId ?? undefined,
+      contextType: context.type,
+      message: `${sourceAgent} (bridge) broadcast ${context.type}${channelId ? ` on ${channelId}` : ' globally'}`,
+      payload: context,
+    });
+
+    if (channelId) {
+      this.channelManager.recordBroadcast(channelId, context);
+      for (const targetId of this.channelManager.getWindowsInChannel(channelId)) {
+        this.windowManager.sendTo(targetId, IpcEvents.CONTEXT_UPDATE, context, sourceMetadata);
+      }
+      return;
+    }
+    for (const id of this.windowManager.getAllWebContentsIds()) {
+      this.windowManager.sendTo(id, IpcEvents.CONTEXT_UPDATE, context, sourceMetadata);
+    }
+  }
+
   private handleBroadcast(): void {
     ipcMain.handle(IpcEvents.BROADCAST, (event, context: Fdc3Context) => {
       const senderId = event.sender.id;
@@ -736,6 +769,9 @@ export class IpcRouter {
         message: `${this.appTitle(senderAppId)} broadcast ${context.type}${channelId ? ` on ${channelId}` : ' globally'}`,
         payload: context,
       });
+
+      // Relay to remote desktop agents when the bridge is connected.
+      this.bridgeService?.forwardBroadcast(context, channelId ?? null);
 
       if (!channelId) {
         // No channel: global broadcast to ALL windows except sender

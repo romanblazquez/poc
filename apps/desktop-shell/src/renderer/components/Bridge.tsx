@@ -42,12 +42,22 @@ interface BridgeCandidate {
   latencyMs: number;
 }
 
+interface BridgeConnectionInfo {
+  state: 'disconnected' | 'connecting' | 'connected';
+  endpoint: string | null;
+  agentName: string;
+  remoteAgents: string[];
+  messagesOut: number;
+  messagesIn: number;
+}
+
 interface BridgeStatus {
   state: BridgeStatusState;
   provider: BridgeProvider;
   settings: BridgeSettings;
   candidates: BridgeCandidate[];
   selected: BridgeCandidate | null;
+  connection: BridgeConnectionInfo | null;
   lastCheckedAt: number | null;
   lastError: string | null;
   notes: string[];
@@ -273,7 +283,8 @@ interface MonitorSectionProps {
 
 function MonitorSection({ current, isScanning, busy, onScan }: MonitorSectionProps): JSX.Element {
   const state = current.state;
-  const { selected, candidates, lastCheckedAt, lastError } = current;
+  const { selected, candidates, lastCheckedAt, lastError, connection } = current;
+  const relayConnected = connection?.state === 'connected';
 
   return (
     <>
@@ -292,7 +303,7 @@ function MonitorSection({ current, isScanning, busy, onScan }: MonitorSectionPro
             'text-sm font-black',
             state === 'available' ? 'text-[color:var(--shell-positive)]' : state === 'error' || state === 'unavailable' ? 'text-[color:var(--shell-negative)]' : 'text-foreground',
           )}>
-            {stateLabel(state)}
+            {relayConnected ? 'Connected' : stateLabel(state)}
           </div>
         </div>
 
@@ -323,12 +334,26 @@ function MonitorSection({ current, isScanning, busy, onScan }: MonitorSectionPro
       </div>
 
       {/* ── Connection detail / error banner ──────────────────────────── */}
-      {(state === 'available' && selected) ? (
+      {(relayConnected && connection) ? (
+        <div className="flex shrink-0 items-center gap-3 rounded-lg border border-[color:color-mix(in_srgb,var(--shell-positive)_35%,transparent)] bg-[color:color-mix(in_srgb,var(--shell-positive)_6%,transparent)] px-3 py-2">
+          <CheckCircle2 className="size-4 shrink-0 text-[color:var(--shell-positive)]" />
+          <div className="min-w-0 flex-1 text-[11px] text-muted-foreground">
+            Relay connected as <code className="font-bold text-foreground">{connection.agentName}</code>
+            <span className="ml-2 text-muted-foreground/60">
+              — context broadcasts flow both ways.
+              {connection.remoteAgents.length > 0
+                ? ` Remote agents: ${connection.remoteAgents.join(', ')}.`
+                : ' No remote agents connected yet.'}
+            </span>
+          </div>
+          <Badge variant="success" className="shrink-0">↑ {connection.messagesOut} · ↓ {connection.messagesIn}</Badge>
+        </div>
+      ) : (state === 'available' && selected) ? (
         <div className="flex shrink-0 items-center gap-3 rounded-lg border border-[color:color-mix(in_srgb,var(--shell-positive)_35%,transparent)] bg-[color:color-mix(in_srgb,var(--shell-positive)_6%,transparent)] px-3 py-2">
           <CheckCircle2 className="size-4 shrink-0 text-[color:var(--shell-positive)]" />
           <div className="min-w-0 flex-1 text-[11px] text-muted-foreground">
             TCP endpoint detected · <code className="font-bold text-foreground">{selected.endpointUrl}</code>
-            <span className="ml-2 text-muted-foreground/60">— port is open, WebSocket not verified. Start <code>nx serve backplane-stub</code> to enable full bridging.</span>
+            <span className="ml-2 text-muted-foreground/60">— WebSocket relay attaching…</span>
           </div>
           <Badge variant="success" className="shrink-0">{candidates.length} candidate{candidates.length === 1 ? '' : 's'}</Badge>
         </div>
@@ -336,7 +361,7 @@ function MonitorSection({ current, isScanning, busy, onScan }: MonitorSectionPro
         <div className="flex shrink-0 items-center gap-3 rounded-lg border border-[color:color-mix(in_srgb,var(--shell-negative)_35%,transparent)] bg-[color:color-mix(in_srgb,var(--shell-negative)_6%,transparent)] px-3 py-2">
           <TriangleAlert className="size-4 shrink-0 text-[color:var(--shell-negative)]" />
           <div className="min-w-0 flex-1 text-[11px] text-muted-foreground">
-            {lastError ?? (state === 'unavailable' ? 'No Backplane endpoint found — run nx serve backplane-stub or check Configuration.' : 'Scan error — verify host and port range in Configuration.')}
+            {lastError ?? (state === 'unavailable' ? 'No bridge endpoint found — run npm run bridge:server or check Configuration.' : 'Scan error — verify host and port range in Configuration.')}
           </div>
           <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onScan} className="shrink-0">Retry</Button>
         </div>
@@ -880,7 +905,7 @@ function GuideSection(): JSX.Element {
               <div className="mb-3 text-[11px] font-black uppercase tracking-[0.05em] text-muted-foreground">Infrastructure &amp; shared contracts</div>
               <div className="space-y-0.5">
                 <GuideStep n={5} title="Run a FINOS Backplane instance">
-                  Deploy the FINOS Backplane process on a machine accessible to all participants. For local development, <GuidePill label="nx serve backplane-stub" /> simulates it on <GuidePill label="ws://127.0.0.1:4475" />.
+                  Deploy a bridge relay on a machine accessible to all participants. For local development, <GuidePill label="npm run bridge:server" /> runs one on <GuidePill label="ws://127.0.0.1:4475" />.
                 </GuideStep>
                 <GuideStep n={6} title="Agree on context types and channels">
                   All apps must use the same FDC3 context types (<GuidePill label="fdc3.instrument" />, <GuidePill label="fdc3.contact" />, etc.) and channel names. Custom types need a shared schema.
@@ -1039,6 +1064,7 @@ export function Bridge(): JSX.Element {
     settings: form,
     candidates: [],
     selected: null,
+    connection: null,
     lastCheckedAt: null,
     lastError: null,
     notes: [],
@@ -1054,8 +1080,8 @@ export function Bridge(): JSX.Element {
           title="Desktop Agent Bridge"
           description={
             <>
-              Scans for a <strong>FINOS Backplane</strong> service via TCP probe. A detected port means the address is reachable —
-              a running <code className="text-[10px]">nx serve backplane-stub</code> (or real Backplane) is required for actual WebSocket bridging.
+              Scans for a local <strong>bridge service</strong> and attaches the WebSocket relay automatically — context broadcasts
+              then flow to and from remote desktop agents. Start one with <code className="text-[10px]">npm run bridge:server</code>.
             </>
           }
           meta={<StatusBadge label={stateLabel(current.state)} tone={stateTone(current.state)} />}
